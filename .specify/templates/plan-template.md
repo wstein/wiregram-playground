@@ -31,7 +31,14 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Gates determined based on the project constitution (`.specify/memory/constitution.md`):
+
+- **MUST** comply with core code quality principles: **CLEAN**, **FOCUSED**, **DRY**, **KISS**, **SOLID**.
+- **MUST** follow Test-First discipline: tests for the work MUST be written and observed to FAIL before implementation begins.
+- **MUST** provide documentation in **arc42** Asciidoc format placed under `docs/modules/ROOT/pages` (Antora layout).
+- **MUST** record major decisions as RFCs/ADRs and meeting minutes in `docs/rfc/`, `docs/adr/`, and `docs/minutes/` respectively.
+- **SHOULD** prefer the `.yaml` extension for YAML files when possible and be consistent across the project.
+- **MUST** include explicit performance goals and constraints in the plan's "Performance Goals" and "Constraints" fields.
 
 ## Project Structure
 

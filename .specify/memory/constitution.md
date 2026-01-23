@@ -1,50 +1,64 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: template → 1.0.0
+- Modified principles: Added CLEAN Code Quality; Test-First & Testing Standards; UX Consistency & Accessibility; Language-Agnostic High Performance; Simplicity (FOCUSED/DRY/KISS/SOLID)
+- Added sections: Documentation & Artifacts; Development Workflow
+- Removed sections: none
+- Templates requiring updates:
+  - .specify/templates/plan-template.md ✅ updated
+  - .specify/templates/spec-template.md ✅ updated
+  - .specify/templates/tasks-template.md ✅ updated
+  - .specify/templates/agent-file-template.md ✅ updated
+  - .specify/templates/commands/*.md ⚠ pending (no files found)
+- Follow-up TODOs: none
+-->
+
+# Wiregram Playground Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. CLEAN Code Quality (NON-NEGOTIABLE)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Code MUST be readable, well-structured, and maintainable. Every contribution MUST include clear intent, inline documentation where needed, and pass automated static analysis and lints. Type annotations, consistent formatting, and small, focused functions and modules are REQUIRED. Rationale: Research artifacts must be reproducible and reviewable by peers across languages and time.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Test-First & Testing Standards (NON-NEGOTIABLE)
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+All work MUST follow a Test-First discipline: tests (unit, integration, contract, or acceptance) are written and verified to FAIL before implementation begins. Tests MUST be automated and run in CI on every PR; gate criteria include passing tests and no new high-severity lint findings. Coverage targets are advisory (e.g., 80% for critical modules) but testing MUST prioritize correctness and reproducibility. Rationale: Ensures experimental validity and prevents regressions in research outcomes.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. UX Consistency & Accessibility
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+User-facing APIs, CLIs, UIs, and developer ergonomics MUST be consistent, documented, and language-agnostic where possible. Error messages, schema names, and user journeys MUST follow a documented style guide and be accessible. Rationale: Consistency reduces cognitive load for researchers and external reviewers, improving reproducibility and evaluation.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Language-Agnostic, High Performance & Interoperability
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Designs MUST be language-agnostic: interfaces, contracts, and data schemas MUST be explicit and versioned. Performance requirements MUST be captured in the Plan (p95/p99 targets, resource constraints) and validated with benchmarks. Interoperability (clear JSON/text protocols, schema validations) is REQUIRED for cross-language experiments. Rationale: Research experiments often compare implementations across languages and require objective performance measurements.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Simplicity: FOCUSED, DRY, KISS, SOLID
+
+Prefer the simplest solution that satisfies requirements. Modules MUST be focused, adhere to SOLID principles where applicable, avoid duplication (DRY), and keep designs minimal (KISS). Complex solutions MUST be justified with measurable benefits. Rationale: Simpler designs are easier to reason about, test, and reproduce in an academic setting.
+
+## Documentation & Artifacts
+
+- Architecture documentation MUST follow **arc42** using **Asciidoc** and be stored in the Antora layout at `docs/modules/ROOT/pages`.
+- Major decisions and proposals MUST be recorded as **RFCs** and **ADRs** in `docs/rfc/` and `docs/adr/` respectively; meeting minutes MUST be kept in `docs/minutes/`.
+- Documentation MUST include quickstarts, reproducible experiment steps, and benchmark instructions. Where configuration files are used, prefer the **`.yaml`** extension for consistency.
+
+## Development Workflow
+
+- Branching: feature branches SHOULD follow `feat/` or `research/` prefixes; PRs MUST be small and scoped to a single change or experiment.
+- Reviews: All PRs MUST have at least one approving reviewer; substantial changes (new principles, infra, or API) require two approvers, one of whom MUST be a maintainer or project lead.
+- Gates: CI MUST enforce linting, Test-First evidence (tests included and executed), and that all tests pass before merge. Performance-sensitive changes MUST include benchmarks and performance regression checks.
+- Commits: Use clear, imperative commit messages and reference RFCs/ADRs where relevant.
+- Artifacts: Every experiment or feature MUST include a Plan, Spec, Tasks, Tests, Documentation, and benchmark artifacts when applicable.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- Constitution status: This document is the authoritative source for project principles and governance.
+- Amendments: Proposals to amend the constitution MUST be made as an RFC in `docs/rfc/` and include a migration plan, tests, and PR that updates this file. Amendments require approval by at least **two** maintainers and an explicit version bump.
+- Versioning policy (semantic):
+  - **MAJOR** when principles or governance change in a backward-incompatible way (removal or redefinition of principles).
+  - **MINOR** when new principles or sections are added or materially expanded guidance is introduced.
+  - **PATCH** for clarifications, wording fixes, or non-substantive refinements.
+- Compliance: The project SHOULD perform an annual constitution compliance review and maintain an audit log of governance decisions.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-01-23 | **Last Amended**: 2026-01-23

@@ -113,3 +113,10 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+
+## Documentation & Governance *(mandatory)*
+
+- **Documentation MUST** follow the **arc42** structure using **Asciidoc** and be placed in `docs/modules/ROOT/pages` to align with Antora site layout.
+- **Major architectural decisions MUST** be captured as RFCs and ADRs in `docs/rfc/` and `docs/adr/` and meeting notes in `docs/minutes/`.
+- **YAML files SHOULD** use the `.yaml` extension when possible for consistency.
+- **Tests & acceptance criteria MUST** be present in the "User Scenarios & Testing" section and be independently executable.

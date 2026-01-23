@@ -51,6 +51,8 @@ description: "Task list template for feature implementation"
 - [ ] T001 Create project structure per implementation plan
 - [ ] T002 Initialize [language] project with [framework] dependencies
 - [ ] T003 [P] Configure linting and formatting tools
+- [ ] T003b Create documentation skeletons: `docs/modules/ROOT/pages` (arc42 Asciidoc templates) and directories `docs/rfc/`, `docs/adr/`, `docs/minutes/`.
+- [ ] T003c Configure CI checks: linting, tests-on-PR, enforce Test-First rule (failing tests build check), and a YAML extension consistency check (prefer `.yaml`).
 
 ---
 
