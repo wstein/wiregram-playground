@@ -29,15 +29,29 @@ This research document records the decisions for the MVP technical choices and t
 
 ## Research Tasks (R1–R5)
 
-- R1: Lexer Prototypes (Ruby & Crystal)
+- R1: Lexer Prototypes (Ruby & Crystal) — **IN PROGRESS**
   - Implement minimal regex-based tokenizers for a MiniLang grammar that preserve leading/trailing trivia.
   - Measure tokenization throughput on representative files (small → 1MB) and record artifacts.
-  - Deliverable: `research/lexer-prototype/` with code, micro-benchmarks, and notes.
+  - Deliverable: `research/lexer-prototype/` with code, micro-benchmarks, and notes. (scaffolded)
 
-- R2: RD Parser Prototype
+- R2: RD Parser Prototype — **IN PROGRESS**
   - Implement a small RD parser for MiniLang that demonstrates error recovery, AST + concrete node preservation, and idempotent printing.
   - Tests: round-trip parse → print → parse results equivalence over test corpus.
-  - Deliverable: `research/parser-prototype/` with tests and sample corpora.
+  - Deliverable: `research/parser-prototype/` with tests and sample corpora. (scaffolded)
+
+- R3: Generator Language Evaluation
+  - Build small PoCs: one in Rust and one in Crystal (or hybrid) that generate Ruby and Crystal runtime code for a small grammar.
+  - Compare development ergonomics, binary size, and cross-compilation concerns.
+  - Deliverable: recommendation document: `research/generator-language.md` with tradeoffs.
+
+- R4: Contract & LSP Integration Design
+  - Define testable contracts for LSP interactions, linter report JSON schema, and benchmark artifact schema.
+  - Deliverable: `specs/001-wiregram-framework/contracts/` initial schemas and example messages.
+
+- R5: Benchmark Plan
+  - Define reference hardware, dataset, measurement procedure, warm-up cycles, and artifact storage layout (prefer reproducible builds and metadata capture).
+  - Deliverable: `research/benchmark-plan.md` with commands to reproduce measurements.
+
 
 - R3: Generator Language Evaluation
   - Build small PoCs: one in Rust and one in Crystal (or hybrid) that generate Ruby and Crystal runtime code for a small grammar.
