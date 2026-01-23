@@ -33,8 +33,8 @@ module WireGram
       end
 
       def expect(type)
-        if current_token[:type] == type
-          token = current_token
+        token = current_token
+        if token && token[:type] == type
           advance
           token
         else
@@ -42,15 +42,16 @@ module WireGram
           @errors << { 
             type: :unexpected_token, 
             expected: type, 
-            got: current_token[:type],
-            position: current_token[:position]
+            got: token ? token[:type] : :eof,
+            position: token ? token[:position] : @position
           }
           nil
         end
       end
 
       def at_end?
-        current_token[:type] == :eof
+        token = current_token
+        token.nil? || token[:type] == :eof
       end
 
       # Synchronize after an error - find next safe point

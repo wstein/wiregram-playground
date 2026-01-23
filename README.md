@@ -1,6 +1,6 @@
 # WireGram Playground
 
-A nextgen universal, declarative framework designed to unify the creation of code analysis and transformation tools.
+A next-generation universal, declarative framework designed to unify the creation of code analysis and transformation tools.
 
 ## Overview
 
@@ -27,10 +27,12 @@ The framework provides a unified interface for:
 Define code transformations declaratively:
 ```ruby
 transform do |node|
-  when node.type == :function_call
+  case node.type
+  when :function_call
     optimize_call(node)
-  when node.type == :variable_declaration
+  when :variable_declaration
     validate_naming(node)
+  end
 end
 ```
 
