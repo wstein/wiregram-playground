@@ -1,0 +1,65 @@
+# Inherit from the default RuboCop configuration
+inherit_from:
+  - https://raw.githubusercontent.com/rubocop/rubocop/master/config/default.yml
+
+# Customize some settings
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.0
+  Exclude:
+    - "vendor/**/*"
+    - "tmp/**/*"
+    - "bin/**/*"
+    - "db/**/*"
+    - "node_modules/**/*"
+    - "spec/fixtures/**/*"
+    - "spec/001-wiregram-framework/research/**/*"
+
+# Line length
+Layout/LineLength:
+  Max: 120
+
+# Indentation
+Layout/IndentationWidth:
+  Width: 2
+
+# String literals
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+
+# Frozen string literals
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+# Documentation
+Style/Documentation:
+  Enabled: false
+
+# Block delimiters
+Style/BlockDelimiters:
+  EnforcedStyle: semantic
+
+# Method length
+Metrics/MethodLength:
+  Max: 20
+
+# Class length
+Metrics/ClassLength:
+  Max: 200
+
+# Module length
+Metrics/ModuleLength:
+  Max: 200
+
+# AbcSize
+Metrics/AbcSize:
+  Max: 20
+
+# Cyclomatic complexity
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+# Perceived complexity
+Metrics/PerceivedComplexity:
+  Max: 10
