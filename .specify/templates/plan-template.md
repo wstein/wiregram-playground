@@ -33,7 +33,7 @@
 
 Gates determined based on the project constitution (`.specify/memory/constitution.md`):
 
-- **MUST** comply with core code quality principles: **CLEAN**, **FOCUSED**, **DRY**, **KISS**, **SOLID**.
+- **MUST** comply with core code quality principles: **MODULAR**, **EXTENSIBLE**, **OO-DESIGN**, **FUNCTIONAL-STYLE**, **LANGUAGE-AGNOSTIC**, **HIGH-PERFORMANCE**, **ERROR-TOLERANT**, **ELEGANT**, **ACADEMIC-QUALITY**, **PROFESSIONALLY-DOCUMENTED**, **CLEAN**, **FOCUSED**, **DRY**, **KISS**, **SOLID**.
 - **MUST** follow Test-First discipline: tests for the work MUST be written and observed to FAIL before implementation begins.
 - **MUST** provide documentation in **arc42** Asciidoc format placed under `docs/modules/ROOT/pages` (Antora layout).
 - **MUST** record major decisions as RFCs/ADRs and meeting minutes in `docs/rfc/`, `docs/adr/`, and `docs/minutes/` respectively.
