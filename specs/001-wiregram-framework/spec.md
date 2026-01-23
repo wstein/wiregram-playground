@@ -75,6 +75,7 @@ A researcher runs a benchmark suite for the generated runtime on a representativ
 - **FR-007**: Documentation for the language and generated artifacts MUST be produced in **arc42** Asciidoc form and placed in `docws/modules/ROOT/pages` with quickstarts and benchmark reproduction steps.
 - **FR-008**: The tool MUST provide both a CLI and a library API (language bindings optional) for integration into CI and editor workflows.
 - **FR-009**: Configurations and metadata SHOULD prefer `.yaml` extensions when applicable.
+- **FR-010**: Lexer implementations for Ruby and Crystal MUST use the language's builtin regex engines and explicitly preserve leading/trailing trivia. Parser implementations MUST follow an RD (recursive-descent) design that supports error-tolerant parsing and concrete syntax preservation.
 
 ### Assumptions & Clarifications
 
