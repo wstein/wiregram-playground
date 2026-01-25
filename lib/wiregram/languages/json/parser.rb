@@ -17,6 +17,28 @@ module WireGram
           parse_value
         end
 
+        # Stream parsed nodes as they are built. For arrays, yields each item as it is parsed.
+        def parse_stream
+          # If top-level array, stream each item
+          if current_token && current_token[:type] == :lbracket
+            expect(:lbracket)
+
+            unless current_token[:type] == :rbracket
+              loop do
+                node = parse_value
+                yield(node) if block_given?
+                break if current_token[:type] == :rbracket
+                expect(:comma)
+              end
+            end
+
+            expect(:rbracket)
+          else
+            node = parse_value
+            yield(node) if block_given?
+          end
+        end
+
         private
 
         def parse_value
