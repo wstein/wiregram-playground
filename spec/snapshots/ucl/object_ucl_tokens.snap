@@ -1,0 +1,7 @@
+{type: lbrace, value: "{", position: 0}
+{type: identifier, value: "key", position: 5}
+{type: equals, value: "=", position: 6}
+{type: string, value: "value", position: 15}
+{type: semicolon, value: ";", position: 15}
+{type: rbrace, value: "}", position: 17}
+{type: eof, value: nil, position: 18}

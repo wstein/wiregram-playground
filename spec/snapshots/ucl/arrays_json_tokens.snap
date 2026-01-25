@@ -1,0 +1,10 @@
+{type: lbracket, value: "[", position: 0}
+{type: number, value: 1, position: 2}
+{type: comma, value: ",", position: 2}
+{type: string, value: "hello", position: 11}
+{type: comma, value: ",", position: 11}
+{type: boolean, value: true, position: 17}
+{type: comma, value: ",", position: 17}
+{type: null, value: nil, position: 23}
+{type: rbracket, value: "]", position: 23}
+{type: eof, value: nil, position: 24}

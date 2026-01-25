@@ -1,0 +1,183 @@
+=== INPUT ===
+let x = 42
+let y = x + 1
+let result = (x * y) / 2
+
+
+=== TOKENS ===
+{type: keyword, value: "let", position: 3}
+{type: identifier, value: "x", position: 5}
+{type: equals, value: "=", position: 6}
+{type: number, value: 42, position: 10}
+{type: keyword, value: "let", position: 14}
+{type: identifier, value: "y", position: 16}
+{type: equals, value: "=", position: 17}
+{type: identifier, value: "x", position: 20}
+{type: plus, value: "+", position: 21}
+{type: number, value: 1, position: 24}
+{type: keyword, value: "let", position: 28}
+{type: identifier, value: "result", position: 35}
+{type: equals, value: "=", position: 36}
+{type: lparen, value: "(", position: 38}
+{type: identifier, value: "x", position: 40}
+{type: star, value: "*", position: 41}
+{type: identifier, value: "y", position: 44}
+{type: rparen, value: ")", position: 44}
+{type: slash, value: "/", position: 46}
+{type: number, value: 2, position: 49}
+{type: eof, value: nil, position: 50}
+
+=== AST ===
+{
+  "type": "program",
+  "value": null,
+  "children": [
+    {
+      "type": "assign",
+      "value": null,
+      "children": [
+        {
+          "type": "identifier",
+          "value": "x",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "number",
+          "value": 42,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "assign",
+      "value": null,
+      "children": [
+        {
+          "type": "identifier",
+          "value": "y",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "add",
+          "value": null,
+          "children": [
+            {
+              "type": "identifier",
+              "value": "x",
+              "children": [],
+              "metadata": {}
+            },
+            {
+              "type": "number",
+              "value": 1,
+              "children": [],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "assign",
+      "value": null,
+      "children": [
+        {
+          "type": "identifier",
+          "value": "result",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "divide",
+          "value": null,
+          "children": [
+            {
+              "type": "group",
+              "value": null,
+              "children": [
+                {
+                  "type": "multiply",
+                  "value": null,
+                  "children": [
+                    {
+                      "type": "identifier",
+                      "value": "x",
+                      "children": [],
+                      "metadata": {}
+                    },
+                    {
+                      "type": "identifier",
+                      "value": "y",
+                      "children": [],
+                      "metadata": {}
+                    }
+                  ],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            },
+            {
+              "type": "number",
+              "value": 2,
+              "children": [],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
+
+=== UOM ===
+{
+  "program": {
+    "statements": [
+      [
+        "assignment",
+        "x",
+        42
+      ],
+      [
+        "assignment",
+        "y",
+        [
+          "+",
+          "x",
+          1
+        ]
+      ],
+      [
+        "assignment",
+        "result",
+        [
+          "/",
+          [
+            "*",
+            "x",
+            "y"
+          ],
+          2
+        ]
+      ]
+    ]
+  }
+}
+
+=== OUTPUT ===
+let x = 42
+let y = x + 1
+let result = (x * y) / 2
+
+=== ERRORS ===
+[]

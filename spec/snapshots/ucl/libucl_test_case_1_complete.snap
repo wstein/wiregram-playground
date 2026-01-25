@@ -1,0 +1,320 @@
+=== INPUT ===
+{
+"key1": value;
+"key1": value2;
+"key1": "value;"
+"key1": 1.0,
+"key1": -0xdeadbeef
+"key1": 0xdeadbeef.1
+"key1": 0xreadbeef
+"key1": -1e-10,
+"key1": 1
+"key1": true
+"key1": no
+"key1": yes
+}
+
+
+=== TOKENS ===
+{type: lbrace, value: "{", position: 0}
+{type: string, value: "key1", position: 8}
+{type: colon, value: ":", position: 8}
+{type: identifier, value: "value", position: 15}
+{type: semicolon, value: ";", position: 15}
+{type: string, value: "key1", position: 23}
+{type: colon, value: ":", position: 23}
+{type: identifier, value: "value2", position: 31}
+{type: semicolon, value: ";", position: 31}
+{type: string, value: "key1", position: 39}
+{type: colon, value: ":", position: 39}
+{type: string, value: "value;", position: 49}
+{type: string, value: "key1", position: 56}
+{type: colon, value: ":", position: 56}
+{type: number, value: "1.0", position: 61}
+{type: comma, value: ",", position: 61}
+{type: string, value: "key1", position: 69}
+{type: colon, value: ":", position: 69}
+{type: hex_number, value: "-0xdeadbeef", position: 82}
+{type: string, value: "key1", position: 89}
+{type: colon, value: ":", position: 89}
+{type: invalid_hex, value: "0xdeadbeef.1", position: 103}
+{type: string, value: "key1", position: 110}
+{type: colon, value: ":", position: 110}
+{type: invalid_hex, value: "0xreadbeef", position: 122}
+{type: string, value: "key1", position: 129}
+{type: colon, value: ":", position: 129}
+{type: number, value: "-1e-10", position: 137}
+{type: comma, value: ",", position: 137}
+{type: string, value: "key1", position: 145}
+{type: colon, value: ":", position: 145}
+{type: number, value: "1", position: 148}
+{type: string, value: "key1", position: 155}
+{type: colon, value: ":", position: 155}
+{type: boolean, value: true, position: 161}
+{type: string, value: "key1", position: 168}
+{type: colon, value: ":", position: 168}
+{type: boolean, value: false, position: 172}
+{type: string, value: "key1", position: 179}
+{type: colon, value: ":", position: 179}
+{type: boolean, value: true, position: 184}
+{type: rbrace, value: "}", position: 185}
+{type: eof, value: nil, position: 187}
+
+=== AST ===
+{
+  "type": "object",
+  "value": null,
+  "children": [
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "value",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "value2",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "value;",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "number",
+          "value": "1.0",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "hex_number",
+          "value": "-0xdeadbeef",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "0xdeadbeef.1",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "0xreadbeef",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "number",
+          "value": "-1e-10",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "number",
+          "value": "1",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "boolean",
+          "value": true,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "boolean",
+          "value": false,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "key1",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "boolean",
+          "value": true,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
+
+=== UOM ===
+{
+    "key1": true
+}
+
+=== OUTPUT ===
+key1 = "value";
+key1 = "value2";
+key1 = "value;";
+key1 = 1.0;
+key1 = -3735928559;
+key1 = "0xdeadbeef.1";
+key1 = "0xreadbeef";
+key1 = -1e-10;
+key1 = 1;
+key1 = true;
+key1 = false;
+key1 = true;
+
+=== ERRORS ===
+[]

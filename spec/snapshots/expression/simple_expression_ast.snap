@@ -1,0 +1,13 @@
+{
+  "type": "program",
+  "value": null,
+  "children": [
+    {
+      "type": "number",
+      "value": 42,
+      "children": [],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

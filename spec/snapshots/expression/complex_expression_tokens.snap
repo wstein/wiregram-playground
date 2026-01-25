@@ -1,0 +1,11 @@
+{type: keyword, value: "let", position: 3}
+{type: identifier, value: "result", position: 10}
+{type: equals, value: "=", position: 11}
+{type: lparen, value: "(", position: 13}
+{type: identifier, value: "x", position: 15}
+{type: plus, value: "+", position: 16}
+{type: identifier, value: "y", position: 19}
+{type: rparen, value: ")", position: 19}
+{type: star, value: "*", position: 21}
+{type: number, value: 2, position: 24}
+{type: eof, value: nil, position: 24}

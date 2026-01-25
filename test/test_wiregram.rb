@@ -221,3 +221,35 @@ class TestWireGramAnalyzer < Minitest::Test
     assert diagnostics.any? { |d| d[:type] == :optimization }
   end
 end
+
+class TestWireGramJson < Minitest::Test
+  def test_json_tokenize_and_parse
+    src = '{"a": 1, "b": [true, false, null], "c": "hi"}'
+    lexer = WireGram::Languages::Json::Lexer.new(src)
+    tokens = lexer.tokenize
+
+    assert tokens.any? { |t| t[:type] == :lbrace }
+    assert tokens.any? { |t| t[:type] == :rbrace }
+    assert tokens.any? { |t| t[:type] == :number }
+    assert tokens.any? { |t| t[:type] == :string }
+
+    fabric = WireGram.weave(src, language: :json)
+    ast = fabric.ast
+
+    assert_equal :program, ast.type
+    obj = ast.children[0]
+    assert_equal :object, obj.type
+    # Should have at least 3 members
+    assert obj.children.length >= 3
+
+    # Check array member exists
+    pair_b = obj.children.find { |p| p.children[0].value == 'b' }
+    assert pair_b
+    assert_equal :array, pair_b.children[1].type
+
+    # Check boolean and null present in array
+    arr = pair_b.children[1]
+    assert arr.children.any? { |v| v.type == :boolean }
+    assert arr.children.any? { |v| v.type == :null }
+  end
+end

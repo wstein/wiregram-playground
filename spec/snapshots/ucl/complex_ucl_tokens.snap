@@ -1,0 +1,5 @@
+{type: identifier, value: "key", position: 3}
+{type: equals, value: "=", position: 4}
+{type: hex_number, value: "0xdeadbeef", position: 16}
+{type: semicolon, value: ";", position: 16}
+{type: eof, value: nil, position: 17}

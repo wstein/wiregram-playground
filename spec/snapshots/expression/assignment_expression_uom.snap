@@ -1,0 +1,11 @@
+{
+  "program": {
+    "statements": [
+      [
+        "assignment",
+        "x",
+        42
+      ]
+    ]
+  }
+}

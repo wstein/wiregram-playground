@@ -1,0 +1,5 @@
+{type: keyword, value: "let", position: 3}
+{type: identifier, value: "x", position: 5}
+{type: equals, value: "=", position: 6}
+{type: number, value: 42, position: 10}
+{type: eof, value: nil, position: 10}

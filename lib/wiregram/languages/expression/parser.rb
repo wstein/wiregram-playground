@@ -17,7 +17,7 @@ module WireGram
       class Parser < WireGram::Core::BaseParser
         def parse
           statements = []
-          
+
           until at_end?
             begin
               stmt = parse_statement
@@ -29,6 +29,37 @@ module WireGram
           end
 
           WireGram::Core::Node.new(:program, children: statements)
+        end
+
+        # Enhanced parse method that returns complete pipeline results
+        def parse_with_pipeline(tokens)
+          result = {}
+
+          # Store tokens
+          result[:tokens] = tokens
+
+          # Parse AST
+          @tokens = tokens
+          @position = 0
+          @errors = []
+
+          ast = parse
+          result[:ast] = ast
+          result[:errors] = @errors.dup
+
+          # Transform to UOM
+          require_relative 'transformer'
+          transformer = Transformer.new
+          uom = UOM.new(transformer.transform(ast))
+          result[:uom] = uom
+
+          # Serialize
+          require_relative 'serializer'
+          serializer = Serializer.new
+          output = serializer.serialize(uom)
+          result[:output] = output
+
+          result
         end
 
         private
@@ -43,17 +74,17 @@ module WireGram
 
         def parse_assignment
           expect(:keyword) # 'let'
-          
+
           identifier_token = expect(:identifier)
           return nil unless identifier_token
-          
+
           identifier = WireGram::Core::Node.new(:identifier, value: identifier_token[:value])
-          
+
           expect(:equals)
-          
+
           value = parse_expression
           return nil unless value
-          
+
           WireGram::Core::Node.new(:assign, children: [identifier, value])
         end
 
@@ -64,10 +95,10 @@ module WireGram
           while [:plus, :minus].include?(current_token[:type])
             operator = current_token[:type]
             advance
-            
+
             right = parse_term
             return nil unless right
-            
+
             node_type = operator == :plus ? :add : :subtract
             left = WireGram::Core::Node.new(node_type, children: [left, right])
           end
@@ -82,10 +113,10 @@ module WireGram
           while [:star, :slash].include?(current_token[:type])
             operator = current_token[:type]
             advance
-            
+
             right = parse_factor
             return nil unless right
-            
+
             node_type = operator == :star ? :multiply : :divide
             left = WireGram::Core::Node.new(node_type, children: [left, right])
           end
@@ -110,10 +141,11 @@ module WireGram
             advance
             expr = parse_expression
             expect(:rparen)
-            expr
+            # Preserve parentheses by wrapping expression in a group node
+            WireGram::Core::Node.new(:group, children: [expr])
           else
-            @errors << { 
-              type: :unexpected_token, 
+            @errors << {
+              type: :unexpected_token,
               expected: "number, identifier, or '('",
               got: token[:type],
               position: token[:position]

@@ -1,0 +1,22 @@
+{
+  "user": {
+    "profile": {
+      "name": "Jane Smith",
+      "contact": {
+        "email": "jane@example.com",
+        "phone": "+1-555-0123"
+      }
+    },
+    "settings": {
+      "theme": "dark",
+      "notifications": {
+        "email": true,
+        "push": false
+      }
+    }
+  },
+  "metadata": {
+    "created": "2023-01-01T00:00:00Z",
+    "version": 2.1
+  }
+}

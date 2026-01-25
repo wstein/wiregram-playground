@@ -1,0 +1,19 @@
+{
+  "program": {
+    "statements": [
+      [
+        "assignment",
+        "result",
+        [
+          "*",
+          [
+            "+",
+            "x",
+            "y"
+          ],
+          2
+        ]
+      ]
+    ]
+  }
+}

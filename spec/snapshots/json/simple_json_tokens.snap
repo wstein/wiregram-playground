@@ -1,0 +1,10 @@
+{type: lbrace, value: "{", position: 0}
+{type: string, value: "name", position: 7}
+{type: colon, value: ":", position: 7}
+{type: string, value: "John", position: 15}
+{type: comma, value: ",", position: 15}
+{type: string, value: "age", position: 22}
+{type: colon, value: ":", position: 22}
+{type: number, value: 30, position: 26}
+{type: rbrace, value: "}", position: 26}
+{type: eof, value: nil, position: 27}

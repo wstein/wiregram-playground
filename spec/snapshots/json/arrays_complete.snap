@@ -1,0 +1,236 @@
+=== INPUT ===
+[
+  "string",
+  42,
+  true,
+  null,
+  {
+    "nested": "object"
+  },
+  [
+    "nested",
+    "array"
+  ],
+  {
+    "mixed": [
+      "string",
+      123,
+      {
+        "deep": "value"
+      }
+    ]
+  }
+]
+
+=== TOKENS ===
+{type: lbracket, value: "[", position: 0}
+{type: string, value: "string", position: 12}
+{type: comma, value: ",", position: 12}
+{type: number, value: 42, position: 18}
+{type: comma, value: ",", position: 18}
+{type: boolean, value: true, position: 26}
+{type: comma, value: ",", position: 26}
+{type: null, value: nil, position: 34}
+{type: comma, value: ",", position: 34}
+{type: lbrace, value: "{", position: 38}
+{type: string, value: "nested", position: 52}
+{type: colon, value: ":", position: 52}
+{type: string, value: "object", position: 62}
+{type: rbrace, value: "}", position: 65}
+{type: comma, value: ",", position: 66}
+{type: lbracket, value: "[", position: 70}
+{type: string, value: "nested", position: 84}
+{type: comma, value: ",", position: 84}
+{type: string, value: "array", position: 97}
+{type: rbracket, value: "]", position: 100}
+{type: comma, value: ",", position: 101}
+{type: lbrace, value: "{", position: 105}
+{type: string, value: "mixed", position: 118}
+{type: colon, value: ":", position: 118}
+{type: lbracket, value: "[", position: 120}
+{type: string, value: "string", position: 136}
+{type: comma, value: ",", position: 136}
+{type: number, value: 123, position: 147}
+{type: comma, value: ",", position: 147}
+{type: lbrace, value: "{", position: 155}
+{type: string, value: "deep", position: 171}
+{type: colon, value: ":", position: 171}
+{type: string, value: "value", position: 180}
+{type: rbrace, value: "}", position: 187}
+{type: rbracket, value: "]", position: 193}
+{type: rbrace, value: "}", position: 197}
+{type: rbracket, value: "]", position: 199}
+{type: eof, value: nil, position: 200}
+
+=== AST ===
+{
+  "type": "array",
+  "value": null,
+  "children": [
+    {
+      "type": "string",
+      "value": "string",
+      "children": [],
+      "metadata": {}
+    },
+    {
+      "type": "number",
+      "value": 42,
+      "children": [],
+      "metadata": {}
+    },
+    {
+      "type": "boolean",
+      "value": true,
+      "children": [],
+      "metadata": {}
+    },
+    {
+      "type": "null",
+      "value": null,
+      "children": [],
+      "metadata": {}
+    },
+    {
+      "type": "object",
+      "value": null,
+      "children": [
+        {
+          "type": "pair",
+          "value": null,
+          "children": [
+            {
+              "type": "string",
+              "value": "nested",
+              "children": [],
+              "metadata": {}
+            },
+            {
+              "type": "string",
+              "value": "object",
+              "children": [],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "array",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "nested",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "array",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "object",
+      "value": null,
+      "children": [
+        {
+          "type": "pair",
+          "value": null,
+          "children": [
+            {
+              "type": "string",
+              "value": "mixed",
+              "children": [],
+              "metadata": {}
+            },
+            {
+              "type": "array",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "string",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "number",
+                  "value": 123,
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "object",
+                  "value": null,
+                  "children": [
+                    {
+                      "type": "pair",
+                      "value": null,
+                      "children": [
+                        {
+                          "type": "string",
+                          "value": "deep",
+                          "children": [],
+                          "metadata": {}
+                        },
+                        {
+                          "type": "string",
+                          "value": "value",
+                          "children": [],
+                          "metadata": {}
+                        }
+                      ],
+                      "metadata": {}
+                    }
+                  ],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
+
+=== UOM ===
+[
+    "string",
+    42,
+    true,
+    null,
+    {
+        "nested": "object"
+    },
+    [
+        "nested",
+        "array"
+    ],
+    {
+        "mixed": [
+            "string",
+            123,
+            {
+                "deep": "value"
+            }
+        ]
+    }
+]
+
+=== OUTPUT ===
+["string", 42, true, null, {"nested": "object"}, ["nested", "array"], {"mixed": ["string", 123, {"deep": "value"}]}]
+
+=== ERRORS ===
+[]

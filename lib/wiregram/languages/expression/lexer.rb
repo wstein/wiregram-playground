@@ -14,7 +14,7 @@ module WireGram
 
         def try_tokenize_next
           char = current_char
-          
+
           case char
           when /\d/
             tokenize_number
@@ -60,7 +60,7 @@ module WireGram
         def tokenize_number
           start = @position
           advance while current_char&.match?(/\d/)
-          
+
           # Handle decimal point
           if current_char == '.' && peek_char&.match?(/\d/)
             advance # skip '.'
@@ -76,7 +76,7 @@ module WireGram
         def tokenize_identifier
           start = @position
           advance while current_char&.match?(/[a-zA-Z0-9_]/)
-          
+
           value = @source[start...@position]
           type = KEYWORDS.include?(value) ? :keyword : :identifier
           add_token(type, value)
@@ -86,14 +86,22 @@ module WireGram
         def tokenize_string
           advance # skip opening quote
           start = @position
-          
+
           while current_char && current_char != '"'
             advance
           end
-          
+
           value = @source[start...@position]
-          advance if current_char == '"' # skip closing quote
-          add_token(:string, value)
+
+          if current_char == '"'
+            advance # skip closing quote
+            add_token(:string, value)
+          else
+            # Unterminated string - report error and add token with captured value
+            @errors << { type: :unexpected_token, message: 'Unterminated string', position: start }
+            add_token(:string, value)
+          end
+
           true
         end
       end

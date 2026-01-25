@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "value": null,
+  "children": [
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "identifier",
+          "value": "key",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "value",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

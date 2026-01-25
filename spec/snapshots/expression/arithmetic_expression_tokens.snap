@@ -1,0 +1,4 @@
+{type: number, value: 1, position: 1}
+{type: plus, value: "+", position: 2}
+{type: number, value: 2, position: 5}
+{type: eof, value: nil, position: 5}

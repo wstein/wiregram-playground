@@ -1,0 +1,59 @@
+{
+  "type": "program",
+  "value": null,
+  "children": [
+    {
+      "type": "assign",
+      "value": null,
+      "children": [
+        {
+          "type": "identifier",
+          "value": "result",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "multiply",
+          "value": null,
+          "children": [
+            {
+              "type": "group",
+              "value": null,
+              "children": [
+                {
+                  "type": "add",
+                  "value": null,
+                  "children": [
+                    {
+                      "type": "identifier",
+                      "value": "x",
+                      "children": [],
+                      "metadata": {}
+                    },
+                    {
+                      "type": "identifier",
+                      "value": "y",
+                      "children": [],
+                      "metadata": {}
+                    }
+                  ],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            },
+            {
+              "type": "number",
+              "value": 2,
+              "children": [],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

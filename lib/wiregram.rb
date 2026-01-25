@@ -17,24 +17,73 @@ module WireGram
   # @param language [Symbol] Language type (default: :expression)
   # @return [WireGram::Core::Fabric] Digital fabric representation
   def self.weave(source, language: :expression)
+    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
+      puts "[weave 01] entering weave language=#{language} source_len=#{source ? source.length : 0}"
+    end
     require_relative 'wiregram/core/fabric'
     require_relative 'wiregram/languages/expression/lexer'
     require_relative 'wiregram/languages/expression/parser'
-    
+    require_relative 'wiregram/languages/json/lexer'
+    require_relative 'wiregram/languages/json/parser'
+require_relative 'wiregram/languages/ucl/lexer'
+require_relative 'wiregram/languages/ucl/parser'
+
     lexer = case language
             when :expression
               WireGram::Languages::Expression::Lexer.new(source)
+            when :json
+              WireGram::Languages::Json::Lexer.new(source)
+            when :ucl
+              WireGram::Languages::Ucl::Lexer.new(source)
             else
               raise Error, "Unsupported language: #{language}"
             end
-    
+
+    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
+      puts "[weave 02] created lexer #{lexer.class}"
+    end
+
     tokens = lexer.tokenize
-    parser = WireGram::Languages::Expression::Parser.new(tokens)
+    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
+      puts "[weave 03] tokenize returned #{tokens ? tokens.length : 0} tokens"
+      if tokens && !tokens.empty?
+        last = tokens.last
+        puts "[weave 03b] last token = #{last.inspect}"
+      end
+    end
+
+    parser = case language
+             when :expression
+               WireGram::Languages::Expression::Parser.new(tokens)
+             when :json
+               WireGram::Languages::Json::Parser.new(tokens)
+             when :ucl
+               WireGram::Languages::Ucl::Parser.new(tokens)
+             end
+
+    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
+      puts "[weave 04] created parser #{parser.class}"
+      puts "[weave 04.5] calling parser.parse (no timeout)"
+    end
+
     ast = parser.parse
-    
+
+    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
+      puts "[weave 05] parser.parse returned ast=#{ast ? ast.type : 'nil'}"
+    end
+
     WireGram::Core::Fabric.new(source, ast, tokens)
   end
 end
+
+# Auto-require language modules (so examples and tests can instantiate lexers/parsers)
+require_relative 'wiregram/languages/expression/lexer'
+require_relative 'wiregram/languages/expression/parser'
+require_relative 'wiregram/languages/json/lexer'
+require_relative 'wiregram/languages/json/parser'
+require_relative 'wiregram/languages/ucl/lexer'
+require_relative 'wiregram/languages/ucl/parser'
+require_relative 'wiregram/languages/ucl/serializer'
 
 # Auto-require core components
 require_relative 'wiregram/core/node'
