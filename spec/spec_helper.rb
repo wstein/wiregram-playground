@@ -4,6 +4,11 @@
 unless ENV['NO_COVERAGE']
   require 'simplecov'
   SimpleCov.start do
+    # Enable branch coverage in addition to line coverage
+    if SimpleCov.respond_to?(:enable_coverage)
+      enable_coverage :branch
+    end
+
     add_filter '/spec/'
     add_group 'Libraries', 'lib'
   end
