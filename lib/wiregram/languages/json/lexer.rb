@@ -95,9 +95,10 @@ module WireGram
           # Use StringScanner to match full quoted string including escapes
           @scanner.pos = @position
           if matched = @scanner.scan(STRING_PATTERN)
-            # Extract and unescape the string content (remove quotes and process escapes)
-            content = matched[1...-1]  # Remove surrounding quotes
-            unescaped = unescape_string(content)
+            # Extract content (remove quotes)
+            content = matched[1...-1]
+            # Only unescape if string contains backslashes (fast path for unescaped strings)
+            unescaped = content.include?('\\') ? unescape_string(content) : content
             add_token(:string, unescaped)
             @position = @scanner.pos
             true
@@ -107,20 +108,40 @@ module WireGram
         end
 
         def unescape_string(str)
-          # Process escape sequences
+          # Fast path: if no backslashes, return as-is (already checked by caller)
+          return str unless str.include?('\\')
+
+          # Pre-allocate result buffer with estimated capacity (most strings don't have many escapes)
           result = String.new(capacity: str.length)
           i = 0
+          
           while i < str.length
             if str[i] == '\\' && i + 1 < str.length
               case str[i + 1]
-              when '"' then result << '"'; i += 2
-              when '\\' then result << '\\'; i += 2
-              when '/' then result << '/'; i += 2
-              when 'b' then result << "\b"; i += 2
-              when 'f' then result << "\f"; i += 2
-              when 'n' then result << "\n"; i += 2
-              when 'r' then result << "\r"; i += 2
-              when 't' then result << "\t"; i += 2
+              when '"'
+                result << '"'
+                i += 2
+              when '\\'
+                result << '\\'
+                i += 2
+              when '/'
+                result << '/'
+                i += 2
+              when 'b'
+                result << "\b"
+                i += 2
+              when 'f'
+                result << "\f"
+                i += 2
+              when 'n'
+                result << "\n"
+                i += 2
+              when 'r'
+                result << "\r"
+                i += 2
+              when 't'
+                result << "\t"
+                i += 2
               when 'u'
                 # Unicode escape \uXXXX
                 if i + 5 < str.length

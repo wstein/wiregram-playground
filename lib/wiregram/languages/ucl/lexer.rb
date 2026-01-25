@@ -147,9 +147,10 @@ module WireGram
         def tokenize_quoted_string_fast
           @scanner.pos = @position
           if matched = @scanner.scan(QUOTED_STRING_PATTERN)
-            # Extract and unescape content (without surrounding quotes)
+            # Extract content (without surrounding quotes)
             content = matched[1...-1]
-            unescaped = unescape_quoted_string(content)
+            # Fast-path: avoid unescaping if there are no backslashes
+            unescaped = content.include?('\\') ? unescape_quoted_string(content) : content
             add_token(:string, unescaped, quoted: true, quote_type: :double)
             @position = @scanner.pos
             true
@@ -162,7 +163,8 @@ module WireGram
           @scanner.pos = @position
           if matched = @scanner.scan(SINGLE_QUOTED_PATTERN)
             content = matched[1...-1]
-            unescaped = unescape_single_quoted_string(content)
+            # Fast-path: avoid unescaping if there are no backslashes
+            unescaped = content.include?('\\') ? unescape_single_quoted_string(content) : content
             add_token(:string, unescaped, quoted: true, quote_type: :single)
             @position = @scanner.pos
             true
@@ -172,6 +174,9 @@ module WireGram
         end
 
         def unescape_quoted_string(str)
+          # Fast path: if no backslashes, return as-is
+          return str unless str.include?('\\')
+
           result = String.new(capacity: str.length)
           i = 0
           while i < str.length
@@ -224,6 +229,9 @@ module WireGram
         end
 
         def unescape_single_quoted_string(str)
+          # Fast path: if no backslashes, return as-is
+          return str unless str.include?('\\')
+
           result = String.new(capacity: str.length)
           i = 0
           while i < str.length

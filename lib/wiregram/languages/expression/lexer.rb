@@ -81,15 +81,58 @@ module WireGram
         def tokenize_string_fast
           @scanner.pos = @position
           if matched = @scanner.scan(STRING_PATTERN)
-            # Remove surrounding quotes and unescape
+            # Remove surrounding quotes
             content = matched[1...-1]
-            unescaped = content.gsub(/\\(.)/) { |_| $1 }
+            # Fast-path: avoid unescaping for common case with no backslashes
+            unescaped = content.include?('\\') ? unescape_string(content) : content
             add_token(:string, unescaped)
             @position = @scanner.pos
             true
           else
             false
           end
+        end
+
+        def unescape_string(str)
+          # Fast path: if no backslashes, return as-is
+          return str unless str.include?('\\')
+
+          result = String.new(capacity: str.length)
+          i = 0
+          while i < str.length
+            if str[i] == '\\' && i + 1 < str.length
+              case str[i + 1]
+              when '"' then result << '"'; i += 2
+              when '\\' then result << '\\'; i += 2
+              when '/' then result << '/'; i += 2
+              when 'b' then result << "\b"; i += 2
+              when 'f' then result << "\f"; i += 2
+              when 'n' then result << "\n"; i += 2
+              when 'r' then result << "\r"; i += 2
+              when 't' then result << "\t"; i += 2
+              when 'u'
+                if i + 5 < str.length
+                  hex = str[i + 2..i + 5]
+                  begin
+                    result << [hex.to_i(16)].pack('U')
+                  rescue
+                    result << '?'
+                  end
+                  i += 6
+                else
+                  result << str[i]
+                  i += 1
+                end
+              else
+                result << str[i + 1]
+                i += 2
+              end
+            else
+              result << str[i]
+              i += 1
+            end
+          end
+          result
         end
       end
     end
