@@ -180,10 +180,12 @@ DEPENDENCIES
   rake (~> 13.0)
   rbs (~> 3.10)
   rspec (~> 3.13)
+  rubocop (~> 1.82)
   ruby-lsp (~> 0.26.5)
   simplecov (~> 0.22.0)
   solargraph (~> 0.58.2)
   webrick (~> 1.9)
+  yard (~> 0.9.38)
 
 BUNDLED WITH
    2.6.9
