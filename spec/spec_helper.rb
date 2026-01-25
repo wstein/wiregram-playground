@@ -4,11 +4,6 @@
 unless ENV['NO_COVERAGE']
   require 'simplecov'
   SimpleCov.start do
-    # Enable branch coverage in addition to line coverage
-    if SimpleCov.respond_to?(:enable_coverage)
-      enable_coverage :branch
-    end
-
     add_filter '/spec/'
     add_group 'Libraries', 'lib'
   end
@@ -31,6 +26,14 @@ require 'wiregram/languages/ucl'
 Dir[File.expand_path('support/**/*.rb', __dir__)].each { |f| require f }
 
 RSpec.configure do |config|
+  require 'timeout'
+
+  # Fail fast on tests that hang — set per-example timeout (seconds)
+  default_timeout = (ENV['SPEC_TIMEOUT'] || 60).to_i
+  config.around(:each) do |ex|
+    Timeout.timeout(default_timeout) { ex.run }
+  end
+
   config.expect_with :rspec do |expectations|
     expectations.include_chain_clauses_in_custom_matcher_descriptions = true
   end

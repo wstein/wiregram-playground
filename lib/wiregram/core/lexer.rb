@@ -129,22 +129,8 @@ module WireGram
   end
 
   def add_token(type, value = nil, extras = {})
-    # Choose position semantics: value-like tokens point at their end (scanner.pos if available),
-    # punctuation tokens point at their start (@position).
-    if [:identifier, :keyword, :string, :number, :hex_number, :invalid_hex, :boolean, :null].include?(type)
-      pos = defined?(@scanner) ? @scanner.pos : (@position + (value.is_a?(String) ? value.length : 1))
-    else
-      pos = @position
-    end
-
-    token = { type: type, value: value, position: pos }
+    token = { type: type, value: value, position: @position }
     token.merge!(extras) if extras && !extras.empty?
-
-    if ENV['DEBUG_LEXER']
-      scanner_pos = defined?(@scanner) ? @scanner.pos : 'n/a'
-      STDERR.puts "ADD_TOKEN: type=#{type} value=#{value.inspect} position=#{pos} scanner_pos=#{scanner_pos}"
-    end
-
     if @streaming
       @last_token = token
     else
