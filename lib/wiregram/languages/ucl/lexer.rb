@@ -93,6 +93,20 @@ module WireGram
           end
 
           # 5. Identifiers or Unquoted strings
+          # Prefer URL tokens (scheme://) and interpolated unquoted strings over identifiers
+          if @scanner.check(URL_PATTERN)
+            return tokenize_unquoted_string
+          end
+
+          # If there's an interpolation '${' before the next delimiter, treat as an unquoted string
+          interp_pos = @source.index('${', @position)
+          if interp_pos
+            delim_pos = @source.index(/[\s,;:\}\)\"]/, @position)
+            if delim_pos.nil? || interp_pos < delim_pos
+              return tokenize_unquoted_string
+            end
+          end
+
           if char&.match?(/[a-zA-Z_]/)
             return tokenize_identifier_or_keyword
           elsif char == '/'
@@ -120,8 +134,12 @@ module WireGram
             if @scanner.scan(/#[^\n]*/)
               @position = @scanner.pos
             else
-              advance while current_char && current_char != "\n"
-              advance if current_char == "\n"
+              nl = @source.index("\n", @position)
+              if nl
+                @position = nl + 1
+              else
+                @position = @source.length
+              end
             end
             return true
           elsif current_char == '/' && peek_char(1) == '*'
@@ -132,23 +150,29 @@ module WireGram
         end
 
         def skip_nested_block_comment
-          advance # skip /
-          advance # skip *
+          # Use index-based scanning to jump over nested block comments efficiently
+          src = @source
+          pos = @position + 2 # skip initial '/*'
           depth = 1
 
-          while depth > 0 && current_char
-            if current_char == '/' && peek_char(1) == '*'
-              advance
-              advance
+          while depth > 0 && pos < src.length
+            nxt_open = src.index('/*', pos)
+            nxt_close = src.index('*/', pos)
+
+            # If no closer, advance to end
+            if nxt_close.nil?
+              pos = src.length
+              break
+            elsif nxt_open && nxt_open < nxt_close
               depth += 1
-            elsif current_char == '*' && peek_char(1) == '/'
-              advance
-              advance
-              depth -= 1
+              pos = nxt_open + 2
             else
-              advance
+              depth -= 1
+              pos = nxt_close + 2
             end
           end
+
+          @position = pos
         end
 
         def tokenize_directive
@@ -327,11 +351,39 @@ module WireGram
 
         def tokenize_unquoted_string
           @scanner.pos = @position
-          # Fast path: consume a run of non-delimiter characters (no interpolation)
-          if matched = @scanner.scan(/[^\s,;:\}\)"]+/)
-            # matched does not include delimiters; consume and return
-            add_token(:string, matched, position: @scanner.pos)
-            @position = @scanner.pos
+          src = @source
+          start = @position
+
+          # If URL at current position, consume entire URL until next delimiter (allow ':' in URL)
+          if @scanner.check(URL_PATTERN)
+            @scanner.scan(URL_PATTERN)
+            after = @scanner.pos
+            end_pos = src.index(/[\s,;\}\)\"]/, after) || src.length
+            @position = end_pos
+            add_token(:string, src[start...@position], position: @position)
+            return true
+          end
+
+          # If interpolation '${' occurs before the next delimiter, handle nested interpolation first
+          interp_pos = src.index('${', start)
+          delim_pos = src.index(/[\s,;:\}\)\"]/, start)
+          if interp_pos && (delim_pos.nil? || interp_pos < delim_pos)
+            close = find_matching_interpolation_close(src, interp_pos + 2)
+            if close.nil?
+              end_pos = src.length
+            else
+              end_pos = src.index(/[\s,;:\}\)\"]/, close + 1) || src.length
+            end
+            @position = end_pos
+            add_token(:string, src[start...@position], position: @position)
+            return true
+          end
+
+          # Fast path: consume until next delimiter (no interpolation present)
+          end_pos = src.index(/[\s,;:\}\)\"]/, start) || src.length
+          if end_pos > start
+            @position = end_pos
+            add_token(:string, src[start...@position], position: @position)
             return true
           end
 
@@ -368,6 +420,24 @@ module WireGram
             # Hit a delimiter immediately without consuming anything
             false
           end
+        end
+
+        # Find matching closing '}' for an interpolation that starts at pos (pos is after the '${')
+        def find_matching_interpolation_close(src, pos)
+          depth = 1
+          while depth > 0 && pos < src.length
+            next_open = src.index('${', pos)
+            next_close = src.index('}', pos)
+            return nil if next_close.nil?
+            if next_open && next_open < next_close
+              depth += 1
+              pos = next_open + 2
+            else
+              depth -= 1
+              pos = next_close + 1
+            end
+          end
+          pos - 1
         end
 
         def tokenize_hex_or_invalid
