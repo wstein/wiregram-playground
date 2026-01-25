@@ -99,7 +99,7 @@ module WireGram
             content = matched[1...-1]
             # Only unescape if string contains backslashes (fast path for unescaped strings)
             unescaped = content.include?('\\') ? unescape_string(content) : content
-            add_token(:string, unescaped)
+            add_token(:string, unescaped, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -172,7 +172,7 @@ module WireGram
           @scanner.pos = @position
           if matched = @scanner.scan(NUMBER_PATTERN)
             value = matched.include?('.') || matched.match?(/[eE]/) ? matched.to_f : matched.to_i
-            add_token(:number, value)
+            add_token(:number, value, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -183,15 +183,15 @@ module WireGram
         def tokenize_literal
           @scanner.pos = @position
           if @scanner.scan(TRUE_PATTERN)
-            add_token(:boolean, true)
+            add_token(:boolean, true, position: @scanner.pos)
             @position = @scanner.pos
             true
           elsif @scanner.scan(FALSE_PATTERN)
-            add_token(:boolean, false)
+            add_token(:boolean, false, position: @scanner.pos)
             @position = @scanner.pos
             true
           elsif @scanner.scan(NULL_PATTERN)
-            add_token(:null, nil)
+            add_token(:null, nil, position: @scanner.pos)
             @position = @scanner.pos
             true
           else

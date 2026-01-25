@@ -15,6 +15,8 @@ module WireGram
         URL_PATTERN = /[a-zA-Z0-9_\-\.]+:\/\//
         HEX_PATTERN = /0[xX][0-9a-fA-F]+/
         NUMBER_PATTERN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/
+        # Capture hex-like tokens that include invalid characters (e.g., 0xreadbeef)
+        INVALID_HEX_REMAIN = /-?0[xX][^\s,;:\}\)\"]+/
         FLAG_PATTERN = /-[A-Za-z_]/
         DIRECTIVE_PATTERN = /\.[a-zA-Z_][a-zA-Z0-9_\-\.]*/
         QUOTED_STRING_PATTERN = /"(?:\\.|[^"\\])*"/
@@ -63,11 +65,13 @@ module WireGram
             return tokenize_single_quoted_string_fast
           end
 
-          # 3. Numbers (must check before dash-identifiers)
-          if char == '-'
-            if peek_char(1)&.match?(/\d/)
-               return tokenize_number_fast
-            end
+          # 3. Numbers and hex literals (must check before dash-identifiers)
+          if char == '-' && peek_char(1) == '0' && peek_char(2)&.match?(/[xX]/)
+            return tokenize_hex_or_invalid
+          elsif char == '-' && peek_char(1)&.match?(/\d/)
+            return tokenize_number_fast
+          elsif char == '0' && peek_char(1)&.match?(/[xX]/)
+            return tokenize_hex_or_invalid
           elsif char&.match?(/\d/)
             return tokenize_number_fast
           end
@@ -151,7 +155,7 @@ module WireGram
           @scanner.pos = @position
           if matched = @scanner.scan(DIRECTIVE_PATTERN)
             # Store without leading dot
-            add_token(:directive, matched[1..-1])
+            add_token(:directive, matched[1..-1], position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -166,7 +170,7 @@ module WireGram
             content = matched[1...-1]
             # Fast-path: avoid unescaping if there are no backslashes
             unescaped = content.include?('\\') ? unescape_quoted_string(content) : content
-            add_token(:string, unescaped, quoted: true, quote_type: :double)
+            add_token(:string, unescaped, { quoted: true, quote_type: :double, position: @scanner.pos })
             @position = @scanner.pos
             true
           else
@@ -180,7 +184,7 @@ module WireGram
             content = matched[1...-1]
             # Fast-path: avoid unescaping if there are no backslashes
             unescaped = content.include?('\\') ? unescape_single_quoted_string(content) : content
-            add_token(:string, unescaped, quoted: true, quote_type: :single)
+            add_token(:string, unescaped, { quoted: true, quote_type: :single, position: @scanner.pos })
             @position = @scanner.pos
             true
           else
@@ -274,21 +278,21 @@ module WireGram
             if KEYWORDS.key?(matched)
               v = KEYWORDS[matched]
               if v.nil?
-                add_token(:null, nil)
+                add_token(:null, nil, position: @scanner.pos)
               else
-                add_token(:boolean, v)
+                add_token(:boolean, v, position: @scanner.pos)
               end
             else
               lc = matched.downcase
               if KEYWORDS.key?(lc)
                 v = KEYWORDS[lc]
                 if v.nil?
-                  add_token(:null, nil)
+                  add_token(:null, nil, position: @scanner.pos)
                 else
-                  add_token(:boolean, v)
+                  add_token(:boolean, v, position: @scanner.pos)
                 end
               else
-                add_token(:identifier, matched)
+                add_token(:identifier, matched, position: @scanner.pos)
               end
             end
 
@@ -313,9 +317,9 @@ module WireGram
 
             lookup = value.downcase
             if KEYWORDS.key?(lookup)
-               add_token(KEYWORDS[lookup].nil? ? :null : :boolean, KEYWORDS[lookup])
+               add_token(KEYWORDS[lookup].nil? ? :null : :boolean, KEYWORDS[lookup], position: @position)
             else
-               add_token(:identifier, value)
+               add_token(:identifier, value, position: @position)
             end
             true
           end
@@ -326,7 +330,7 @@ module WireGram
           # Fast path: consume a run of non-delimiter characters (no interpolation)
           if matched = @scanner.scan(/[^\s,;:\}\)"]+/)
             # matched does not include delimiters; consume and return
-            add_token(:string, matched)
+            add_token(:string, matched, position: @scanner.pos)
             @position = @scanner.pos
             return true
           end
@@ -358,7 +362,7 @@ module WireGram
           value = @source[start...@position]
           # Only add token if we actually consumed something
           if value.length > 0
-            add_token(:string, value)
+            add_token(:string, value, position: @position)
             true
           else
             # Hit a delimiter immediately without consuming anything
@@ -366,19 +370,32 @@ module WireGram
           end
         end
 
-        def tokenize_number_fast
+        def tokenize_hex_or_invalid
           @scanner.pos = @position
-
-          # Try hex number first
-          if @scanner.scan(HEX_PATTERN)
-            add_token(:hex_number, @scanner.matched)
+          # Match hex with optional fractional part (treated as invalid) or invalid remainder
+          if @scanner.scan(/-?0[xX][0-9a-fA-F]+(?:\.[0-9a-fA-F]+)?/)
+            m = @scanner.matched
+            if m.include?('.')
+              add_token(:invalid_hex, m, position: @scanner.pos)
+            else
+              add_token(:hex_number, m, position: @scanner.pos)
+            end
+            @position = @scanner.pos
+            return true
+          elsif @scanner.scan(INVALID_HEX_REMAIN)
+            add_token(:invalid_hex, @scanner.matched, position: @scanner.pos)
             @position = @scanner.pos
             return true
           end
+          false
+        end
+
+        def tokenize_number_fast
+          @scanner.pos = @position
 
           # Try regular number
           if @scanner.scan(NUMBER_PATTERN)
-            add_token(:number, @scanner.matched)
+            add_token(:number, @scanner.matched, position: @scanner.pos)
             @position = @scanner.pos
             return true
           end

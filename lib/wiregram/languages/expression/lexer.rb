@@ -57,7 +57,7 @@ module WireGram
           if @scanner.scan(NUMBER_PATTERN)
             matched = @scanner.matched
             value = matched.include?('.') ? matched.to_f : matched.to_i
-            add_token(:number, value)
+            add_token(:number, value, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -70,7 +70,7 @@ module WireGram
           if @scanner.scan(IDENTIFIER_PATTERN)
             value = @scanner.matched
             type = KEYWORDS.include?(value) ? :keyword : :identifier
-            add_token(type, value)
+            add_token(type, value, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -85,7 +85,7 @@ module WireGram
             content = matched[1...-1]
             # Fast-path: avoid unescaping for common case with no backslashes
             unescaped = content.include?('\\') ? unescape_string(content) : content
-            add_token(:string, unescaped)
+            add_token(:string, unescaped, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
