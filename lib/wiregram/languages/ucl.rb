@@ -64,6 +64,16 @@ module WireGram
         parser = WireGram::Languages::Ucl::Parser.new(token_stream)
         parser.parse
       end
+
+      def self.parse_stream(input)
+        lexer = WireGram::Languages::Ucl::Lexer.new(input)
+        lexer.enable_streaming!
+        token_stream = WireGram::Core::StreamingTokenStream.new(lexer)
+        parser = WireGram::Languages::Ucl::Parser.new(token_stream)
+        parser.parse_stream do |node|
+          yield(node) if block_given?
+        end
+      end
     end
   end
 end

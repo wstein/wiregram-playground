@@ -71,6 +71,16 @@ module WireGram
           parser.parse
         end
 
+        def parse_stream(input)
+          lexer = WireGram::Languages::Expression::Lexer.new(input)
+          lexer.enable_streaming!
+          token_stream = WireGram::Core::StreamingTokenStream.new(lexer)
+          parser = WireGram::Languages::Expression::Parser.new(token_stream)
+          parser.parse_stream do |node|
+            yield(node) if block_given?
+          end
+        end
+
         def transform(input)
           ast = parse(input)
           transformer = Transformer.new

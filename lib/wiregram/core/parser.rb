@@ -30,6 +30,8 @@ module WireGram
 
       def advance
         @position += 1
+        # Notify token source (if it's a streaming source) so it can drop consumed tokens
+        @tokens.consume_to(@position) if @tokens.respond_to?(:consume_to)
       end
 
       def expect(type)
