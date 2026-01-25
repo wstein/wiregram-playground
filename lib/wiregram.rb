@@ -17,9 +17,6 @@ module WireGram
   # @param language [Symbol] Language type (default: :expression)
   # @return [WireGram::Core::Fabric] Digital fabric representation
   def self.weave(source, language: :expression)
-    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
-      puts "[weave 01] entering weave language=#{language} source_len=#{source ? source.length : 0}"
-    end
     require_relative 'wiregram/core/fabric'
     require_relative 'wiregram/languages/expression/lexer'
     require_relative 'wiregram/languages/expression/parser'
@@ -39,18 +36,7 @@ module WireGram
               raise Error, "Unsupported language: #{language}"
             end
 
-    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
-      puts "[weave 02] created lexer #{lexer.class}"
-    end
-
     tokens = lexer.tokenize
-    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
-      puts "[weave 03] tokenize returned #{tokens ? tokens.length : 0} tokens"
-      if tokens && !tokens.empty?
-        last = tokens.last
-        puts "[weave 03b] last token = #{last.inspect}"
-      end
-    end
 
     parser = case language
              when :expression
@@ -61,16 +47,7 @@ module WireGram
                WireGram::Languages::Ucl::Parser.new(tokens)
              end
 
-    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
-      puts "[weave 04] created parser #{parser.class}"
-      puts "[weave 04.5] calling parser.parse (no timeout)"
-    end
-
     ast = parser.parse
-
-    if ENV['WIREGRAM_DEBUG'] && !ENV['WIREGRAM_DEBUG'].empty?
-      puts "[weave 05] parser.parse returned ast=#{ast ? ast.type : 'nil'}"
-    end
 
     WireGram::Core::Fabric.new(source, ast, tokens)
   end
