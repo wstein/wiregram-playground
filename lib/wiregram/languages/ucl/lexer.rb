@@ -13,8 +13,10 @@ module WireGram
         WHITESPACE_PATTERN = /\s+/
         IDENTIFIER_PATTERN = /[a-zA-Z_][a-zA-Z0-9_%\-]*/
         URL_PATTERN = /[a-zA-Z0-9_\-\.]+:\/\//
-        HEX_PATTERN = /0[xX][0-9a-fA-F]+/
+        # Hex numbers (allow optional leading sign). Invalid hex patterns are handled explicitly.
+        HEX_PATTERN = /-?0[xX][0-9a-fA-F]+/
         NUMBER_PATTERN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/
+        INVALID_HEX_REMAIN = /-?0[xX][^\s,;:\}\)"]+/
         FLAG_PATTERN = /-[A-Za-z_]/
         DIRECTIVE_PATTERN = /\.[a-zA-Z_][a-zA-Z0-9_\-\.]*/
         QUOTED_STRING_PATTERN = /"(?:\\.|[^"\\])*"/
@@ -369,9 +371,19 @@ module WireGram
         def tokenize_number_fast
           @scanner.pos = @position
 
-          # Try hex number first
-          if @scanner.scan(HEX_PATTERN)
+          # Handle hex numbers and invalid hex forms
+          if @scanner.scan(/-?0[xX][0-9a-fA-F]+\.[0-9a-fA-F]*/)
+            # Hex with a decimal point -> invalid hex
+            add_token(:invalid_hex, @scanner.matched)
+            @position = @scanner.pos
+            return true
+          elsif @scanner.scan(HEX_PATTERN)
             add_token(:hex_number, @scanner.matched)
+            @position = @scanner.pos
+            return true
+          elsif @scanner.scan(INVALID_HEX_REMAIN)
+            # Starts like hex but contains invalid characters -> treat as invalid_hex
+            add_token(:invalid_hex, @scanner.matched)
             @position = @scanner.pos
             return true
           end
