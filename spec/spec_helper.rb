@@ -4,6 +4,9 @@
 unless ENV['NO_COVERAGE']
   require 'simplecov'
   SimpleCov.start do
+    # Enable branch coverage reporting (requires Ruby's built-in branch coverage support)
+    enable_coverage :branch
+
     add_filter '/spec/'
     add_group 'Libraries', 'lib'
   end
