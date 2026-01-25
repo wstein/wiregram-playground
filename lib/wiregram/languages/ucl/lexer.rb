@@ -34,28 +34,9 @@ module WireGram
           # Handle comments
           return true if skip_comment
 
-          # Check for directive (must come before identifier check since it starts with .)
-          if current_char == '.' && peek_char(1)&.match?(/[a-zA-Z_]/)
-            return tokenize_directive
-          end
-
-          # Check for flag-style identifiers (like -i)
-          if current_char == '-' && peek_char(1)&.match?(/[A-Za-z_]/)
-            return tokenize_identifier_or_keyword
-          end
-
-          # Check for URLs
-          if @source[@position..] =~ URL_PATTERN
-            return tokenize_unquoted_string
-          end
-
-          # Check for percent-prefixed tokens
-          if current_char == '%' && peek_char(1)&.match?(/[A-Za-z_]/)
-            return tokenize_identifier_or_keyword
-          end
-
           char = current_char
 
+          # Fast path: handle structural tokens first (most common in UCL)
           case char
           when '{'
             add_token(:lbrace, '{'); advance; true
@@ -81,11 +62,39 @@ module WireGram
             tokenize_quoted_string_fast
           when "'"
             tokenize_single_quoted_string_fast
+          when '.'
+            # Directive (must be checked before identifier)
+            if peek_char(1)&.match?(/[a-zA-Z_]/)
+              tokenize_directive
+            else
+              false
+            end
+          when '-'
+            # Flag-style identifier (like -i) or number
+            if peek_char(1)&.match?(/[A-Za-z_]/)
+              tokenize_identifier_or_keyword
+            elsif peek_char(1)&.match?(/\d/)
+              tokenize_number_fast
+            else
+              false
+            end
+          when '%'
+            # Percent-prefixed token
+            if peek_char(1)&.match?(/[A-Za-z_]/)
+              tokenize_identifier_or_keyword
+            else
+              false
+            end
           when /[a-zA-Z_]/
             tokenize_identifier_or_keyword
           when '/'
-            tokenize_unquoted_string
-          when /[0-9\-]/
+            # Check for URL before treating as unquoted string
+            if @source[@position..].start_with?(%r{[a-zA-Z0-9_\-\.]+://})
+              tokenize_unquoted_string
+            else
+              false
+            end
+          when /\d/
             tokenize_number_fast
           else
             false
@@ -298,7 +307,8 @@ module WireGram
             elsif current_char == '}' && interp_depth > 0
               advance
               interp_depth -= 1
-            elsif interp_depth == 0 && current_char.match?(/[\s,;:\}\)]/)
+            elsif interp_depth == 0 && current_char.match?(/[\s,;:\}\)\"]/)
+              # Stop at delimiters including quotes
               if current_char == ':' && peek_char(1) == '/' && peek_char(2) == '/'
                 advance
               else
@@ -310,8 +320,14 @@ module WireGram
           end
 
           value = @source[start...@position]
-          add_token(:string, value)
-          true
+          # Only add token if we actually consumed something
+          if value.length > 0
+            add_token(:string, value)
+            true
+          else
+            # Hit a delimiter immediately without consuming anything
+            false
+          end
         end
 
         def tokenize_number_fast
