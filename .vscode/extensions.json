@@ -3,9 +3,9 @@
     "castwide.solargraph",
     "crystal-lang.crystal",
     "redhat.vscode-yaml",
-    "eamodio.gitlens",
     "tadashi.fish",
     "GitHub.vscode-pull-request-github",
-    "ms-azuretools.vscode-docker"
+    "ms-azuretools.vscode-containers",
+    "mhutchie.git-graph"
   ]
 }
