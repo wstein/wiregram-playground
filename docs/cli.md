@@ -36,6 +36,14 @@ Streaming & NDJSON (newline-delimited JSON)
 - For `parse` streaming (e.g., when parsing a large JSON array), the CLI will emit each parsed item node as a JSON object line as soon as it's available.
 - The CLI still supports non-streaming usage: piping to `WIREGRAM_FORMAT=json` or using `inspect` returns a single structured JSON object for the full result.
 
+### Performance & Streaming ⚡
+- Lexers have been optimized for large inputs using: **StringScanner**, **pre-compiled regex patterns**, and **fast string unescape** fast-paths.
+- When the CLI uses streaming (`tokenize` / `parse`) and a language supports streaming, the lexer is put into *streaming mode* which avoids accumulating large `@tokens` arrays in memory. This reduces GC pressure and memory usage for big files.
+- Streaming output is NDJSON (one JSON object per line) and is ideal for Unix pipelines. Example: `bin/wiregram json tokenize large.json | jq -c .`.
+- Developer note: streaming is enabled by calling `enable_streaming!` on a language's lexer (internals). Languages expose `tokenize_stream` / `parse_stream` methods which handle this automatically.
+
+> Tip: For very large files, prefer `tokenize`/`parse` streaming over `inspect` or `process` to keep memory usage low and latency minimal.
+
 Example server request:
 
 POST /v1/process

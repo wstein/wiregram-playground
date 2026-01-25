@@ -103,6 +103,7 @@ module WireGram
         if status.success?
           # Streaming commands (tokenize/parse) may emit NDJSON (one JSON object per line).
           # Handle both single-document JSON (inspect) and NDJSON streaming.
+          # Note: WireGram lexers have been optimized for large inputs (StringScanner, pre-compiled patterns, fast unescape) and streaming mode avoids keeping the entire token array in memory. Prefer streaming (`tokenize`/`parse`) plus line-by-line parsing in clients for lowest memory usage and latency.
           if result_text.lines.size > 1 && result_text.lines.all? { |l| l.strip.start_with?("{") || l.strip.start_with?("[") }
             # NDJSON: parse each line individually
             result_text.lines.each do |line|
