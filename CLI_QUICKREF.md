@@ -32,7 +32,7 @@ bin/wiregram json inspect config.json
 ```
 
 ### Tokenize
-Shows the token stream. The CLI supports streaming token output (NDJSON) when available — this is ideal for large inputs.
+Shows the token stream. The CLI supports streaming token output (NDJSON) when available — this is ideal for large inputs and keeps memory usage low.
 
 ```bash
 # Basic (may stream tokens line-delimited JSON)
@@ -40,6 +40,9 @@ echo '{"a":1}' | bin/wiregram json tokenize
 
 # Stream and pipe to jq (-c for compact JSON lines)
 bin/wiregram json tokenize large.json | jq -c .
+
+# Notes: When streaming is active, lexers avoid accumulating large token arrays in memory.
+# This behavior is automatic; languages that support streaming will enable it internally.
 
 echo 'x = 1 + 2' | bin/wiregram expression tokenize
 echo 'key = "value"' | bin/wiregram ucl tokenize

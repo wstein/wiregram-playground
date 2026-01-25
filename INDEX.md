@@ -118,9 +118,11 @@ ruby check_cli.rb
 
 ## 📈 Performance
 
-- **Tokenization**: 15-100ms
+- **Tokenization**: 15-100ms (small files) — larger files use streaming and optimized lexers
 - **Parsing**: 30-150ms  
 - **Full pipeline**: 100-300ms
+
+For high-throughput or large inputs, prefer streaming commands (`tokenize` / `parse`) which use NDJSON and enable lexer streaming mode to avoid large in-memory token arrays. The lexers (JSON, UCL, Expression) were optimized with **StringScanner**, **pre-compiled regex patterns**, and **fast string handling** to reduce CPU and memory costs.
 
 For high-throughput, use `bin/wiregram server` to avoid subprocess overhead.
 

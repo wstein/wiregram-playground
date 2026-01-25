@@ -155,6 +155,25 @@ No modifications required.
 
 ---
 
+## Performance Improvements (Lexers)
+
+### Summary
+We implemented a cross-language set of lexer performance optimizations to improve tokenization speed and reduce memory allocation for large inputs.
+
+### Changes
+- **StringScanner**: All lexers (JSON, UCL, Expression) now use Ruby's `StringScanner` for C-backed scanning of tokens.
+- **Pre-compiled Regex Patterns**: Token-matching regexes are compiled once as class constants (e.g., `STRING_PATTERN`, `NUMBER_PATTERN`, `STRUCTURAL_PATTERN`).
+- **Fast String Handling**: String tokenization avoids expensive unescape work when the string contains no backslashes (common case). When escapes are present we use an allocation-minimizing unescape routine.
+- **Structural Token Fast-path (UCL)**: UCL structural tokens (braces, brackets, punctuation) are matched using a single `STRUCTURAL_PATTERN` which reduces branching overhead.
+- **Token Streaming Mode**: `BaseLexer` gained `enable_streaming!` which tells the lexer to *not* accumulate tokens in `@tokens` when streaming (avoids large in-memory token arrays). Language modules' `tokenize_stream` and `parse_stream` methods enable streaming internally.
+- **Comment & Unquoted String Optimizations (UCL)**: `#` comments are skipped via scanner fast-path, and `tokenize_unquoted_string` uses a scanner-driven fast path for common cases.
+
+### Impact
+- Reduced memory usage when streaming tokens for large files
+- Significant CPU improvements by shifting per-character logic to scanner+regex (C-level), especially on JSON large files
+
+---
+
 ## Testing
 
 ### Before
