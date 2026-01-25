@@ -93,22 +93,25 @@ module WireGram
           end
 
           # 5. Identifiers or Unquoted strings
-          # Prefer URL tokens (scheme://) and interpolated unquoted strings over identifiers
+          # Prefer URL tokens (scheme://) over identifiers
           if @scanner.check(URL_PATTERN)
             return tokenize_unquoted_string
           end
 
-          # If there's an interpolation '${' before the next delimiter, treat as an unquoted string
-          interp_pos = @source.index('${', @position)
-          if interp_pos
-            delim_pos = @source.index(/[\s,;:\}\)\"]/, @position)
-            if delim_pos.nil? || interp_pos < delim_pos
-              return tokenize_unquoted_string
-            end
-          end
-
+          # If starting with a letter, check if the following characters lead into an interpolation
+          # without scanning the entire remaining source (use scanner.check so we don't advance)
           if char&.match?(/[a-zA-Z_]/)
-            return tokenize_identifier_or_keyword
+            @scanner.pos = @position
+            if (m = @scanner.check(IDENTIFIER_PATTERN))
+              after_pos = @position + m.length
+              if @source[after_pos, 2] == '${'
+                return tokenize_unquoted_string
+              else
+                return tokenize_identifier_or_keyword
+              end
+            else
+              return tokenize_identifier_or_keyword
+            end
           elsif char == '/'
             # Check for URL before treating as unquoted string
             if @scanner.check(URL_PATTERN)
@@ -358,21 +361,33 @@ module WireGram
           if @scanner.check(URL_PATTERN)
             @scanner.scan(URL_PATTERN)
             after = @scanner.pos
-            end_pos = src.index(/[\s,;\}\)\"]/, after) || src.length
+            # Use scanner.scan_until to find next delimiter and stop before it
+            if @scanner.scan_until(/[\s,;\}\)\"]/)
+              # scanner.pos points after the delimiter; set end_pos to position before it
+              end_pos = @scanner.pos - 1
+            else
+              end_pos = src.length
+            end
             @position = end_pos
             add_token(:string, src[start...@position], position: @position)
             return true
           end
 
-          # If interpolation '${' occurs before the next delimiter, handle nested interpolation first
-          interp_pos = src.index('${', start)
-          delim_pos = src.index(/[\s,;:\}\)\"]/, start)
-          if interp_pos && (delim_pos.nil? || interp_pos < delim_pos)
+          # If interpolation occurs within the upcoming run, handle nested interpolation
+          # Use scanner to find next '${' starting at current position to avoid scanning whole file
+          @scanner.pos = start
+          if @scanner.scan_until(/\$\{/) # moves pos to after '${'
+            interp_pos = @scanner.pos - 2
             close = find_matching_interpolation_close(src, interp_pos + 2)
             if close.nil?
               end_pos = src.length
             else
-              end_pos = src.index(/[\s,;:\}\)\"]/, close + 1) || src.length
+              @scanner.pos = close + 1
+              if @scanner.scan_until(/[\s,;:\}\)\"]/)
+                end_pos = @scanner.pos - 1
+              else
+                end_pos = src.length
+              end
             end
             @position = end_pos
             add_token(:string, src[start...@position], position: @position)
@@ -380,7 +395,12 @@ module WireGram
           end
 
           # Fast path: consume until next delimiter (no interpolation present)
-          end_pos = src.index(/[\s,;:\}\)\"]/, start) || src.length
+          @scanner.pos = start
+          if @scanner.scan_until(/[\s,;:\}\)\"]/)
+            end_pos = @scanner.pos - 1
+          else
+            end_pos = src.length
+          end
           if end_pos > start
             @position = end_pos
             add_token(:string, src[start...@position], position: @position)
