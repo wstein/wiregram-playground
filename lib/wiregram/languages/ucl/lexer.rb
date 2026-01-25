@@ -19,6 +19,18 @@ module WireGram
         DIRECTIVE_PATTERN = /\.[a-zA-Z_][a-zA-Z0-9_\-\.]*/
         QUOTED_STRING_PATTERN = /"(?:\\.|[^"\\])*"/
         SINGLE_QUOTED_PATTERN = /'(?:\\.|[^'\\])*'/
+        STRUCTURAL_PATTERN = /[\{\}\[\]\:\=;,\(\)]/
+        
+        KEYWORDS = {
+          'true' => true, 'false' => false, 'yes' => true, 'no' => false,
+          'on' => true, 'off' => false, 'null' => nil, 'nil' => nil
+        }.freeze
+
+        STRUCTURAL_MAP = {
+          '{' => :lbrace, '}' => :rbrace, '[' => :lbracket, ']' => :rbracket,
+          ':' => :colon, '=' => :equals, ';' => :semicolon, ',' => :comma,
+          '(' => :lparen, ')' => :rparen
+        }.freeze
 
         def initialize(source)
           super(source)
@@ -34,71 +46,59 @@ module WireGram
           # Handle comments
           return true if skip_comment
 
+          @scanner.pos = @position
           char = current_char
 
-          # Fast path: handle structural tokens first (most common in UCL)
+          # 1. Structural/Punctuation tokens (High Frequency)
+          if matched = @scanner.scan(STRUCTURAL_PATTERN)
+            add_token(STRUCTURAL_MAP[matched], matched)
+            @position = @scanner.pos
+            return true
+          end
+
+          # 2. Quoted strings
+          if char == '"'
+            return tokenize_quoted_string_fast
+          elsif char == "'"
+            return tokenize_single_quoted_string_fast
+          end
+
+          # 3. Numbers (must check before dash-identifiers)
+          if char == '-'
+            if peek_char(1)&.match?(/\d/)
+               return tokenize_number_fast
+            end
+          elsif char&.match?(/\d/)
+            return tokenize_number_fast
+          end
+
+          # 4. Directives, Flags, Prefixes
           case char
-          when '{'
-            add_token(:lbrace, '{'); advance; true
-          when '}'
-            add_token(:rbrace, '}'); advance; true
-          when '['
-            add_token(:lbracket, '['); advance; true
-          when ']'
-            add_token(:rbracket, ']'); advance; true
-          when ':'
-            add_token(:colon, ':'); advance; true
-          when '='
-            add_token(:equals, '='); advance; true
-          when ';'
-            add_token(:semicolon, ';'); advance; true
-          when ','
-            add_token(:comma, ','); advance; true
-          when '('
-            add_token(:lparen, '('); advance; true
-          when ')'
-            add_token(:rparen, ')'); advance; true
-          when '"'
-            tokenize_quoted_string_fast
-          when "'"
-            tokenize_single_quoted_string_fast
           when '.'
-            # Directive (must be checked before identifier)
             if peek_char(1)&.match?(/[a-zA-Z_]/)
-              tokenize_directive
-            else
-              false
+              return tokenize_directive
             end
           when '-'
-            # Flag-style identifier (like -i) or number
             if peek_char(1)&.match?(/[A-Za-z_]/)
-              tokenize_identifier_or_keyword
-            elsif peek_char(1)&.match?(/\d/)
-              tokenize_number_fast
-            else
-              false
+              return tokenize_identifier_or_keyword
             end
           when '%'
-            # Percent-prefixed token
             if peek_char(1)&.match?(/[A-Za-z_]/)
-              tokenize_identifier_or_keyword
-            else
-              false
+              return tokenize_identifier_or_keyword
             end
-          when /[a-zA-Z_]/
-            tokenize_identifier_or_keyword
-          when '/'
-            # Check for URL before treating as unquoted string
-            if @source[@position..].start_with?(%r{[a-zA-Z0-9_\-\.]+://})
-              tokenize_unquoted_string
-            else
-              false
-            end
-          when /\d/
-            tokenize_number_fast
-          else
-            false
           end
+
+          # 5. Identifiers or Unquoted strings
+          if char&.match?(/[a-zA-Z_]/)
+            return tokenize_identifier_or_keyword
+          elsif char == '/'
+            # Check for URL before treating as unquoted string
+            if @scanner.check(URL_PATTERN)
+              return tokenize_unquoted_string
+            end
+          end
+
+          false
         end
 
         private
@@ -110,9 +110,15 @@ module WireGram
         end
 
         def skip_comment
+          @scanner.pos = @position
           if current_char == '#'
-            advance while current_char && current_char != "\n"
-            advance if current_char == "\n"
+            # Fast-skip to end of line
+            if @scanner.scan(/#[^\n]*/)
+              @position = @scanner.pos
+            else
+              advance while current_char && current_char != "\n"
+              advance if current_char == "\n"
+            end
             return true
           elsif current_char == '/' && peek_char(1) == '*'
             skip_nested_block_comment
@@ -261,41 +267,71 @@ module WireGram
         end
 
         def tokenize_identifier_or_keyword
-          start = @position
-          advance if current_char == '-'  # Handle flags like -i
-
-          while current_char
-            break if current_char.match?(/[\[\]\{\}\(\);:,=\s]/)
-            if current_char.match?(/[a-zA-Z0-9_%\-]/)
-              advance
+          @scanner.pos = @position
+          if matched = @scanner.scan(IDENTIFIER_PATTERN)
+            # Use Hash lookup for keywords (much faster than case/downcase)
+            # Fast path: try direct lookup (no allocation if already lowercase)
+            if KEYWORDS.key?(matched)
+              v = KEYWORDS[matched]
+              if v.nil?
+                add_token(:null, nil)
+              else
+                add_token(:boolean, v)
+              end
             else
-              break
+              lc = matched.downcase
+              if KEYWORDS.key?(lc)
+                v = KEYWORDS[lc]
+                if v.nil?
+                  add_token(:null, nil)
+                else
+                  add_token(:boolean, v)
+                end
+              else
+                add_token(:identifier, matched)
+              end
             end
-          end
 
-          value = @source[start...@position]
-          case value.downcase
-          when 'true'
-            add_token(:boolean, true)
-          when 'false'
-            add_token(:boolean, false)
-          when 'yes'
-            add_token(:boolean, true)
-          when 'no'
-            add_token(:boolean, false)
-          when 'null', 'nil'
-            add_token(:null, nil)
-          when 'on'
-            add_token(:boolean, true)
-          when 'off'
-            add_token(:boolean, false)
+            @position = @scanner.pos
+            true
           else
-            add_token(:identifier, value)
+            # Fallback for flags or complex unquoted strings if IDENTIFIER_PATTERN misses
+            start = @position
+            advance if current_char == '-'
+
+            while current_char
+              break if current_char.match?(/[\[\]\{\}\(\);:,=\s]/)
+              if current_char.match?(/[a-zA-Z0-9_%\-]/)
+                advance
+              else
+                break
+              end
+            end
+
+            value = @source[start...@position]
+            return false if value.empty?
+
+            lookup = value.downcase
+            if KEYWORDS.key?(lookup)
+               add_token(KEYWORDS[lookup].nil? ? :null : :boolean, KEYWORDS[lookup])
+            else
+               add_token(:identifier, value)
+            end
+            true
           end
-          true
         end
 
         def tokenize_unquoted_string
+          @scanner.pos = @position
+          # Fast path: consume a run of non-delimiter characters (no interpolation)
+          if matched = @scanner.scan(/[^\s,;:\}\)"]+/)
+            # matched does not include delimiters; consume and return
+            add_token(:string, matched)
+            @position = @scanner.pos
+            return true
+          end
+
+          # Fallback: handle interpolation and nested braces
           start = @position
           interp_depth = 0
 
@@ -307,7 +343,7 @@ module WireGram
             elsif current_char == '}' && interp_depth > 0
               advance
               interp_depth -= 1
-            elsif interp_depth == 0 && current_char.match?(/[\s,;:\}\)\"]/)
+            elsif interp_depth == 0 && current_char.match?(/[\s,;:\}\)"]/)
               # Stop at delimiters including quotes
               if current_char == ':' && peek_char(1) == '/' && peek_char(2) == '/'
                 advance

@@ -12,6 +12,19 @@ module WireGram
         @position = 0
         @tokens = []
         @errors = []
+        @streaming = false
+        @last_token = nil
+      end
+
+      # Public API to enable/disable streaming mode. When enabled, tokens are
+      # returned directly and not stored in @tokens which avoids large memory
+      # allocations during token streaming.
+      def enable_streaming!
+        @streaming = true
+      end
+
+      def disable_streaming!
+        @streaming = false
       end
 
 # Tokenize the source code eagerly (compatibility)
@@ -19,6 +32,7 @@ module WireGram
     @tokens = []
     @errors = []
     @position = 0
+    @streaming = false
 
     loop do
       token = next_token
@@ -36,20 +50,29 @@ module WireGram
     # If at end, return EOF token
     if @position >= @source.length
       token = { type: :eof, value: nil, position: @position }
-      unless @tokens.last && @tokens.last[:type] == :eof
-        @tokens << token
+      if @streaming
+        @last_token = token
+      else
+        unless @tokens.last && @tokens.last[:type] == :eof
+          @tokens << token
+        end
       end
       return token
     end
 
     prev_len = @tokens.length
+    @last_token = nil if @streaming
 
     # Keep trying until a token has been added (skip_comment may not add tokens)
     loop do
       if try_tokenize_next
-        # If a token was added, return it
-        return @tokens.last if @tokens.length > prev_len
-        # else loop and try again (e.g., comments were skipped)
+        if @streaming
+          return @last_token if @last_token
+          # else loop and try again (e.g., comments were skipped)
+        else
+          return @tokens.last if @tokens.length > prev_len
+          # else loop and try again (e.g., comments were skipped)
+        end
       else
         # Error recovery: skip character and report unknown
         @errors << {
@@ -59,15 +82,23 @@ module WireGram
         }
         token = { type: :unknown, value: current_char, position: @position }
         advance
-        @tokens << token
+        if @streaming
+          @last_token = token
+        else
+          @tokens << token
+        end
         return token
       end
 
       # If we advanced to EOF while skipping, return EOF
       if @position >= @source.length
         token = { type: :eof, value: nil, position: @position }
-        unless @tokens.last && @tokens.last[:type] == :eof
-          @tokens << token
+        if @streaming
+          @last_token = token
+        else
+          unless @tokens.last && @tokens.last[:type] == :eof
+            @tokens << token
+          end
         end
         return token
       end
@@ -100,7 +131,12 @@ module WireGram
   def add_token(type, value = nil, extras = {})
     token = { type: type, value: value, position: @position }
     token.merge!(extras) if extras && !extras.empty?
-    @tokens << token
+    if @streaming
+      @last_token = token
+    else
+      @tokens << token
+    end
+    token
   end
 end
   end
