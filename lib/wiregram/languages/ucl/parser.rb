@@ -34,6 +34,39 @@ module WireGram
           end
         end
 
+        # Stream pairs/directives as they are parsed from the input
+        # Yields individual :pair or :directive nodes (useful for large inputs)
+        def parse_stream
+          if current_token && current_token[:type] == :lbrace
+            expect(:lbrace)
+            until at_end? || current_token[:type] == :rbrace
+              if current_token[:type] == :directive
+                d = parse_directive
+                yield(d) if block_given? && d
+              else
+                p = parse_pair
+                yield(p) if block_given? && p
+              end
+              # allow separators
+              if current_token && [:semicolon, :comma].include?(current_token[:type])
+                advance
+              end
+            end
+            expect(:rbrace)
+          else
+            # Top-level pairs
+            until at_end?
+              if current_token && current_token[:type] == :directive
+                d = parse_directive
+                yield(d) if block_given? && d
+              else
+                p = parse_pair
+                yield(p) if block_given? && p
+              end
+            end
+          end
+        end
+
         # Convert AST Node -> UOM (Ruby Hash)
         def self.ast_to_uom(node)
           return nil unless node

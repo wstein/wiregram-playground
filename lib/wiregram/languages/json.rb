@@ -84,7 +84,8 @@ module WireGram
       # Stream AST nodes as they are parsed. Yields Node objects.
       def self.parse_stream(input)
         lexer = WireGram::Languages::Json::Lexer.new(input)
-        token_stream = WireGram::Core::TokenStream.new(lexer)
+        lexer.enable_streaming!
+        token_stream = WireGram::Core::StreamingTokenStream.new(lexer)
         parser = WireGram::Languages::Json::Parser.new(token_stream)
         parser.parse_stream do |node|
           yield(node) if block_given?

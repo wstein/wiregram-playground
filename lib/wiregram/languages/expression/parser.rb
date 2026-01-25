@@ -31,6 +31,19 @@ module WireGram
           WireGram::Core::Node.new(:program, children: statements)
         end
 
+        # Stream statements as they are parsed (for large inputs / low memory)
+        def parse_stream
+          until at_end?
+            begin
+              stmt = parse_statement
+              yield(stmt) if block_given? && stmt
+            rescue => e
+              @errors << { type: :parse_error, message: e.message, position: @position }
+              synchronize
+            end
+          end
+        end
+
         # Enhanced parse method that returns complete pipeline results
         def parse_with_pipeline(tokens)
           result = {}
