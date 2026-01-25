@@ -1,0 +1,394 @@
+=== INPUT ===
+{
+  "user": {
+    "profile": {
+      "name": "Jane Smith",
+      "contact": {
+        "email": "jane@example.com",
+        "phone": "+1-555-0123"
+      }
+    },
+    "settings": {
+      "theme": "dark",
+      "notifications": {
+        "email": true,
+        "push": false
+      }
+    }
+  },
+  "metadata": {
+    "created": "2023-01-01T00:00:00Z",
+    "version": 2.1
+  }
+}
+
+=== TOKENS ===
+{type: lbrace, value: "{", position: 0}
+{type: string, value: "user", position: 10}
+{type: colon, value: ":", position: 10}
+{type: lbrace, value: "{", position: 12}
+{type: string, value: "profile", position: 27}
+{type: colon, value: ":", position: 27}
+{type: lbrace, value: "{", position: 29}
+{type: string, value: "name", position: 43}
+{type: colon, value: ":", position: 43}
+{type: string, value: "Jane Smith", position: 57}
+{type: comma, value: ",", position: 57}
+{type: string, value: "contact", position: 74}
+{type: colon, value: ":", position: 74}
+{type: lbrace, value: "{", position: 76}
+{type: string, value: "email", position: 93}
+{type: colon, value: ":", position: 93}
+{type: string, value: "jane@example.com", position: 113}
+{type: comma, value: ",", position: 113}
+{type: string, value: "phone", position: 130}
+{type: colon, value: ":", position: 130}
+{type: string, value: "+1-555-0123", position: 145}
+{type: rbrace, value: "}", position: 152}
+{type: rbrace, value: "}", position: 158}
+{type: comma, value: ",", position: 159}
+{type: string, value: "settings", position: 175}
+{type: colon, value: ":", position: 175}
+{type: lbrace, value: "{", position: 177}
+{type: string, value: "theme", position: 192}
+{type: colon, value: ":", position: 192}
+{type: string, value: "dark", position: 200}
+{type: comma, value: ",", position: 200}
+{type: string, value: "notifications", position: 223}
+{type: colon, value: ":", position: 223}
+{type: lbrace, value: "{", position: 225}
+{type: string, value: "email", position: 242}
+{type: colon, value: ":", position: 242}
+{type: boolean, value: true, position: 248}
+{type: comma, value: ",", position: 248}
+{type: string, value: "push", position: 264}
+{type: colon, value: ":", position: 264}
+{type: boolean, value: false, position: 271}
+{type: rbrace, value: "}", position: 278}
+{type: rbrace, value: "}", position: 284}
+{type: rbrace, value: "}", position: 288}
+{type: comma, value: ",", position: 289}
+{type: string, value: "metadata", position: 303}
+{type: colon, value: ":", position: 303}
+{type: lbrace, value: "{", position: 305}
+{type: string, value: "created", position: 320}
+{type: colon, value: ":", position: 320}
+{type: string, value: "2023-01-01T00:00:00Z", position: 344}
+{type: comma, value: ",", position: 344}
+{type: string, value: "version", position: 359}
+{type: colon, value: ":", position: 359}
+{type: number, value: 2.1, position: 364}
+{type: rbrace, value: "}", position: 367}
+{type: rbrace, value: "}", position: 369}
+{type: eof, value: nil, position: 370}
+
+=== AST ===
+{
+  "type": "object",
+  "value": null,
+  "children": [
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "user",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "object",
+          "value": null,
+          "children": [
+            {
+              "type": "pair",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "profile",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "object",
+                  "value": null,
+                  "children": [
+                    {
+                      "type": "pair",
+                      "value": null,
+                      "children": [
+                        {
+                          "type": "string",
+                          "value": "name",
+                          "children": [],
+                          "metadata": {}
+                        },
+                        {
+                          "type": "string",
+                          "value": "Jane Smith",
+                          "children": [],
+                          "metadata": {}
+                        }
+                      ],
+                      "metadata": {}
+                    },
+                    {
+                      "type": "pair",
+                      "value": null,
+                      "children": [
+                        {
+                          "type": "string",
+                          "value": "contact",
+                          "children": [],
+                          "metadata": {}
+                        },
+                        {
+                          "type": "object",
+                          "value": null,
+                          "children": [
+                            {
+                              "type": "pair",
+                              "value": null,
+                              "children": [
+                                {
+                                  "type": "string",
+                                  "value": "email",
+                                  "children": [],
+                                  "metadata": {}
+                                },
+                                {
+                                  "type": "string",
+                                  "value": "jane@example.com",
+                                  "children": [],
+                                  "metadata": {}
+                                }
+                              ],
+                              "metadata": {}
+                            },
+                            {
+                              "type": "pair",
+                              "value": null,
+                              "children": [
+                                {
+                                  "type": "string",
+                                  "value": "phone",
+                                  "children": [],
+                                  "metadata": {}
+                                },
+                                {
+                                  "type": "string",
+                                  "value": "+1-555-0123",
+                                  "children": [],
+                                  "metadata": {}
+                                }
+                              ],
+                              "metadata": {}
+                            }
+                          ],
+                          "metadata": {}
+                        }
+                      ],
+                      "metadata": {}
+                    }
+                  ],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            },
+            {
+              "type": "pair",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "settings",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "object",
+                  "value": null,
+                  "children": [
+                    {
+                      "type": "pair",
+                      "value": null,
+                      "children": [
+                        {
+                          "type": "string",
+                          "value": "theme",
+                          "children": [],
+                          "metadata": {}
+                        },
+                        {
+                          "type": "string",
+                          "value": "dark",
+                          "children": [],
+                          "metadata": {}
+                        }
+                      ],
+                      "metadata": {}
+                    },
+                    {
+                      "type": "pair",
+                      "value": null,
+                      "children": [
+                        {
+                          "type": "string",
+                          "value": "notifications",
+                          "children": [],
+                          "metadata": {}
+                        },
+                        {
+                          "type": "object",
+                          "value": null,
+                          "children": [
+                            {
+                              "type": "pair",
+                              "value": null,
+                              "children": [
+                                {
+                                  "type": "string",
+                                  "value": "email",
+                                  "children": [],
+                                  "metadata": {}
+                                },
+                                {
+                                  "type": "boolean",
+                                  "value": true,
+                                  "children": [],
+                                  "metadata": {}
+                                }
+                              ],
+                              "metadata": {}
+                            },
+                            {
+                              "type": "pair",
+                              "value": null,
+                              "children": [
+                                {
+                                  "type": "string",
+                                  "value": "push",
+                                  "children": [],
+                                  "metadata": {}
+                                },
+                                {
+                                  "type": "boolean",
+                                  "value": false,
+                                  "children": [],
+                                  "metadata": {}
+                                }
+                              ],
+                              "metadata": {}
+                            }
+                          ],
+                          "metadata": {}
+                        }
+                      ],
+                      "metadata": {}
+                    }
+                  ],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "metadata",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "object",
+          "value": null,
+          "children": [
+            {
+              "type": "pair",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "created",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "string",
+                  "value": "2023-01-01T00:00:00Z",
+                  "children": [],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            },
+            {
+              "type": "pair",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "version",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "number",
+                  "value": 2.1,
+                  "children": [],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
+
+=== UOM ===
+{
+    "user": {
+        "profile": {
+            "name": "Jane Smith",
+            "contact": {
+                "email": "jane@example.com",
+                "phone": "+1-555-0123"
+            }
+        },
+        "settings": {
+            "theme": "dark",
+            "notifications": {
+                "email": true,
+                "push": false
+            }
+        }
+    },
+    "metadata": {
+        "created": "2023-01-01T00:00:00Z",
+        "version": 2.1
+    }
+}
+
+=== OUTPUT ===
+{"user": {"profile": {"name": "Jane Smith", "contact": {"email": "jane@example.com", "phone": "+1-555-0123"}}, "settings": {"theme": "dark", "notifications": {"email": true, "push": false}}}, "metadata": {"created": "2023-01-01T00:00:00Z", "version": 2.1}}
+
+=== ERRORS ===
+[]

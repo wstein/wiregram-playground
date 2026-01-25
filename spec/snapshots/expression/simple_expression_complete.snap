@@ -1,0 +1,36 @@
+=== INPUT ===
+42
+
+=== TOKENS ===
+{type: number, value: 42, position: 2}
+{type: eof, value: nil, position: 2}
+
+=== AST ===
+{
+  "type": "program",
+  "value": null,
+  "children": [
+    {
+      "type": "number",
+      "value": 42,
+      "children": [],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
+
+=== UOM ===
+{
+  "program": {
+    "statements": [
+      42
+    ]
+  }
+}
+
+=== OUTPUT ===
+42
+
+=== ERRORS ===
+[]

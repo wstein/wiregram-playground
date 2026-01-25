@@ -1,0 +1,126 @@
+=== INPUT ===
+{
+  "name": "John Doe",
+  "age": 30,
+  "active": true,
+  "score": null
+}
+
+=== TOKENS ===
+{type: lbrace, value: "{", position: 0}
+{type: string, value: "name", position: 10}
+{type: colon, value: ":", position: 10}
+{type: string, value: "John Doe", position: 22}
+{type: comma, value: ",", position: 22}
+{type: string, value: "age", position: 31}
+{type: colon, value: ":", position: 31}
+{type: number, value: 30, position: 35}
+{type: comma, value: ",", position: 35}
+{type: string, value: "active", position: 47}
+{type: colon, value: ":", position: 47}
+{type: boolean, value: true, position: 53}
+{type: comma, value: ",", position: 53}
+{type: string, value: "score", position: 64}
+{type: colon, value: ":", position: 64}
+{type: null, value: nil, position: 70}
+{type: rbrace, value: "}", position: 71}
+{type: eof, value: nil, position: 72}
+
+=== AST ===
+{
+  "type": "object",
+  "value": null,
+  "children": [
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "name",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "John Doe",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "age",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "number",
+          "value": 30,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "active",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "boolean",
+          "value": true,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "score",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "null",
+          "value": null,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}
+
+=== UOM ===
+{
+    "name": "John Doe",
+    "age": 30,
+    "active": true,
+    "score": null
+}
+
+=== OUTPUT ===
+{"name": "John Doe", "age": 30, "active": true, "score": null}
+
+=== ERRORS ===
+[]

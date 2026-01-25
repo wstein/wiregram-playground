@@ -1,0 +1,104 @@
+{
+  "type": "object",
+  "value": null,
+  "children": [
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "user",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "object",
+          "value": null,
+          "children": [
+            {
+              "type": "pair",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "name",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "string",
+                  "value": "John",
+                  "children": [],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            },
+            {
+              "type": "pair",
+              "value": null,
+              "children": [
+                {
+                  "type": "string",
+                  "value": "address",
+                  "children": [],
+                  "metadata": {}
+                },
+                {
+                  "type": "object",
+                  "value": null,
+                  "children": [
+                    {
+                      "type": "pair",
+                      "value": null,
+                      "children": [
+                        {
+                          "type": "string",
+                          "value": "city",
+                          "children": [],
+                          "metadata": {}
+                        },
+                        {
+                          "type": "string",
+                          "value": "NYC",
+                          "children": [],
+                          "metadata": {}
+                        }
+                      ],
+                      "metadata": {}
+                    }
+                  ],
+                  "metadata": {}
+                }
+              ],
+              "metadata": {}
+            }
+          ],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "active",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "boolean",
+          "value": true,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

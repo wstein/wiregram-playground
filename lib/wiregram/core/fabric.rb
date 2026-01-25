@@ -54,12 +54,31 @@ module WireGram
         case node.type
         when :program
           node.children.map { |child| unweave(child) }.join(" ")
+        when :ucl_program
+          # Use UCL serializer for normalized output
+          require_relative '../languages/ucl/serializer'
+          WireGram::Languages::Ucl::Serializer.serialize_program(node, renumber: false)
+        when :pair
+          key = node.children[0]
+          value = node.children[1]
+          key_text = key.value.to_s
+          value_text = unweave(value)
+          "#{key_text} = #{value_text};"
+        when :object
+          inner = node.children.map { |c| "  #{unweave(c)}" }.join("\n")
+          "{\n#{inner}\n}"
+        when :array
+          "[" + node.children.map { |c| unweave(c) }.join(', ') + "]"
         when :number
           node.value.to_s
         when :string
           "\"#{node.value}\""
         when :identifier
           node.value.to_s
+        when :boolean
+          node.value ? 'true' : 'false'
+        when :null
+          'null'
         when :add
           "#{unweave(node.children[0])} + #{unweave(node.children[1])}"
         when :subtract

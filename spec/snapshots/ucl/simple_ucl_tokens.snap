@@ -1,0 +1,5 @@
+{type: identifier, value: "key", position: 3}
+{type: equals, value: "=", position: 4}
+{type: string, value: "value", position: 13}
+{type: semicolon, value: ";", position: 13}
+{type: eof, value: nil, position: 14}

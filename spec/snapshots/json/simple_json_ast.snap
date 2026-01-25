@@ -1,0 +1,45 @@
+{
+  "type": "object",
+  "value": null,
+  "children": [
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "name",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "string",
+          "value": "John",
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "type": "pair",
+      "value": null,
+      "children": [
+        {
+          "type": "string",
+          "value": "age",
+          "children": [],
+          "metadata": {}
+        },
+        {
+          "type": "number",
+          "value": 30,
+          "children": [],
+          "metadata": {}
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "metadata": {}
+}

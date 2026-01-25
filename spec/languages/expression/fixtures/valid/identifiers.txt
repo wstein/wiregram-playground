@@ -1,0 +1,3 @@
+x
+variable_name
+result

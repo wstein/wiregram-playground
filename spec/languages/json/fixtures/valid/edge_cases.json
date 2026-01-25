@@ -1,0 +1,30 @@
+{
+  "strings": {
+    "newline": "line1\nline2",
+    "tab": "before\ttab\tafter",
+    "quotes": "He said \"Hello\"",
+    "backslash": "C:\\Windows\\System32",
+    "unicode": "Unicode: \u0041\u0042\u0043",
+    "empty": ""
+  },
+  "numbers": {
+    "integer": 42,
+    "negative": -123,
+    "float": 3.14159,
+    "scientific": 1.23e-10,
+    "large": 9007199254740991,
+    "zero": 0
+  },
+  "booleans": {
+    "true": true,
+    "false": false
+  },
+  "nulls": {
+    "null_value": null
+  },
+  "special": {
+    "infinity": 1e1000,
+    "negative_infinity": -1e1000,
+    "nan": null
+  }
+}

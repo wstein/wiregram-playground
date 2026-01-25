@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'json'
+
 module WireGram
   module Core
     # AST Node - Represents a node in the abstract syntax tree
@@ -45,6 +47,59 @@ module WireGram
 
       def inspect
         "#<Node type=#{@type} value=#{@value.inspect} children=#{@children.length}>"
+      end
+
+      # Deep serialization for snapshots - shows actual content with depth limiting
+      def to_detailed_string(depth = 0, max_depth = 3)
+        return "..." if depth > max_depth
+
+        indent = "  " * depth
+        result = "#{indent}#<Node type=#{@type}"
+
+        if @value
+          result += " value=#{@value.inspect}"
+        end
+
+        if @children.any?
+          result += " children=#{@children.length}>"
+          @children.each do |child|
+            if child.is_a?(Node)
+              result += "\n#{child.to_detailed_string(depth + 1, max_depth)}"
+            else
+              result += "\n#{indent}  #{child.inspect}"
+            end
+          end
+        else
+          result += ">"
+        end
+
+        result
+      end
+
+      # Convert to JSON format for snapshots
+      def to_json
+        # Handle infinity values that can't be serialized to JSON
+        hash = to_h
+        JSON.pretty_generate(sanitize_for_json(hash))
+      end
+
+      private
+
+      def sanitize_for_json(obj)
+        case obj
+        when Hash
+          obj.transform_values { |v| sanitize_for_json(v) }
+        when Array
+          obj.map { |v| sanitize_for_json(v) }
+        when Float
+          if obj.infinite?
+            obj.positive? ? "Infinity" : "-Infinity"
+          else
+            obj
+          end
+        else
+          obj
+        end
       end
     end
   end
