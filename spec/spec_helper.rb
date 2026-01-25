@@ -1,5 +1,17 @@
 # frozen_string_literal: true
 
+# Enable coverage for test runs by default. Set NO_COVERAGE=1 to disable.
+unless ENV['NO_COVERAGE']
+  require 'simplecov'
+  SimpleCov.start do
+    add_filter '/spec/'
+    add_group 'Libraries', 'lib'
+  end
+  SimpleCov.at_exit do
+    SimpleCov.result.format!
+  end
+end
+
 require 'bundler/setup'
 require 'rspec'
 

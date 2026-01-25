@@ -192,6 +192,19 @@ module WireGram
             }
           end
 
+          # Simplified JSON format for snapshots - convert each item to simple JSON
+          def to_simple_json
+            @items.map do |item|
+              if item.respond_to?(:to_simple_json)
+                item.to_simple_json
+              elsif item.respond_to?(:to_json)
+                item.to_json
+              else
+                item.to_s
+              end
+            end
+          end
+
           # Pretty JSON for snapshots
           def to_pretty_json
             JSON.pretty_generate(to_json)
@@ -245,8 +258,19 @@ module WireGram
           # Simplified JSON format for snapshots - just the value
           def to_simple_json
             case @type
-            when :string, :number, :boolean, :null
+            when :string
               @value
+            when :number
+              # Convert numeric strings to Integer or Float
+              if @value.include?('.') || @value.include?('e') || @value.include?('E')
+                @value.to_f
+              else
+                @value.to_i
+              end
+            when :boolean
+              @value
+            when :null
+              nil
             else
               @value
             end
@@ -262,6 +286,60 @@ module WireGram
           def escape_ucl_string(str)
             str.to_s.gsub(/\\/) { '\\\\' }
                      .gsub(/"/) { '\\"' }
+          end
+        end
+
+        # Build a UOM from a simple Ruby structure (Hash or Array) typically produced by JSON.parse.
+        def self.from_simple_json(obj)
+          u = UOM.new
+
+          # If top-level is a single-item array with an object (common test format), use the first item
+          if obj.is_a?(Array) && obj.length == 1 && obj[0].is_a?(Hash)
+            obj = obj[0]
+          end
+
+          if obj.is_a?(Hash)
+            obj.each do |k, v|
+              u.add_assignment(u.root, k.to_s, convert_value_to_uom(v))
+            end
+          elsif obj.is_a?(Array)
+            # Convert array into a single assignment named 'items'
+            arr = ArrayValue.new(obj.map { |e| convert_value_to_uom(e) })
+            u.add_assignment(u.root, 'items', arr)
+          else
+            # For primitives, store under key 'value'
+            u.add_assignment(u.root, 'value', convert_value_to_uom(obj))
+          end
+
+          u
+        end
+
+        def self.convert_value_to_uom(v)
+          case v
+          when Hash
+            sec = Section.new(nil)
+            v.each do |kk, vv|
+              # Use a temporary UOM to add assignment with sorting
+              temp_uom = UOM.new
+              temp_uom.add_assignment(temp_uom.root, kk.to_s, convert_value_to_uom(vv))
+              # Copy the assignment to our section
+              sec.items.concat(temp_uom.root.items)
+            end
+            # Re-sort after all assignments
+            sec.items.sort_by! { |item| item.key.to_s }
+            sec
+          when Array
+            ArrayValue.new(v.map { |e| convert_value_to_uom(e) })
+          when String
+            Value.new(:string, v)
+          when Integer, Float
+            Value.new(:number, v.to_s)
+          when TrueClass, FalseClass
+            Value.new(:boolean, v)
+          when NilClass
+            Value.new(:null, nil)
+          else
+            Value.new(:string, v.to_s)
           end
         end
 
@@ -361,7 +439,11 @@ module WireGram
                 end
               else
                 # Handle other types (sections, arrays, etc.)
-                grouped[key] << value.to_s
+                if value.respond_to?(:to_simple_json)
+                  grouped[key] << value.to_simple_json
+                else
+                  grouped[key] << value.to_s
+                end
               end
             end
           end
@@ -434,45 +516,70 @@ module WireGram
           lines.join("\n")
         end
 
-        def render_value(v)
-          case v.type
-          when :string
-            quote_string(v.value)
-          when :number
-            # For numbers, check if they need formatting
-            # Keep scientific notation as-is
-            num_str = v.value.to_s
-            if num_str.include?('e') || num_str.include?('E')
-              # Scientific notation - keep as-is
-              num_str
-            elsif num_str.include?('.')
-              # Decimal notation - format with 6 decimal places only for some cases
-              parts = num_str.split('.')
-              if parts.length == 2 && parts[1].length == 1
-                # One decimal place: check if it's non-zero
-                last_digit = parts[1][0].to_i
-                if last_digit != 0
-                  # Non-zero last digit like "123.2" - format to 6 places
-                  float_val = num_str.to_f
-                  sprintf("%.6f", float_val)
+        def render_value(v, indent = 0)
+          indent_str = '    ' * indent
+
+          # Handle nested UOM types
+          case
+          when v.is_a?(Section)
+            inner = render_section(v, indent + 1)
+            # Represent as a block
+            "{\n#{inner}\n#{indent_str}}"
+          when v.is_a?(ArrayValue)
+            arr_lines = []
+            arr_lines << "["
+            v.items.each do |item|
+              item_lines = render_value(item, indent + 1).lines.map(&:chomp)
+              item_lines.each_with_index do |line, i|
+                suffix = (i == item_lines.length - 1) ? ',' : ''
+                arr_lines << "#{indent_str}    #{line}#{suffix}"
+              end
+            end
+            arr_lines << "#{indent_str}]"
+            arr_lines.join("\n")
+          when defined?(Value) && v.is_a?(Value)
+            case v.type
+            when :string
+              quote_string(v.value)
+            when :number
+              # For numbers, check if they need formatting
+              # Keep scientific notation as-is
+              num_str = v.value.to_s
+              if num_str.include?('e') || num_str.include?('E')
+                # Scientific notation - keep as-is
+                num_str
+              elsif num_str.include?('.')
+                # Decimal notation - format with 6 decimal places only for some cases
+                parts = num_str.split('.')
+                if parts.length == 2 && parts[1].length == 1
+                  # One decimal place: check if it's non-zero
+                  last_digit = parts[1][0].to_i
+                  if last_digit != 0
+                    # Non-zero last digit like "123.2" - format to 6 places
+                    float_val = num_str.to_f
+                    sprintf("%.6f", float_val)
+                  else
+                    # Zero last digit like "1.0" - keep as-is
+                    num_str
+                  end
                 else
-                  # Zero last digit like "1.0" - keep as-is
+                  # Other decimal formats - keep as-is
                   num_str
                 end
               else
-                # Other decimal formats - keep as-is
+                # Integer
                 num_str
               end
+            when :boolean
+              v.value ? 'true' : 'false'
+            when :null
+              'null'
             else
-              # Integer
-              num_str
+              quote_string(v.value.to_s)
             end
-          when :boolean
-            v.value ? 'true' : 'false'
-          when :null
-            'null'
           else
-            quote_string(v.value.to_s)
+            # Fallback - stringify
+            quote_string(v.to_s)
           end
         end
 

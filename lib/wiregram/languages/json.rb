@@ -54,6 +54,31 @@ module WireGram
         end
         result
       end
+
+      # Tokenize input
+      def self.tokenize(input)
+        lexer = WireGram::Languages::Json::Lexer.new(input)
+        token_stream = WireGram::Core::TokenStream.new(lexer)
+        token_stream.tokens
+      end
+
+      # Stream tokens one-by-one (memory efficient for large files)
+      def self.tokenize_stream(input)
+        lexer = WireGram::Languages::Json::Lexer.new(input)
+        loop do
+          token = lexer.next_token
+          yield(token) if block_given?
+          break if token && token[:type] == :eof
+        end
+      end
+
+      # Parse input to AST
+      def self.parse(input)
+        lexer = WireGram::Languages::Json::Lexer.new(input)
+        token_stream = WireGram::Core::TokenStream.new(lexer)
+        parser = WireGram::Languages::Json::Parser.new(token_stream)
+        parser.parse
+      end
     end
   end
 end

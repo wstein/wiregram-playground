@@ -21,6 +21,21 @@ ruby demo.rb
 
 This will showcase all major features of the WireGram framework.
 
+### Using the CLI
+
+A lightweight umbrella CLI is available at `bin/wiregram`:
+
+```bash
+# Make it executable and run the JSON inspector for the json language
+chmod +x bin/wiregram
+echo '{"a":1}' | bin/wiregram json inspect --pretty
+
+# Start the JSON HTTP server for programmatic use
+bin/wiregram server --port 4567
+```
+
+The CLI uses a stable JSON output format which makes it easy to call from other languages (Crystal, Kotlin, etc.).
+
 ## Core Concepts
 
 ### 1. Weaving Source Code into Fabric

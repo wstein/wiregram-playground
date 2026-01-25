@@ -301,6 +301,19 @@ module WireGram
           when :identifier
             # treat unquoted identifiers as strings (could be variables/macro refs)
             UOM::Value.new(:string, node.value)
+          when :object
+            # Convert object node into a UOM::Section
+            sub = UOM::Section.new(nil)
+            node.children.each do |c|
+              process_child(sub, c)
+            end
+            sub
+          when :array
+            arr = UOM::ArrayValue.new
+            node.children.each do |el|
+              arr.items << convert_value(el)
+            end
+            arr
           else
             UOM::Value.new(:string, node.value.to_s)
           end

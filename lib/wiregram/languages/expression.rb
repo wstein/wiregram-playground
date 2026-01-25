@@ -49,13 +49,24 @@ module WireGram
         end
 
         def tokenize(input)
-          lexer = Lexer.new(input)
-          lexer.tokenize
+          lexer = WireGram::Languages::Expression::Lexer.new(input)
+          token_stream = WireGram::Core::TokenStream.new(lexer)
+          token_stream.tokens
+        end
+
+        def tokenize_stream(input)
+          lexer = WireGram::Languages::Expression::Lexer.new(input)
+          loop do
+            token = lexer.next_token
+            yield(token) if block_given?
+            break if token && token[:type] == :eof
+          end
         end
 
         def parse(input)
-          tokens = tokenize(input)
-          parser = Parser.new(tokens)
+          lexer = WireGram::Languages::Expression::Lexer.new(input)
+          token_stream = WireGram::Core::TokenStream.new(lexer)
+          parser = WireGram::Languages::Expression::Parser.new(token_stream)
           parser.parse
         end
 
