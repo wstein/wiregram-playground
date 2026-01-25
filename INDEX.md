@@ -60,7 +60,9 @@ echo 'x = 10 + 20' | bin/wiregram expression tokenize
 
 # Parse UCL
 echo 'key = "value"' | bin/wiregram ucl parse
-
+# Stream tokens or parsed nodes (NDJSON)
+bin/wiregram json tokenize large.json | jq -c .
+bin/wiregram json parse large_array.json | jq -c .
 # Start HTTP server
 bin/wiregram server --port 4567
 ```

@@ -32,19 +32,29 @@ bin/wiregram json inspect config.json
 ```
 
 ### Tokenize
-Shows the token stream.
+Shows the token stream. The CLI supports streaming token output (NDJSON) when available — this is ideal for large inputs.
 
 ```bash
+# Basic (may stream tokens line-delimited JSON)
 echo '{"a":1}' | bin/wiregram json tokenize
+
+# Stream and pipe to jq (-c for compact JSON lines)
+bin/wiregram json tokenize large.json | jq -c .
+
 echo 'x = 1 + 2' | bin/wiregram expression tokenize
 echo 'key = "value"' | bin/wiregram ucl tokenize
 ```
 
 ### Parse
-Shows the abstract syntax tree (AST).
+Shows the abstract syntax tree (AST). For large arrays or streaming-capable languages, `parse` can stream nodes as NDJSON lines.
 
 ```bash
+# Parse and print full AST (non-streaming)
 echo '{"a":1}' | bin/wiregram json parse
+
+# Stream array items as individual JSON node lines
+bin/wiregram json parse large_array.json | jq -c .
+
 echo 'x = 1 + 2' | bin/wiregram expression parse
 echo 'key = "value"' | bin/wiregram ucl parse
 ```

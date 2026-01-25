@@ -96,13 +96,24 @@ module WireGram
         error = IO::Memory.new
         process = Process.new(cmd[0], cmd[1..], output: output, error: error)
         status = process.wait
-        
+
         result_text = output.to_s
         error_text = error.to_s
-        
+
         if status.success?
-          # Try to parse as JSON if format is json or output looks like JSON
-          if result_text.strip.start_with?('{') || result_text.strip.start_with?('[')
+          # Streaming commands (tokenize/parse) may emit NDJSON (one JSON object per line).
+          # Handle both single-document JSON (inspect) and NDJSON streaming.
+          if result_text.lines.size > 1 && result_text.lines.all? { |l| l.strip.start_with?("{") || l.strip.start_with?("[") }
+            # NDJSON: parse each line individually
+            result_text.lines.each do |line|
+              begin
+                obj = JSON.parse(line)
+                puts @format == "json" ? JSON.generate(obj) : JSON.pretty_generate(obj)
+              rescue
+                puts line
+              end
+            end
+          elsif result_text.strip.start_with?('{') || result_text.strip.start_with?('[')
             if @format == "json"
               puts result_text
             else

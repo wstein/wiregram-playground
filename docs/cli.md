@@ -24,6 +24,18 @@ Global option: `--format json|text` or set `WIREGRAM_FORMAT=json` for machine-fr
 - JSON (structured) when `--format json` or `WIREGRAM_FORMAT=json` is set
 - Server returns JSON payloads at `/v1/process` with parameters `{ language, input, mode, pretty }`
 
+Streaming & NDJSON (newline-delimited JSON)
+- For streaming commands (`tokenize` and `parse`) the CLI prefers streaming outputs when a language supports it.
+- When streaming is active the CLI emits one JSON object per line (NDJSON / line-delimited JSON). This is optimal for large inputs and low-memory processing and is friendly to tools like `jq -c`.
+- Example: `bin/wiregram json tokenize large.json` will stream tokens as lines like:
+  ```text
+  {"type":"lbrace","value":"{","position":0}
+  {"type":"string","value":"name","position":2}
+  ...
+  ```
+- For `parse` streaming (e.g., when parsing a large JSON array), the CLI will emit each parsed item node as a JSON object line as soon as it's available.
+- The CLI still supports non-streaming usage: piping to `WIREGRAM_FORMAT=json` or using `inspect` returns a single structured JSON object for the full result.
+
 Example server request:
 
 POST /v1/process
