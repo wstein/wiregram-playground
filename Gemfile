@@ -18,3 +18,7 @@ gem "cucumber", "~> 10.2"
 gem "simplecov", "~> 0.22.0"
 
 gem "webrick", "~> 1.9"
+
+gem "rubocop", "~> 1.82"
+
+gem "yard", "~> 0.9.38"
