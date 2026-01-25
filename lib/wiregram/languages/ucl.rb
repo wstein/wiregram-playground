@@ -49,6 +49,7 @@ module WireGram
       # Stream tokens one-by-one (memory efficient for large files)
       def self.tokenize_stream(input)
         lexer = WireGram::Languages::Ucl::Lexer.new(input)
+        lexer.enable_streaming!
         loop do
           token = lexer.next_token
           yield(token) if block_given?

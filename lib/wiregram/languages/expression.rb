@@ -56,6 +56,7 @@ module WireGram
 
         def tokenize_stream(input)
           lexer = WireGram::Languages::Expression::Lexer.new(input)
+          lexer.enable_streaming!
           loop do
             token = lexer.next_token
             yield(token) if block_given?
