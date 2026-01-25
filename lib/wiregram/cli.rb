@@ -209,7 +209,17 @@ module WireGram
           end
         when 'parse'
           input = read_input(argv)
-          if mod.respond_to?(:parse)
+          if mod.respond_to?(:parse_stream)
+            # Stream AST nodes as they are built; emit one JSON object per line
+            mod.parse_stream(input) do |node|
+              h = (node ? node.to_h : nil)
+              if @global[:format] == 'json' || ENV['WIREGRAM_FORMAT'] == 'json'
+                puts JSON.generate(h)
+              else
+                puts JSON.pretty_generate(h)
+              end
+            end
+          elsif mod.respond_to?(:parse)
             result = mod.parse(input)
             output_result({ ast: result })
           else
