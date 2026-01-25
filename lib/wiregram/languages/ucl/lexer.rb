@@ -1,13 +1,30 @@
 # frozen_string_literal: true
 
+require 'strscan'
 require_relative '../../core/lexer'
 
 module WireGram
   module Languages
     module Ucl
-      # UCL (Universal Configuration Language) Lexer
+      # UCL (Universal Configuration Language) Lexer - high-performance with StringScanner
       # Tokenizes UCL syntax including objects, arrays, strings, numbers, and comments
       class Lexer < WireGram::Core::BaseLexer
+        # Pre-compiled regex patterns for performance
+        WHITESPACE_PATTERN = /\s+/
+        IDENTIFIER_PATTERN = /[a-zA-Z_][a-zA-Z0-9_%\-]*/
+        URL_PATTERN = /[a-zA-Z0-9_\-\.]+:\/\//
+        HEX_PATTERN = /0[xX][0-9a-fA-F]+/
+        NUMBER_PATTERN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/
+        FLAG_PATTERN = /-[A-Za-z_]/
+        DIRECTIVE_PATTERN = /\.[a-zA-Z_][a-zA-Z0-9_\-\.]*/
+        QUOTED_STRING_PATTERN = /"(?:\\.|[^"\\])*"/
+        SINGLE_QUOTED_PATTERN = /'(?:\\.|[^'\\])*'/
+
+        def initialize(source)
+          super(source)
+          @scanner = StringScanner.new(source)
+        end
+
         protected
 
         def try_tokenize_next
@@ -17,17 +34,22 @@ module WireGram
           # Handle comments
           return true if skip_comment
 
-          # Heuristics: treat leading '-' followed by letter as identifier (flags like -i)
+          # Check for directive (must come before identifier check since it starts with .)
+          if current_char == '.' && peek_char(1)&.match?(/[a-zA-Z_]/)
+            return tokenize_directive
+          end
+
+          # Check for flag-style identifiers (like -i)
           if current_char == '-' && peek_char(1)&.match?(/[A-Za-z_]/)
             return tokenize_identifier_or_keyword
           end
 
-          # Heuristic: capture URLs like http://... as unquoted strings
-          if @source[@position..] =~ /\A[a-zA-Z0-9_\-\.]+:\/\//
+          # Check for URLs
+          if @source[@position..] =~ URL_PATTERN
             return tokenize_unquoted_string
           end
 
-          # Heuristic: percent-prefixed tokens like %a should be identifiers
+          # Check for percent-prefixed tokens
           if current_char == '%' && peek_char(1)&.match?(/[A-Za-z_]/)
             return tokenize_identifier_or_keyword
           end
@@ -56,29 +78,15 @@ module WireGram
           when ')'
             add_token(:rparen, ')'); advance; true
           when '"'
-            tokenize_quoted_string
+            tokenize_quoted_string_fast
           when "'"
-            tokenize_single_quoted_string
-          when '.'
-            # directive like .include
-            if peek_char(1)&.match?(/[a-zA-Z_]/)
-              start = @position
-              advance # consume '.'
-              advance while current_char&.match?(/[a-zA-Z0-9_\-\.]/)
-              value = @source[start...@position]
-              # store value without the leading dot
-              add_token(:directive, value[1..-1])
-              true
-            else
-              false
-            end
-
+            tokenize_single_quoted_string_fast
           when /[a-zA-Z_]/
             tokenize_identifier_or_keyword
           when '/'
             tokenize_unquoted_string
           when /[0-9\-]/
-            tokenize_number
+            tokenize_number_fast
           else
             false
           end
@@ -87,19 +95,17 @@ module WireGram
         private
 
         def skip_whitespace
-          while current_char&.match?(/[\s]/)
-            advance
-          end
+          @scanner.pos = @position
+          @scanner.skip(WHITESPACE_PATTERN)
+          @position = @scanner.pos
         end
 
         def skip_comment
           if current_char == '#'
-            # Skip line comment
             advance while current_char && current_char != "\n"
             advance if current_char == "\n"
             return true
           elsif current_char == '/' && peek_char(1) == '*'
-            # Skip block comment with nesting support
             skip_nested_block_comment
             return true
           end
@@ -126,99 +132,123 @@ module WireGram
           end
         end
 
-        def tokenize_quoted_string
-          advance # skip opening quote
-          value = String.new
-
-          while current_char
-            if current_char == '"'
-              break
-            elsif current_char == '\\'
-              advance
-              esc = current_char
-              case esc
-              when '"' then value << '"'
-              when '\\' then value << '\\'
-              when '/' then value << '/'
-              when 'b' then value << "\b"
-              when 'f' then value << "\f"
-              when 'n' then value << "\n"
-              when 'r' then value << "\r"
-              when 't' then value << "\t"
-              when 'u'
-                # unicode escape \uXXXX
-                hex = String.new
-                4.times do
-                  advance
-                  hex << (current_char || '')
-                end
-                value << ([hex.to_i(16)].pack('U') rescue '?')
-              when 'x'
-                # hex escape \xXX
-                hex = String.new
-                2.times do
-                  advance
-                  hex << (current_char || '')
-                end
-                value << hex.to_i(16).chr rescue value << 'x'
-              else
-                value << esc
-              end
-              advance
-            else
-              value << current_char
-              advance
-            end
+        def tokenize_directive
+          @scanner.pos = @position
+          if matched = @scanner.scan(DIRECTIVE_PATTERN)
+            # Store without leading dot
+            add_token(:directive, matched[1..-1])
+            @position = @scanner.pos
+            true
+          else
+            false
           end
-
-          advance if current_char == '"' # skip closing quote
-          # mark double-quoted strings explicitly
-          add_token(:string, value, quoted: true, quote_type: :double)
-          true
         end
 
-        def tokenize_single_quoted_string
-          advance # skip opening quote
-          value = String.new
+        def tokenize_quoted_string_fast
+          @scanner.pos = @position
+          if matched = @scanner.scan(QUOTED_STRING_PATTERN)
+            # Extract and unescape content (without surrounding quotes)
+            content = matched[1...-1]
+            unescaped = unescape_quoted_string(content)
+            add_token(:string, unescaped, quoted: true, quote_type: :double)
+            @position = @scanner.pos
+            true
+          else
+            false
+          end
+        end
 
-          while current_char
-            if current_char == "'"
-              break
-            elsif current_char == '\\'
-              advance
-              esc = current_char
-              case esc
-              when "'" then value << "'"
-              when '\\' then value << '\\'
+        def tokenize_single_quoted_string_fast
+          @scanner.pos = @position
+          if matched = @scanner.scan(SINGLE_QUOTED_PATTERN)
+            content = matched[1...-1]
+            unescaped = unescape_single_quoted_string(content)
+            add_token(:string, unescaped, quoted: true, quote_type: :single)
+            @position = @scanner.pos
+            true
+          else
+            false
+          end
+        end
+
+        def unescape_quoted_string(str)
+          result = String.new(capacity: str.length)
+          i = 0
+          while i < str.length
+            if str[i] == '\\' && i + 1 < str.length
+              case str[i + 1]
+              when '"' then result << '"'; i += 2
+              when '\\' then result << '\\'; i += 2
+              when '/' then result << '/'; i += 2
+              when 'b' then result << "\b"; i += 2
+              when 'f' then result << "\f"; i += 2
+              when 'n' then result << "\n"; i += 2
+              when 'r' then result << "\r"; i += 2
+              when 't' then result << "\t"; i += 2
+              when 'u'
+                if i + 5 < str.length
+                  hex = str[i + 2..i + 5]
+                  begin
+                    result << [hex.to_i(16)].pack('U')
+                  rescue
+                    result << '?'
+                  end
+                  i += 6
+                else
+                  result << str[i]
+                  i += 1
+                end
+              when 'x'
+                if i + 3 < str.length
+                  hex = str[i + 2..i + 3]
+                  begin
+                    result << hex.to_i(16).chr
+                  rescue
+                    result << 'x'
+                  end
+                  i += 4
+                else
+                  result << str[i]
+                  i += 1
+                end
               else
-                value << '\\' << esc
+                result << str[i + 1]
+                i += 2
               end
-              advance
             else
-              value << current_char
-              advance
+              result << str[i]
+              i += 1
             end
           end
+          result
+        end
 
-          advance if current_char == "'" # skip closing quote
-          # mark single-quoted strings explicitly
-          add_token(:string, value, quoted: true, quote_type: :single)
-          true
+        def unescape_single_quoted_string(str)
+          result = String.new(capacity: str.length)
+          i = 0
+          while i < str.length
+            if str[i] == '\\' && i + 1 < str.length
+              case str[i + 1]
+              when "'" then result << "'"; i += 2
+              when '\\' then result << '\\'; i += 2
+              else
+                result << '\\' << str[i + 1]
+                i += 2
+              end
+            else
+              result << str[i]
+              i += 1
+            end
+          end
+          result
         end
 
         def tokenize_identifier_or_keyword
           start = @position
+          advance if current_char == '-'  # Handle flags like -i
 
-          # Allow leading dash for tokens like -i and include '%' inside identifiers
-          advance if current_char == '-'
-
-          # Continue reading identifier characters including hyphens
-          # This handles hyphenated identifiers like "all-depends", "build-depends"
           while current_char
-            # Stop at UCL structural delimiters
             break if current_char.match?(/[\[\]\{\}\(\);:,=\s]/)
-
-            # Continue if it's a valid identifier character (including hyphens)
             if current_char.match?(/[a-zA-Z0-9_%\-]/)
               advance
             else
@@ -227,23 +257,21 @@ module WireGram
           end
 
           value = @source[start...@position]
-
-          # Check for keywords and booleans
           case value.downcase
           when 'true'
             add_token(:boolean, true)
           when 'false'
             add_token(:boolean, false)
           when 'yes'
-            add_token(:boolean, true)  # Normalization: yes -> true
+            add_token(:boolean, true)
           when 'no'
-            add_token(:boolean, false) # Normalization: no -> false
+            add_token(:boolean, false)
           when 'null', 'nil'
             add_token(:null, nil)
           when 'on'
-            add_token(:boolean, true)  # Normalization: on -> true
+            add_token(:boolean, true)
           when 'off'
-            add_token(:boolean, false) # Normalization: off -> false
+            add_token(:boolean, false)
           else
             add_token(:identifier, value)
           end
@@ -256,7 +284,6 @@ module WireGram
 
           while current_char
             if current_char == '$' && peek_char(1) == '{'
-              # start interpolation, include '${'
               advance
               advance
               interp_depth += 1
@@ -264,12 +291,9 @@ module WireGram
               advance
               interp_depth -= 1
             elsif interp_depth == 0 && current_char.match?(/[\s,;:\}\)]/)
-              # Check if this is a URL scheme (colon followed by //)
               if current_char == ':' && peek_char(1) == '/' && peek_char(2) == '/'
-                # This is part of a URL, continue
                 advance
               else
-                # Real break - this is a structural delimiter or whitespace
                 break
               end
             else
@@ -282,86 +306,24 @@ module WireGram
           true
         end
 
-        def tokenize_number
-          start = @position
+        def tokenize_number_fast
+          @scanner.pos = @position
 
-          # Handle negative sign
-          advance if current_char == '-'
-
-          # Check for hex number
-          if current_char == '0' && (peek_char(1) == 'x' || peek_char(1) == 'X')
-            # Let tokenize_hex_number handle the entire thing from start (including negative sign)
-            tokenize_hex_number_with_sign(start)
+          # Try hex number first
+          if @scanner.scan(HEX_PATTERN)
+            add_token(:hex_number, @scanner.matched)
+            @position = @scanner.pos
             return true
           end
 
-          # Integer part
-          if current_char == '0'
-            advance
-          else
-            advance while current_char&.match?(/[0-9]/)
-          end
-
-          # Fraction part
-          if current_char == '.'
-            advance
-            advance while current_char&.match?(/[0-9]/)
-          end
-
-          # Scientific notation
-          if current_char&.match?(/[eE]/)
-            advance
-            advance if current_char&.match?(/[+-]/)
-            advance while current_char&.match?(/[0-9]/)
-          end
-
-          value = @source[start...@position]
-          add_token(:number, value)
-          true
-        end
-
-        def tokenize_hex_number_with_sign(start)
-          advance # 0
-          advance # x or X
-
-          # Allow hex numbers and also support hex-like tokens that may include dots later
-
-          hex_start = @position
-          advance while current_char&.match?(/[0-9a-fA-F]/)
-          hex_part = @source[hex_start...@position]
-
-          # Check for invalid hex - if hex_part is empty or next char suggests invalid hex
-          if hex_part.empty? || current_char&.match?(/[a-zA-Z0-9_]/)
-            # Could be invalid hex like 0xreadbeef or just 0x
-            # Try to read more to capture the full invalid token
-            if !hex_part.empty? && current_char&.match?(/[a-zA-Z0-9_]/)
-              # We have some hex digits followed by invalid chars - read them all
-              advance while current_char&.match?(/[a-zA-Z0-9_.]/)
-            elsif hex_part.empty?
-              # Just "0x" with nothing after - could be valid identifier like "0x"
-              # For now, treat as string
-              advance while current_char&.match?(/[a-zA-Z0-9_.]/)
-            end
-
-            value = @source[start...@position]
-            add_token(:invalid_hex, value)
+          # Try regular number
+          if @scanner.scan(NUMBER_PATTERN)
+            add_token(:number, @scanner.matched)
+            @position = @scanner.pos
             return true
           end
 
-          # Check for invalid hex number with fraction (e.g., 0xdeadbeef.1)
-          if current_char == '.'
-            # This is an invalid hex number - treat as string
-            advance while current_char&.match?(/[0-9a-fA-F.]/)
-            # Return as a string token to be normalized
-            value = @source[start...@position]
-            add_token(:invalid_hex, value)
-            return true
-          end
-
-          # Valid hex number
-          value = @source[start...@position]
-          add_token(:hex_number, value)
-          true
+          false
         end
       end
     end
