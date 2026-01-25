@@ -38,6 +38,31 @@ module WireGram
           errors: parser.errors
         }
       end
+
+      # Tokenize input
+      def self.tokenize(input)
+        lexer = WireGram::Languages::Ucl::Lexer.new(input)
+        token_stream = WireGram::Core::TokenStream.new(lexer)
+        token_stream.tokens
+      end
+
+      # Stream tokens one-by-one (memory efficient for large files)
+      def self.tokenize_stream(input)
+        lexer = WireGram::Languages::Ucl::Lexer.new(input)
+        loop do
+          token = lexer.next_token
+          yield(token) if block_given?
+          break if token && token[:type] == :eof
+        end
+      end
+
+      # Parse input to AST
+      def self.parse(input)
+        lexer = WireGram::Languages::Ucl::Lexer.new(input)
+        token_stream = WireGram::Core::TokenStream.new(lexer)
+        parser = WireGram::Languages::Ucl::Parser.new(token_stream)
+        parser.parse
+      end
     end
   end
 end

@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Umbrella CLI for WireGram
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
+require 'wiregram/cli'
+
+begin
+  WireGram::CLI::Runner.start(ARGV)
+rescue Interrupt
+  STDERR.puts "\nInterrupted"
+  exit 130
+end

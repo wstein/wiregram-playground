@@ -25,8 +25,8 @@ module WireGram
     require_relative 'wiregram/languages/expression/parser'
     require_relative 'wiregram/languages/json/lexer'
     require_relative 'wiregram/languages/json/parser'
-require_relative 'wiregram/languages/ucl/lexer'
-require_relative 'wiregram/languages/ucl/parser'
+    require_relative 'wiregram/languages/ucl/lexer'
+    require_relative 'wiregram/languages/ucl/parser'
 
     lexer = case language
             when :expression

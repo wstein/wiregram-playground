@@ -13,8 +13,8 @@ gem "rspec", "~> 3.13"
 
 gem "rbs", "~> 3.10"
 
-gem "ucl", "~> 0.1.3"
-
 gem "cucumber", "~> 10.2"
 
 gem "simplecov", "~> 0.22.0"
+
+gem "webrick", "~> 1.9"
