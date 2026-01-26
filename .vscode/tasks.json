@@ -1,0 +1,38 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Ruby prototypes (tests)",
+      "type": "shell",
+      "command": "rspec --format documentation specs/001-wiregram-framework/research/lexer-prototype/ruby/spec/lexer_spec.rb specs/001-wiregram-framework/research/parser-prototype/ruby/spec/parser_spec.rb",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Ruby lexer benchmark",
+      "type": "shell",
+      "command": "ruby specs/001-wiregram-framework/research/bench/run_lexer_bench.rb",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Parser (example)",
+      "type": "shell",
+      "command": "ruby specs/001-wiregram-framework/research/parser-prototype/ruby/parser.rb specs/001-wiregram-framework/research/corpus/sample.minilang",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "group": "none",
+      "problemMatcher": []
+    }
+  ]
+}
