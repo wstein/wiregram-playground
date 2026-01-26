@@ -1,0 +1,39 @@
+{
+  "name": "WireGram - Fedora Dev Container",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "VARIANT": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "castwide.solargraph",
+        "crystal-lang.crystal",
+        "GitHub.vscode-pull-request-github",
+        "ms-azuretools.vscode-docker",
+        "tadashi.fish",
+        "redhat.vscode-yaml",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "fish",
+        "editor.formatOnSave": false,
+        "files.associations": {
+          "*.wg": "ini",
+          "*.minilang": "plaintext"
+        },
+        "yaml.format.enable": true
+      }
+    }
+  },
+  "forwardPorts": [
+    8080
+  ],
+  "postCreateCommand": ".devcontainer/scripts/devcontainer-setup.sh",
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:1": {}
+  }
+}
