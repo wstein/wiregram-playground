@@ -83,7 +83,7 @@ describe 'Expression Language Integration' do
 
     it 'processes valid strings' do
       input = load_valid_fixture('strings.txt')
-      result = assert_expression_pipeline(input.strip, '"hello"\n"world"\n"test string"')
+      assert_expression_pipeline(input.strip, '"hello"\n"world"\n"test string"')
     end
 
     it 'processes valid arithmetic expressions' do
@@ -94,7 +94,8 @@ describe 'Expression Language Integration' do
 
     it 'processes valid assignments' do
       input = load_valid_fixture('assignments.txt')
-      result = assert_expression_pipeline(input.strip, "let x = 42\nlet result = x + y\nlet message = \"hello\"\nlet value = 1 * 2 + 3")
+      result = assert_expression_pipeline(input.strip,
+                                          "let x = 42\nlet result = x + y\nlet message = \"hello\"\nlet value = 1 * 2 + 3")
       expect(result[:output]).to eq("let x = 42\nlet result = x + y\nlet message = \"hello\"\nlet value = 1 * 2 + 3")
     end
 

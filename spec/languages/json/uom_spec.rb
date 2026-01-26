@@ -178,7 +178,7 @@ describe WireGram::Languages::Json::UOM do
       key = 'name'
       value = described_class::StringValue.new('John')
       item = described_class::ObjectItem.new(key, value)
-      expect(item.to_simple_json).to eq(['name', 'John'])
+      expect(item.to_simple_json).to eq(%w[name John])
     end
   end
 

@@ -97,7 +97,7 @@ describe 'JSON Language Integration' do
         'name' => 'John',
         'age' => 30,
         'active' => true,
-        'tags' => ['developer', 'ruby']
+        'tags' => %w[developer ruby]
       }
       expect(simple_json).to eq(expected)
     end

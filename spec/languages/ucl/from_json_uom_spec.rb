@@ -4,7 +4,7 @@ require 'spec_helper'
 
 RSpec.describe 'UCL UOM from JSON' do
   it 'converts JSON fixtures into UOM and uom_json' do
-    input = File.read(File.expand_path('../../../../vendor/libucl/tests/schema/maxProperties.json', __FILE__))
+    input = File.read(File.expand_path('../../../vendor/libucl/tests/schema/maxProperties.json', __dir__))
 
     result = WireGram::Languages::Ucl.process(input)
 

@@ -12,7 +12,6 @@ module SnapshotHelper
     File.join(snapshot_dir(language), "#{name}.snap")
   end
 
-
   # Assert that content matches the snapshot named `name`.
   # If ENV['UPDATE_SNAPSHOTS'] is set truthy, write the snapshot instead.
   def assert_snapshot(name, content, language = 'ucl')
@@ -24,9 +23,7 @@ module SnapshotHelper
       return
     end
 
-    unless File.exist?(path)
-      raise "Snapshot missing: #{path}. Run tests with UPDATE_SNAPSHOTS=1 to create snapshots."
-    end
+    raise "Snapshot missing: #{path}. Run tests with UPDATE_SNAPSHOTS=1 to create snapshots." unless File.exist?(path)
 
     expected = File.open(path, 'rb', &:read).force_encoding('UTF-8')
     # Compare after stripping trailing whitespace/newlines to avoid insignificant

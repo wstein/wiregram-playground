@@ -32,19 +32,21 @@ RSpec.describe 'Streaming mode' do
   end
 
   context 'StreamingTokenStream buffer behavior' do
-    class DummyLexer
-      def initialize(count)
-        @i = 0
-        @count = count
-      end
+    let(:dummy_lexer_class) do
+      Class.new do
+        def initialize(count)
+          @i = 0
+          @count = count
+        end
 
-      def next_token
-        if @i >= @count
-          { type: :eof, value: nil, position: @i }
-        else
-          tok = { type: :id, value: "t#{@i}", position: @i }
-          @i += 1
-          tok
+        def next_token
+          if @i >= @count
+            { type: :eof, value: nil, position: @i }
+          else
+            tok = { type: :id, value: "t#{@i}", position: @i }
+            @i += 1
+            tok
+          end
         end
       end
     end
@@ -52,7 +54,7 @@ RSpec.describe 'Streaming mode' do
     it 'keeps the internal buffer bounded by buffer_size when used correctly' do
       total = 100
       buffer_size = 8
-      lexer = DummyLexer.new(total)
+      lexer = dummy_lexer_class.new(total)
       stream = WireGram::Core::StreamingTokenStream.new(lexer, buffer_size)
 
       total.times do |i|
@@ -73,12 +75,13 @@ RSpec.describe 'Streaming mode' do
     it 'does not grow unbounded when only calling #next repeatedly' do
       total = 50
       buffer_size = 4
-      lexer = DummyLexer.new(total)
+      lexer = dummy_lexer_class.new(total)
       stream = WireGram::Core::StreamingTokenStream.new(lexer, buffer_size)
 
       total.times do
         token = stream.next
         break if token[:type] == :eof
+
         buffer_len = stream.instance_variable_get(:@buffer).length
         # With only next calls the buffer should be extremely small (<=1)
         expect(buffer_len).to be <= 1

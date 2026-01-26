@@ -187,9 +187,9 @@ describe 'Expression UOM' do
       json = value.to_json_format
 
       expect(json).to eq({
-        type: :number,
-        value: 42
-      })
+                           type: :number,
+                           value: 42
+                         })
     end
 
     it 'serializes binary operations to JSON' do
@@ -199,11 +199,11 @@ describe 'Expression UOM' do
       json = op.to_json_format
 
       expect(json).to eq({
-        type: :binary_operation,
-        operator: :+,
-        left: { type: :number, value: 1 },
-        right: { type: :number, value: 2 }
-      })
+                           type: :binary_operation,
+                           operator: :+,
+                           left: { type: :number, value: 1 },
+                           right: { type: :number, value: 2 }
+                         })
     end
   end
 end

@@ -93,7 +93,7 @@ module JsonTestHelper
   def json_array_test_cases
     [
       { input: '[]', expected: [], description: 'empty array' },
-      { input: '["a", "b"]', expected: ['a', 'b'], description: 'string array' },
+      { input: '["a", "b"]', expected: %w[a b], description: 'string array' },
       { input: '[1, 2, 3]', expected: [1, 2, 3], description: 'number array' },
       { input: '[true, false]', expected: [true, false], description: 'boolean array' }
     ]
