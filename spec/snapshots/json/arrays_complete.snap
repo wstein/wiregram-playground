@@ -207,26 +207,26 @@
 
 === UOM ===
 [
-    "string",
-    42,
-    true,
-    null,
-    {
-        "nested": "object"
-    },
-    [
-        "nested",
-        "array"
-    ],
-    {
-        "mixed": [
-            "string",
-            123,
-            {
-                "deep": "value"
-            }
-        ]
-    }
+  "string",
+  42,
+  true,
+  null,
+  {
+    "nested": "object"
+  },
+  [
+    "nested",
+    "array"
+  ],
+  {
+    "mixed": [
+      "string",
+      123,
+      {
+        "deep": "value"
+      }
+    ]
+  }
 ]
 
 === OUTPUT ===
