@@ -271,42 +271,6 @@ describe WireGram::Languages::Ucl do
     end
   end
 
-  describe 'Integration with libucl test files' do
-    it 'processes basic test case 1.in' do
-      input = <<~UCL
-        {
-        "key1": value;
-        "key1": value2;
-        "key1": "value;"
-        "key1": 1.0,
-        "key1": -0xdeadbeef
-        "key1": 0xdeadbeef.1
-        "key1": 0xreadbeef
-        "key1": -1e-10,
-        "key1": 1
-        "key1": true
-        "key1": no
-        "key1": yes
-        }
-      UCL
-
-      result = WireGram::Languages::Ucl.process(input)
-
-      expect(result[:output]).to include('key1 = "value";')
-      expect(result[:output]).to include('key1 = "value2";')
-      expect(result[:output]).to include('key1 = "value;";')
-      expect(result[:output]).to include('key1 = 1.0;')
-      expect(result[:output]).to include('key1 = -3735928559;')
-      expect(result[:output]).to include('key1 = "0xdeadbeef.1";')
-      expect(result[:output]).to include('key1 = "0xreadbeef";')
-      expect(result[:output]).to include('key1 = -1e-10;')
-      expect(result[:output]).to include('key1 = 1;')
-      expect(result[:output]).to include('key1 = true;')
-      expect(result[:output]).to include('key1 = false;')
-      expect(result[:output]).to include('key1 = true;')
-    end
-  end
-
   describe 'Token Stream' do
     it 'produces correct token stream for simple assignment' do
       input = 'key = "value";'

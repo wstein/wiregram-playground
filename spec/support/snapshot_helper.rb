@@ -2,7 +2,7 @@
 
 module SnapshotHelper
   def snapshot_dir(language = 'ucl')
-    dir = File.expand_path("../snapshots/#{language}", __dir__)
+    dir = File.expand_path("../../features/snapshots/#{language}", __dir__)
     Dir.mkdir(File.dirname(dir)) unless Dir.exist?(File.dirname(dir))
     Dir.mkdir(dir) unless Dir.exist?(dir)
     dir

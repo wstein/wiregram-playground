@@ -2,6 +2,7 @@
 
 require 'bundler/setup'
 require 'rspec/core/rake_task'
+require 'cucumber/rake/task'
 require 'fileutils'
 require 'rake/clean'
 
@@ -11,7 +12,7 @@ require 'wiregram'
 
 # Configuration
 LANGUAGES = %w[expression json ucl].freeze
-SNAPSHOT_DIR = 'spec/snapshots'
+SNAPSHOT_DIR = 'features/snapshots'
 
 # Clean task
 CLEAN.include(
@@ -43,7 +44,13 @@ namespace :test do
     RSpec::Core::RakeTask.new(:spec) do |t|
       t.pattern = 'spec/**/*_spec.rb'
     end
+
+    Cucumber::Rake::Task.new(:cucumber) do |t|
+      t.cucumber_opts = ENV['CUCUMBER_OPTS'] || '--format pretty'
+    end
+
     Rake::Task['spec'].invoke
+    Rake::Task['cucumber'].invoke
   end
 
   desc 'Run expression language tests'
