@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'json'
 
 module WireGram
@@ -7,23 +8,21 @@ module WireGram
       # Universal Object Model for JSON
       # Represents JSON data in a normalized, language-agnostic format
       class UOM
-        attr_reader :root
+        attr_accessor :root
 
         def initialize(root = nil)
           @root = root
         end
 
-        def root=(value)
-          @root = value
-        end
-
         def to_normalized_string
           return '' if @root.nil?
+
           @root.to_json
         end
 
         def to_simple_json
           return nil if @root.nil?
+
           @root.to_simple_json
         end
 
@@ -37,27 +36,24 @@ module WireGram
             freeze
           end
 
-          def to_json
+          def to_json(*_args)
             case @type
             when :string
-              "\"#{escape_json_string(@value)}\""
+              # Use JSON.generate to correctly escape control characters and unicode
+              ::JSON.generate(@value)
             when :number
-              @value.to_s
+              # Represent infinite floats as quoted strings ("Infinity" / "-Infinity")
+              if @value.is_a?(Float) && @value.infinite?
+                ::JSON.generate(@value.positive? ? 'Infinity' : '-Infinity')
+              else
+                ::JSON.generate(@value)
+              end
             when :boolean
               @value.to_s
             when :null
               'null'
             else
-              @value.to_s
-            end
-          end
-
-          def to_simple_json
-            case @type
-            when :string, :number, :boolean, :null
-              @value
-            else
-              @value
+              ::JSON.generate(@value.to_s)
             end
           end
 
@@ -65,9 +61,9 @@ module WireGram
             other.is_a?(Value) && other.type == @type && other.value == @value
           end
 
-      def inspect
-        "#<#{self.class.name} #{to_h.inspect}>"
-      end
+          def inspect
+            "#<#{self.class.name} #{to_h.inspect}>"
+          end
 
           # Convert UOM value to JSON format
           def to_json_format
@@ -77,51 +73,59 @@ module WireGram
             }
           end
 
+          # Simple JSON - just the value (keep for backward compatibility)
+          def to_simple_json
+            case @type
+            when :string, :number, :boolean
+              @value
+            when :null
+              nil
+            else
+              @value
+            end
+          end
+
           # Pretty JSON for snapshots
           def to_pretty_json
-            JSON.pretty_generate(to_simple_json, indent: '    ')
+            JSON.pretty_generate(to_simple_json, indent: '  ')
           rescue JSON::GeneratorError
             to_pretty_string
           end
 
-      # Pretty-print UOM for snapshots
-      def to_pretty_string(indent = 0)
-        indent_str = "  " * indent
-        case self
-        when ObjectValue
-          result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectValue:0xXXXXXXXX @items=#{@items.length}>"
-          if @items.any?
-            @items.each do |key, value|
-              result += "\n#{indent_str}  [#{key.inspect}]"
-              if value
-                result += "\n#{value.to_pretty_string(indent + 2)}"
+          # Pretty-print UOM for snapshots
+          def to_pretty_string(indent = 0)
+            indent_str = '  ' * indent
+            case self
+            when ObjectValue
+              result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectValue:0xXXXXXXXX @items=#{@items.length}>"
+              if @items.any?
+                @items.each do |key, value|
+                  result += "\n#{indent_str}  [#{key.inspect}]"
+                  result += "\n#{value.to_pretty_string(indent + 2)}" if value
+                end
               end
+              result
+            when ArrayValue
+              result = "#{indent_str}#<WireGram::Languages::Json::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
+              if @items.any?
+                @items.each_with_index do |item, index|
+                  result += "\n#{indent_str}  [#{index}]"
+                  result += "\n#{item.to_pretty_string(indent + 2)}" if item
+                end
+              end
+              result
+            when Value
+              "#{indent_str}#<WireGram::Languages::Json::UOM::Value:0xXXXXXXXX @type=#{@type}, @value=#{@value.inspect}>"
+            else
+              "#{indent_str}#<#{self.class.name}:0xXXXXXXXX>"
             end
           end
-          result
-        when ArrayValue
-          result = "#{indent_str}#<WireGram::Languages::Json::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
-          if @items.any?
-            @items.each_with_index do |item, index|
-              result += "\n#{indent_str}  [#{index}]"
-              if item
-                result += "\n#{item.to_pretty_string(indent + 2)}"
-              end
-            end
-          end
-          result
-        when Value
-          "#{indent_str}#<WireGram::Languages::Json::UOM::Value:0xXXXXXXXX @type=#{@type}, @value=#{@value.inspect}>"
-        else
-          "#{indent_str}#<#{self.class.name}:0xXXXXXXXX>"
-        end
-      end
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             case @type
             when :string
               "#{indent}#<Json::UOM::Value type=#{@type} value=\"#{escape_json_string(@value)}\">"
@@ -136,7 +140,7 @@ module WireGram
 
           def escape_json_string(str)
             str.to_s.gsub(/\\/) { '\\\\' }
-                     .gsub(/"/) { '\\"' }
+               .gsub(/"/) { '\\"' }
           end
         end
 
@@ -177,15 +181,16 @@ module WireGram
             freeze
           end
 
-          def to_json
+          def to_json(*_args)
             if @items.empty?
               '{}'
             else
               pairs = @items.map do |item|
                 next if item.value.nil?
+
                 "\"#{escape_json_string(item.key)}\": #{item.value.to_json}"
               end.compact
-              "{#{pairs.join(', ')}}"
+              "{#{pairs.join(", ")}}"
             end
           end
 
@@ -193,6 +198,7 @@ module WireGram
             result = {}
             @items.each do |item|
               next if item.value.nil?
+
               result[item.key] = item.value.to_simple_json
             end
             result
@@ -216,7 +222,7 @@ module WireGram
 
           # Pretty JSON for snapshots (render as actual JSON data structure)
           def to_pretty_json
-            JSON.pretty_generate(sanitize_for_json(to_simple_json), indent: '    ')
+            JSON.pretty_generate(sanitize_for_json(to_simple_json), indent: '  ')
           rescue JSON::GeneratorError
             to_pretty_string
           end
@@ -233,7 +239,7 @@ module WireGram
               obj.map { |v| sanitize_for_json(v) }
             when Float
               if obj.infinite?
-                obj.positive? ? "Infinity" : "-Infinity"
+                obj.positive? ? 'Infinity' : '-Infinity'
               else
                 obj
               end
@@ -241,18 +247,17 @@ module WireGram
               obj
             end
           end
-          def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
 
-            indent = "  " * depth
+          def to_detailed_string(depth = 0, max_depth = 3)
+            return '...' if depth > max_depth
+
+            indent = '  ' * depth
             result = "#{indent}#<Json::UOM::ObjectValue items=#{@items.length}>"
 
             if @items.any?
               @items.each do |item|
                 result += "\n#{indent}  #<Json::UOM::ObjectItem key=\"#{escape_json_string(item.key)}\">"
-                if item.value
-                  result += "\n#{item.value.to_detailed_string(depth + 2, max_depth)}"
-                end
+                result += "\n#{item.value.to_detailed_string(depth + 2, max_depth)}" if item.value
               end
             end
 
@@ -261,26 +266,22 @@ module WireGram
 
           # Pretty-print UOM object for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectValue:0xXXXXXXXX @items=#{@items.length}>"
 
             if @items.any?
               @items.each do |item|
                 result += "\n#{indent_str}  #<WireGram::Languages::Json::UOM::ObjectItem:0xXXXXXXXX @key=\"#{escape_json_string(item.key)}\">"
-                if item.value
-                  result += "\n#{item.value.to_pretty_string(indent + 2)}"
-                end
+                result += "\n#{item.value.to_pretty_string(indent + 2)}" if item.value
               end
             end
 
             result
           end
 
-          private
-
           def escape_json_string(str)
             str.to_s.gsub(/\\/) { '\\\\' }
-                     .gsub(/"/) { '\\"' }
+               .gsub(/"/) { '\\"' }
           end
         end
 
@@ -293,12 +294,12 @@ module WireGram
             freeze
           end
 
-          def to_json
+          def to_json(*_args)
             if @items.empty?
               '[]'
             else
               elements = @items.map(&:to_json)
-              "[#{elements.join(', ')}]"
+              "[#{elements.join(", ")}]"
             end
           end
 
@@ -324,24 +325,22 @@ module WireGram
 
           # Pretty JSON for snapshots (render as actual JSON data structure)
           def to_pretty_json
-            JSON.pretty_generate(sanitize_for_json(to_simple_json), indent: '    ')
+            JSON.pretty_generate(sanitize_for_json(to_simple_json), indent: '  ')
           rescue JSON::GeneratorError
             to_pretty_string
           end
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             result = "#{indent}#<Json::UOM::ArrayValue items=#{@items.length}>"
 
             if @items.any?
               @items.each_with_index do |item, index|
                 result += "\n#{indent}  [#{index}]"
-                if item
-                  result += "\n#{item.to_detailed_string(depth + 2, max_depth)}"
-                end
+                result += "\n#{item.to_detailed_string(depth + 2, max_depth)}" if item
               end
             end
 
@@ -350,15 +349,13 @@ module WireGram
 
           # Pretty-print UOM array for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             result = "#{indent_str}#<WireGram::Languages::Json::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
 
             if @items.any?
               @items.each_with_index do |item, index|
                 result += "\n#{indent_str}  [#{index}]"
-                if item
-                  result += "\n#{item.to_pretty_string(indent + 2)}"
-                end
+                result += "\n#{item.to_pretty_string(indent + 2)}" if item
               end
             end
 
@@ -375,7 +372,7 @@ module WireGram
               obj.map { |v| sanitize_for_json(v) }
             when Float
               if obj.infinite?
-                obj.positive? ? "Infinity" : "-Infinity"
+                obj.positive? ? 'Infinity' : '-Infinity'
               else
                 obj
               end
@@ -395,7 +392,7 @@ module WireGram
             freeze
           end
 
-          def to_json
+          def to_json(*_args)
             "\"#{escape_json_string(@key)}\": #{@value.to_json}"
           end
 
@@ -422,26 +419,22 @@ module WireGram
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             result = "#{indent}#<Json::UOM::ObjectItem key=\"#{escape_json_string(@key)}\">"
 
-            if @value
-              result += "\n#{@value.to_detailed_string(depth + 1, max_depth)}"
-            end
+            result += "\n#{@value.to_detailed_string(depth + 1, max_depth)}" if @value
 
             result
           end
 
           # Pretty-print UOM object item for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectItem:0xXXXXXXXX @key=\"#{escape_json_string(@key)}\">"
 
-            if @value
-              result += "\n#{@value.to_pretty_string(indent + 1)}"
-            end
+            result += "\n#{@value.to_pretty_string(indent + 1)}" if @value
 
             result
           end
@@ -450,7 +443,7 @@ module WireGram
 
           def escape_json_string(str)
             str.to_s.gsub(/\\/) { '\\\\' }
-                     .gsub(/"/) { '\\"' }
+               .gsub(/"/) { '\\"' }
           end
         end
       end

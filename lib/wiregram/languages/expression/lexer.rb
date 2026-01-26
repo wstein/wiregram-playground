@@ -36,13 +36,27 @@ module WireGram
           char = current_char
 
           case char
-          when '+' then add_token(:plus, '+'); advance; true
-          when '-' then add_token(:minus, '-'); advance; true
-          when '*' then add_token(:star, '*'); advance; true
-          when '/' then add_token(:slash, '/'); advance; true
-          when '=' then add_token(:equals, '='); advance; true
-          when '(' then add_token(:lparen, '('); advance; true
-          when ')' then add_token(:rparen, ')'); advance; true
+          when '+' then add_token(:plus, '+')
+                        advance
+                        true
+          when '-' then add_token(:minus, '-')
+                        advance
+                        true
+          when '*' then add_token(:star, '*')
+                        advance
+                        true
+          when '/' then add_token(:slash, '/')
+                        advance
+                        true
+          when '=' then add_token(:equals, '=')
+                        advance
+                        true
+          when '(' then add_token(:lparen, '(')
+                        advance
+                        true
+          when ')' then add_token(:rparen, ')')
+                        advance
+                        true
           when '"' then tokenize_string_fast
           when /\d/ then tokenize_number_fast
           when /[a-zA-Z_]/ then tokenize_identifier_fast
@@ -80,7 +94,7 @@ module WireGram
 
         def tokenize_string_fast
           @scanner.pos = @position
-          if matched = @scanner.scan(STRING_PATTERN)
+          if (matched = @scanner.scan(STRING_PATTERN))
             # Remove surrounding quotes
             content = matched[1...-1]
             # Fast-path: avoid unescaping for common case with no backslashes
@@ -102,20 +116,28 @@ module WireGram
           while i < str.length
             if str[i] == '\\' && i + 1 < str.length
               case str[i + 1]
-              when '"' then result << '"'; i += 2
-              when '\\' then result << '\\'; i += 2
-              when '/' then result << '/'; i += 2
-              when 'b' then result << "\b"; i += 2
-              when 'f' then result << "\f"; i += 2
-              when 'n' then result << "\n"; i += 2
-              when 'r' then result << "\r"; i += 2
-              when 't' then result << "\t"; i += 2
+              when '"' then result << '"'
+                            i += 2
+              when '\\' then result << '\\'
+                             i += 2
+              when '/' then result << '/'
+                            i += 2
+              when 'b' then result << "\b"
+                            i += 2
+              when 'f' then result << "\f"
+                            i += 2
+              when 'n' then result << "\n"
+                            i += 2
+              when 'r' then result << "\r"
+                            i += 2
+              when 't' then result << "\t"
+                            i += 2
               when 'u'
                 if i + 5 < str.length
                   hex = str[i + 2..i + 5]
                   begin
                     result << [hex.to_i(16)].pack('U')
-                  rescue
+                  rescue StandardError
                     result << '?'
                   end
                   i += 6

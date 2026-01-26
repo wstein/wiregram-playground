@@ -72,12 +72,7 @@ module WireGram
         end
 
         def extract_key(node)
-          case node.type
-          when :string, :identifier
-            node.value.to_s
-          else
-            node.value.to_s
-          end
+          node.value.to_s
         end
       end
     end

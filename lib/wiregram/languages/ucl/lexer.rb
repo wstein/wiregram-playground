@@ -11,18 +11,18 @@ module WireGram
       class Lexer < WireGram::Core::BaseLexer
         # Pre-compiled regex patterns for performance
         WHITESPACE_PATTERN = /\s+/
-        IDENTIFIER_PATTERN = /[a-zA-Z_][a-zA-Z0-9_%\-]*/
-        URL_PATTERN = /[a-zA-Z0-9_\-\.]+:\/\//
+        IDENTIFIER_PATTERN = /[a-zA-Z_][a-zA-Z0-9_%-]*/
+        URL_PATTERN = %r{[a-zA-Z0-9_\-.]+://}
         HEX_PATTERN = /0[xX][0-9a-fA-F]+/
         NUMBER_PATTERN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/
         # Capture hex-like tokens that include invalid characters (e.g., 0xreadbeef)
-        INVALID_HEX_REMAIN = /-?0[xX][^\s,;:\}\)\"]+/
+        INVALID_HEX_REMAIN = /-?0[xX][^\s,;:})"]+/
         FLAG_PATTERN = /-[A-Za-z_]/
-        DIRECTIVE_PATTERN = /\.[a-zA-Z_][a-zA-Z0-9_\-\.]*/
+        DIRECTIVE_PATTERN = /\.[a-zA-Z_][a-zA-Z0-9_\-.]*/
         QUOTED_STRING_PATTERN = /"(?:\\.|[^"\\])*"/
         SINGLE_QUOTED_PATTERN = /'(?:\\.|[^'\\])*'/
-        STRUCTURAL_PATTERN = /[\{\}\[\]\:\=;,\(\)]/
-        
+        STRUCTURAL_PATTERN = /[{}\[\]:=;,()]/
+
         KEYWORDS = {
           'true' => true, 'false' => false, 'yes' => true, 'no' => false,
           'on' => true, 'off' => false, 'null' => nil, 'nil' => nil
@@ -52,7 +52,7 @@ module WireGram
           char = current_char
 
           # 1. Structural/Punctuation tokens (High Frequency)
-          if matched = @scanner.scan(STRUCTURAL_PATTERN)
+          if (matched = @scanner.scan(STRUCTURAL_PATTERN))
             add_token(STRUCTURAL_MAP[matched], matched)
             @position = @scanner.pos
             return true
@@ -79,24 +79,16 @@ module WireGram
           # 4. Directives, Flags, Prefixes
           case char
           when '.'
-            if peek_char(1)&.match?(/[a-zA-Z_]/)
-              return tokenize_directive
-            end
+            return tokenize_directive if peek_char(1)&.match?(/[a-zA-Z_]/)
           when '-'
-            if peek_char(1)&.match?(/[A-Za-z_]/)
-              return tokenize_identifier_or_keyword
-            end
+            return tokenize_identifier_or_keyword if peek_char(1)&.match?(/[A-Za-z_]/)
           when '%'
-            if peek_char(1)&.match?(/[A-Za-z_]/)
-              return tokenize_identifier_or_keyword
-            end
+            return tokenize_identifier_or_keyword if peek_char(1)&.match?(/[A-Za-z_]/)
           end
 
           # 5. Identifiers or Unquoted strings
           # Prefer URL tokens (scheme://) over identifiers
-          if @scanner.check(URL_PATTERN)
-            return tokenize_unquoted_string
-          end
+          return tokenize_unquoted_string if @scanner.check(URL_PATTERN)
 
           # If starting with a letter, check if the following characters lead into an interpolation
           # without scanning the entire remaining source (use scanner.check so we don't advance)
@@ -104,19 +96,13 @@ module WireGram
             @scanner.pos = @position
             if (m = @scanner.check(IDENTIFIER_PATTERN))
               after_pos = @position + m.length
-              if @source[after_pos, 2] == '${'
-                return tokenize_unquoted_string
-              else
-                return tokenize_identifier_or_keyword
-              end
-            else
-              return tokenize_identifier_or_keyword
+              return tokenize_unquoted_string if @source[after_pos, 2] == '${'
+
             end
+            return tokenize_identifier_or_keyword
           elsif char == '/'
             # Check for URL before treating as unquoted string
-            if @scanner.check(URL_PATTERN)
-              return tokenize_unquoted_string
-            end
+            return tokenize_unquoted_string if @scanner.check(URL_PATTERN)
           end
 
           false
@@ -138,11 +124,11 @@ module WireGram
               @position = @scanner.pos
             else
               nl = @source.index("\n", @position)
-              if nl
-                @position = nl + 1
-              else
-                @position = @source.length
-              end
+              @position = if nl
+                            nl + 1
+                          else
+                            @source.length
+                          end
             end
             return true
           elsif current_char == '/' && peek_char(1) == '*'
@@ -158,7 +144,7 @@ module WireGram
           pos = @position + 2 # skip initial '/*'
           depth = 1
 
-          while depth > 0 && pos < src.length
+          while depth.positive? && pos < src.length
             nxt_open = src.index('/*', pos)
             nxt_close = src.index('*/', pos)
 
@@ -180,9 +166,9 @@ module WireGram
 
         def tokenize_directive
           @scanner.pos = @position
-          if matched = @scanner.scan(DIRECTIVE_PATTERN)
+          if (matched = @scanner.scan(DIRECTIVE_PATTERN))
             # Store without leading dot
-            add_token(:directive, matched[1..-1], position: @scanner.pos)
+            add_token(:directive, matched[1..], position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -192,7 +178,7 @@ module WireGram
 
         def tokenize_quoted_string_fast
           @scanner.pos = @position
-          if matched = @scanner.scan(QUOTED_STRING_PATTERN)
+          if (matched = @scanner.scan(QUOTED_STRING_PATTERN))
             # Extract content (without surrounding quotes)
             content = matched[1...-1]
             # Fast-path: avoid unescaping if there are no backslashes
@@ -207,7 +193,7 @@ module WireGram
 
         def tokenize_single_quoted_string_fast
           @scanner.pos = @position
-          if matched = @scanner.scan(SINGLE_QUOTED_PATTERN)
+          if (matched = @scanner.scan(SINGLE_QUOTED_PATTERN))
             content = matched[1...-1]
             # Fast-path: avoid unescaping if there are no backslashes
             unescaped = content.include?('\\') ? unescape_single_quoted_string(content) : content
@@ -228,20 +214,28 @@ module WireGram
           while i < str.length
             if str[i] == '\\' && i + 1 < str.length
               case str[i + 1]
-              when '"' then result << '"'; i += 2
-              when '\\' then result << '\\'; i += 2
-              when '/' then result << '/'; i += 2
-              when 'b' then result << "\b"; i += 2
-              when 'f' then result << "\f"; i += 2
-              when 'n' then result << "\n"; i += 2
-              when 'r' then result << "\r"; i += 2
-              when 't' then result << "\t"; i += 2
+              when '"' then result << '"'
+                            i += 2
+              when '\\' then result << '\\'
+                             i += 2
+              when '/' then result << '/'
+                            i += 2
+              when 'b' then result << "\b"
+                            i += 2
+              when 'f' then result << "\f"
+                            i += 2
+              when 'n' then result << "\n"
+                            i += 2
+              when 'r' then result << "\r"
+                            i += 2
+              when 't' then result << "\t"
+                            i += 2
               when 'u'
                 if i + 5 < str.length
                   hex = str[i + 2..i + 5]
                   begin
                     result << [hex.to_i(16)].pack('U')
-                  rescue
+                  rescue StandardError
                     result << '?'
                   end
                   i += 6
@@ -254,7 +248,7 @@ module WireGram
                   hex = str[i + 2..i + 3]
                   begin
                     result << hex.to_i(16).chr
-                  rescue
+                  rescue StandardError
                     result << 'x'
                   end
                   i += 4
@@ -283,12 +277,12 @@ module WireGram
           while i < str.length
             if str[i] == '\\' && i + 1 < str.length
               case str[i + 1]
-              when "'" then result << "'"; i += 2
-              when '\\' then result << '\\'; i += 2
+              when "'" then result << "'"
+              when '\\' then result << '\\'
               else
                 result << '\\' << str[i + 1]
-                i += 2
               end
+              i += 2
             else
               result << str[i]
               i += 1
@@ -299,7 +293,7 @@ module WireGram
 
         def tokenize_identifier_or_keyword
           @scanner.pos = @position
-          if matched = @scanner.scan(IDENTIFIER_PATTERN)
+          if (matched = @scanner.scan(IDENTIFIER_PATTERN))
             # Use Hash lookup for keywords (much faster than case/downcase)
             # Fast path: try direct lookup (no allocation if already lowercase)
             if KEYWORDS.key?(matched)
@@ -324,19 +318,18 @@ module WireGram
             end
 
             @position = @scanner.pos
-            true
           else
             # Fallback for flags or complex unquoted strings if IDENTIFIER_PATTERN misses
             start = @position
             advance if current_char == '-'
 
             while current_char
-              break if current_char.match?(/[\[\]\{\}\(\);:,=\s]/)
-              if current_char.match?(/[a-zA-Z0-9_%\-]/)
-                advance
-              else
-                break
-              end
+              break if current_char.match?(/[\[\]{}();:,=\s]/)
+
+              break unless current_char.match?(/[a-zA-Z0-9_%-]/)
+
+              advance
+
             end
 
             value = @source[start...@position]
@@ -344,12 +337,12 @@ module WireGram
 
             lookup = value.downcase
             if KEYWORDS.key?(lookup)
-               add_token(KEYWORDS[lookup].nil? ? :null : :boolean, KEYWORDS[lookup], position: @position)
+              add_token(KEYWORDS[lookup].nil? ? :null : :boolean, KEYWORDS[lookup], position: @position)
             else
-               add_token(:identifier, value, position: @position)
+              add_token(:identifier, value, position: @position)
             end
-            true
           end
+          true
         end
 
         def tokenize_unquoted_string
@@ -360,14 +353,14 @@ module WireGram
           # If URL at current position, consume entire URL until next delimiter (allow ':' in URL)
           if @scanner.check(URL_PATTERN)
             @scanner.scan(URL_PATTERN)
-            after = @scanner.pos
+            @scanner.pos
             # Use scanner.scan_until to find next delimiter and stop before it
-            if @scanner.scan_until(/[\s,;\}\)\"]/)
-              # scanner.pos points after the delimiter; set end_pos to position before it
-              end_pos = @scanner.pos - 1
-            else
-              end_pos = src.length
-            end
+            end_pos = if @scanner.scan_until(/[\s,;})"]/)
+                        # scanner.pos points after the delimiter; set end_pos to position before it
+                        @scanner.pos - 1
+                      else
+                        src.length
+                      end
             @position = end_pos
             add_token(:string, src[start...@position], position: @position)
             return true
@@ -383,11 +376,11 @@ module WireGram
               end_pos = src.length
             else
               @scanner.pos = close + 1
-              if @scanner.scan_until(/[\s,;:\}\)\"]/)
-                end_pos = @scanner.pos - 1
-              else
-                end_pos = src.length
-              end
+              end_pos = if @scanner.scan_until(/[\s,;:})"]/)
+                          @scanner.pos - 1
+                        else
+                          src.length
+                        end
             end
             @position = end_pos
             add_token(:string, src[start...@position], position: @position)
@@ -396,11 +389,11 @@ module WireGram
 
           # Fast path: consume until next delimiter (no interpolation present)
           @scanner.pos = start
-          if @scanner.scan_until(/[\s,;:\}\)\"]/)
-            end_pos = @scanner.pos - 1
-          else
-            end_pos = src.length
-          end
+          end_pos = if @scanner.scan_until(/[\s,;:})"]/)
+                      @scanner.pos - 1
+                    else
+                      src.length
+                    end
           if end_pos > start
             @position = end_pos
             add_token(:string, src[start...@position], position: @position)
@@ -416,16 +409,15 @@ module WireGram
               advance
               advance
               interp_depth += 1
-            elsif current_char == '}' && interp_depth > 0
+            elsif current_char == '}' && interp_depth.positive?
               advance
               interp_depth -= 1
-            elsif interp_depth == 0 && current_char.match?(/[\s,;:\}\)"]/)
+            elsif interp_depth.zero? && current_char.match?(/[\s,;:})"]/)
               # Stop at delimiters including quotes
-              if current_char == ':' && peek_char(1) == '/' && peek_char(2) == '/'
-                advance
-              else
-                break
-              end
+              break unless current_char == ':' && peek_char(1) == '/' && peek_char(2) == '/'
+
+              advance
+
             else
               advance
             end
@@ -433,7 +425,7 @@ module WireGram
 
           value = @source[start...@position]
           # Only add token if we actually consumed something
-          if value.length > 0
+          if value.length.positive?
             add_token(:string, value, position: @position)
             true
           else
@@ -445,10 +437,11 @@ module WireGram
         # Find matching closing '}' for an interpolation that starts at pos (pos is after the '${')
         def find_matching_interpolation_close(src, pos)
           depth = 1
-          while depth > 0 && pos < src.length
+          while depth.positive? && pos < src.length
             next_open = src.index('${', pos)
             next_close = src.index('}', pos)
             return nil if next_close.nil?
+
             if next_open && next_open < next_close
               depth += 1
               pos = next_open + 2

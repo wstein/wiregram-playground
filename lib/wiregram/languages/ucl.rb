@@ -9,6 +9,7 @@ require_relative 'ucl/uom'
 
 module WireGram
   module Languages
+    # Universal Object Model for UCL (Universal Config Language)
     module Ucl
       # UCL Language module - provides lexer, parser, transformer, UOM and serializer
       def self.process(input, opts = {})

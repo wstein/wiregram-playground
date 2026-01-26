@@ -22,7 +22,7 @@ module WireGram
             begin
               stmt = parse_statement
               statements << stmt if stmt
-            rescue => e
+            rescue StandardError => e
               @errors << { type: :parse_error, message: e.message, position: @position }
               synchronize
             end
@@ -37,7 +37,7 @@ module WireGram
             begin
               stmt = parse_statement
               yield(stmt) if block_given? && stmt
-            rescue => e
+            rescue StandardError => e
               @errors << { type: :parse_error, message: e.message, position: @position }
               synchronize
             end
@@ -105,7 +105,7 @@ module WireGram
           left = parse_term
           return nil unless left
 
-          while [:plus, :minus].include?(current_token[:type])
+          while %i[plus minus].include?(current_token[:type])
             operator = current_token[:type]
             advance
 
@@ -123,7 +123,7 @@ module WireGram
           left = parse_factor
           return nil unless left
 
-          while [:star, :slash].include?(current_token[:type])
+          while %i[star slash].include?(current_token[:type])
             operator = current_token[:type]
             advance
 

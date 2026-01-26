@@ -3,23 +3,23 @@
 module WireGram
   module Languages
     module Ucl
+      # Serializer for UCL output
       module Serializer
         module_function
 
-        def escape_string(s)
+        def escape_string(str)
           # Use double-quoted strings in canonical output and escape control chars
-          str = s.to_s
+          str = str.to_s
           # Double backslashes first (use block to avoid gsub replacement escaping pitfalls)
           str = str.gsub(/\\/) { '\\\\' }
           str = str.gsub('"', '\\"')
-          str = str.gsub("\n", "\\n")
-          str = str.gsub("\r", "\\r")
-          str = str.gsub("\t", "\\t")
-          str = str.gsub("\b", "\\b")
-          str = str.gsub("\f", "\\f")
-          str = str.gsub("\0", "\\0")
+          str = str.gsub("\n", '\\n')
+          str = str.gsub("\r", '\\r')
+          str = str.gsub("\t", '\\t')
+          str = str.gsub("\b", '\\b')
+          str = str.gsub("\f", '\\f')
+          str.gsub("\0", '\\0')
           # Leave other UTF-8 chars as-is
-          str
         end
 
         def indent_str(level)
@@ -32,7 +32,7 @@ module WireGram
           # canonicalize key to lowercase for normalized output
           key_text = override_key || key_node.value.to_s.downcase
 
-          if val_node && [:object, :array].include?(val_node.type)
+          if val_node && %i[object array].include?(val_node.type)
             # object- or array-valued pair prints as: key { ... } or key [ ... ]
             inner = format_value(val_node, indent)
             "#{indent_str(indent)}#{key_text} #{inner}"
@@ -51,7 +51,7 @@ module WireGram
               # Ensure the content ends with a newline so closing delimiter sits on its own line
               content = node.value.to_s
               content += "\n" unless content.end_with?("\n")
-              '<<' + delim + "\n" + content + delim
+              "<<#{delim}\n#{content}#{delim}"
             else
               "\"#{escape_string(node.value.to_s)}\""
             end
@@ -64,22 +64,20 @@ module WireGram
                 case node.metadata[:unit]
                 when 'ms'
                   # format with fixed 6 decimals for millisecond conversions
-                  '%.6f' % node.value
+                  format('%.6f', node.value)
                 else
                   # Preserve a single decimal for floats that are integer-valued (1.0)
                   if node.value == node.value.to_i
-                    '%.1f' % node.value
+                    format('%.1f', node.value)
                   else
-                    '%.15g' % node.value
+                    format('%.15g', node.value)
                   end
                 end
-              else
+              elsif node.value == node.value.to_i
                 # Preserve a single decimal for floats that are integer-valued (1.0)
-                if node.value == node.value.to_i
-                  '%.1f' % node.value
-                else
-                  '%.15g' % node.value
-                end
+                format('%.1f', node.value)
+              else
+                format('%.15g', node.value)
               end
             else
               node.value.to_s
@@ -94,7 +92,7 @@ module WireGram
                 formatted = format_value(c, indent + 4)
                 "#{indent_str(indent + 4)}#{formatted},"
               end
-              "[\n" + items.join("\n") + "\n#{indent_str(indent)}]"
+              "[\n#{items.join("\n")}\n#{indent_str(indent)}]"
             end
           when :object
             if node.children.empty?
@@ -103,11 +101,11 @@ module WireGram
               inner = node.children.map do |p|
                 format_pair_inline(p, indent + 4)
               end
-              "{\n" + inner.join("\n") + "\n#{indent_str(indent)}}"
+              "{\n#{inner.join("\n")}\n#{indent_str(indent)}}"
             end
           else
             # fallback
-            node.value != nil ? node.value.to_s : ''
+            !node.value.nil? ? node.value.to_s : ''
           end
         end
 
@@ -136,9 +134,11 @@ module WireGram
           out += "\n\n" unless out.end_with?("\n\n")
 
           # Ensure the output is valid UTF-8 (replace invalid/undef bytes)
-          out = out.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?') rescue out
-
-          out
+          begin
+            out.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+          rescue StandardError
+            out
+          end
         end
 
         # Format a UOM hash (produced by Parser.uom_from_ast) into canonical textual form
@@ -150,6 +150,7 @@ module WireGram
 
           children.each do |child|
             next unless child && (child[:type] || child['type']).to_s == 'pair'
+
             key = child[:key] || child['key']
             val = child[:value] || child['value']
 
@@ -157,25 +158,26 @@ module WireGram
             lines << "  \"#{key}\": #{val_str};"
           end
 
-          "{\n" + lines.join("\n") + "\n}\n"
+          "{\n#{lines.join("\n")}\n}\n"
         end
 
         def format_uom_value(val)
           return 'null' if val.nil?
+
           t = (val[:type] || val['type']).to_s
           v = val[:value] || val['value']
 
           case t
           when 'string'
-            '"' + escape_string(v.to_s) + '"'
+            "\"#{escape_string(v.to_s)}\""
           when 'number'
             if v.is_a?(Integer)
               v.to_s
             elsif v.is_a?(Float)
               if v == v.to_i
-                '%.1f' % v
+                format('%.1f', v)
               else
-                '%.15g' % v
+                format('%.15g', v)
               end
             else
               v.to_s
@@ -188,7 +190,7 @@ module WireGram
               '[]'
             else
               inner = items.map { |it| "  #{format_uom_value(it)}" }
-              "[\n" + inner.join("\n") + "\n]"
+              "[\n#{inner.join("\n")}\n]"
             end
           when 'object'
             # Not fully supported; fallback to {}

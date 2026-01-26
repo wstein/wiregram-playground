@@ -8,6 +8,7 @@ require_relative 'expression/uom'
 
 module WireGram
   module Languages
+    # Universal Object Model for Expression Language
     module Expression
       # Main Expression Language module
       # Provides complete pipeline processing: tokenize -> parse -> transform -> serialize
