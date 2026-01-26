@@ -76,6 +76,38 @@ This is a Ruby-based playground. Requirements:
 bundle install
 ```
 
+### Running tests
+
+Run all tests (RSpec unit tests + Cucumber features) with coverage enabled by default:
+
+```bash
+bundle exec rake test
+```
+
+To run only the RSpec suite:
+
+```bash
+bundle exec rake spec
+# or
+bundle exec rspec
+```
+
+To run only the Cucumber features (coverage will also be collected):
+
+```bash
+bundle exec rake cucumber
+# or
+bundle exec cucumber
+```
+
+To disable coverage for faster test runs:
+
+```bash
+NO_COVERAGE=1 bundle exec rake test
+```
+
+Coverage reports (including branch coverage) are written to `coverage/index.html` by SimpleCov.
+
 ### Basic Usage
 
 ```ruby
