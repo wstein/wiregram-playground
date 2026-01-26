@@ -1,0 +1,60 @@
+# Set the default behavior
+* text=auto
+
+# Explicitly declare text files
+*.txt text
+*.md text
+*.rb text
+*.cr text
+*.yml text
+*.yaml text
+*.json text
+*.sh text
+*.html text
+*.css text
+*.js text
+
+# Declare binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.7z binary
+*.rar binary
+
+# Set line ending behavior
+*.sh text eol=lf
+*.rb text eol=lf
+*.cr text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+
+# Set diff behavior
+*.png diff=binary
+*.jpg diff=binary
+*.jpeg diff=binary
+*.gif diff=binary
+*.ico diff=binary
+*.svg diff=binary
+*.pdf diff=binary
+
+# Set merge behavior
+*.lock merge=union
+*.yml merge=union
+*.yaml merge=union
+*.json merge=union
+
+# Set export-ignore for submodules
+.gitmodules export-ignore
+.gitattributes export-ignore
