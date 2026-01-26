@@ -1,0 +1,14 @@
+= JRuby Port (PoC)
+:toc: left
+:toclevels: 2
+:sectnums:
+
+This folder contains JRuby-specific experiments and wrappers. The Ruby reference
+implementation remains at the repository root.
+
+== Suggested Layout
+* `bin/` - JRuby CLI wrappers.
+* `lib/` - JRuby-compatible libraries or shims.
+* `spec/` - JRuby specs.
+* `examples/` - JRuby examples.
+* `scripts/` - Utility scripts for JRuby runs.

@@ -1,0 +1,17 @@
+= Ports Overview
+:toc: left
+:toclevels: 2
+:sectnums:
+
+This repository keeps the Ruby reference implementation at the project root.
+Additional language targets live under `ports/`.
+
+== Targets
+* `ports/jruby` - JRuby experiments and wrappers.
+* `ports/crystal` - Crystal PoC CLI and library prototypes.
+* `ports/kotlin` - Kotlin PoC CLI and library prototypes.
+* `ports/common` - Shared fixtures and cross-language artifacts.
+
+== Notes
+These ports are exploratory. Expect incomplete implementations and frequent
+changes.

@@ -1,0 +1,15 @@
+= Kotlin Port (PoC)
+:toc: left
+:toclevels: 2
+:sectnums:
+
+This folder is reserved for the Kotlin port of WireGram. The Ruby reference
+implementation remains at the repository root.
+
+== Suggested Layout
+* `src/` - Kotlin sources.
+* `test/` - Kotlin tests.
+* `examples/` - Kotlin examples.
+* `bin/` - CLI binaries or wrappers.
+* `scripts/` - Build and helper scripts.
+* `docs/` - Port-specific notes.
