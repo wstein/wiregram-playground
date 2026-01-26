@@ -8,6 +8,6 @@ require 'wiregram/cli'
 begin
   WireGram::CLI::Runner.start(ARGV)
 rescue Interrupt
-  STDERR.puts "\nInterrupted"
+  warn "\nInterrupted"
   exit 130
 end
