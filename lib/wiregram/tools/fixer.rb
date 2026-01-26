@@ -21,7 +21,7 @@ module WireGram
       # Apply all fixes to a fabric
       def apply_fixes(fabric)
         result_fabric = fabric
-        
+
         @fixes.each do |fix|
           result_fabric = fix[:apply].call(result_fabric)
         end

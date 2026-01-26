@@ -24,9 +24,9 @@ module WireGram
       def find_patterns(pattern_type)
         case pattern_type
         when :arithmetic_operations
-          @ast.find_all { |node| [:add, :subtract, :multiply, :divide].include?(node.type) }
+          @ast.find_all { |node| %i[add subtract multiply divide].include?(node.type) }
         when :literals
-          @ast.find_all { |node| [:number, :string].include?(node.type) }
+          @ast.find_all { |node| %i[number string].include?(node.type) }
         when :identifiers
           @ast.find_all { |node| node.type == :identifier }
         else
@@ -53,7 +53,7 @@ module WireGram
       def unweave(node)
         case node.type
         when :program
-          node.children.map { |child| unweave(child) }.join(" ")
+          node.children.map { |child| unweave(child) }.join(' ')
         when :ucl_program
           # Use UCL serializer for normalized output
           require_relative '../languages/ucl/serializer'
@@ -68,7 +68,7 @@ module WireGram
           inner = node.children.map { |c| "  #{unweave(c)}" }.join("\n")
           "{\n#{inner}\n}"
         when :array
-          "[" + node.children.map { |c| unweave(c) }.join(', ') + "]"
+          "[#{node.children.map { |c| unweave(c) }.join(", ")}]"
         when :number
           node.value.to_s
         when :string

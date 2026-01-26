@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'json'
 
 module WireGram
@@ -6,6 +7,7 @@ module WireGram
     module Ucl
       # Universal Object Model (UOM) for normalized UCL representation
       class UOM
+        # Represents a configuration section in UCL
         class Section
           attr_accessor :name, :items
 
@@ -16,18 +18,16 @@ module WireGram
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             result = "#{indent}#<WireGram::Languages::Ucl::UOM::Section:0xXXXXXXXX @name=#{@name.inspect}, @items=#{@items.length}>"
 
             if @items.any?
               @items.each do |item|
                 if item.is_a?(Assignment)
                   result += "\n#{indent}  #<WireGram::Languages::Ucl::UOM::Assignment:0xXXXXXXXX @key=#{item.key.inspect}, @priority=#{item.priority.inspect}>"
-                  if item.value
-                    result += "\n#{item.value.to_detailed_string(depth + 2, max_depth)}"
-                  end
+                  result += "\n#{item.value.to_detailed_string(depth + 2, max_depth)}" if item.value
                 else
                   result += "\n#{indent}  #{item.inspect}"
                 end
@@ -39,16 +39,14 @@ module WireGram
 
           # Pretty-print UOM section for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             result = "#{indent_str}#<WireGram::Languages::Ucl::UOM::Section:0xXXXXXXXX @name=#{@name.inspect}, @items=#{@items.length}>"
 
             if @items.any?
               @items.each do |item|
                 if item.is_a?(Assignment)
                   result += "\n#{indent_str}  #<WireGram::Languages::Ucl::UOM::Assignment:0xXXXXXXXX @key=#{item.key.inspect}, @priority=#{item.priority.inspect}>"
-                  if item.value
-                    result += "\n#{item.value.to_pretty_string(indent + 2)}"
-                  end
+                  result += "\n#{item.value.to_pretty_string(indent + 2)}" if item.value
                 else
                   result += "\n#{indent_str}  #{item.inspect}"
                 end
@@ -59,7 +57,7 @@ module WireGram
           end
 
           # Convert UOM section to JSON format
-          def to_json
+          def to_json(*_args)
             {
               type: :section,
               name: @name,
@@ -78,60 +76,92 @@ module WireGram
             }
           end
 
-          # Simplified JSON format for snapshots - just key-value pairs
+          # Simplified JSON format for snapshots - grouped key => values arrays
           def to_simple_json
-            result = {}
+            grouped = {}
+
             @items.each do |item|
-              if item.is_a?(Assignment)
-                result[item.key] = item.value.to_simple_json
-              end
+              next unless item.is_a?(Assignment)
+
+              key = item.key
+              val = item.value
+
+              grouped[key] ||= []
+
+              grouped[key] << if val.is_a?(Value)
+                                case val.type
+                                when :string
+                                  val.value
+                                when :number
+                                  # Convert string numbers to numeric types
+                                  if val.value.include?('.') || val.value.include?('e') || val.value.include?('E')
+                                    val.value.to_f
+                                  else
+                                    val.value.to_i
+                                  end
+                                when :boolean
+                                  val.value
+                                when :null
+                                  nil
+                                else
+                                  val.value
+                                end
+                              elsif val.respond_to?(:to_simple_json)
+                                val.to_simple_json
+                              else
+                                val.to_s
+                              end
+            end
+
+            # Unwrap single-value arrays like UOM#to_simple_json
+            result = {}
+            grouped.each do |k, values|
+              result[k] = values.length == 1 ? values[0] : values
             end
             result
           end
 
           # Pretty JSON for snapshots
           def to_pretty_json
-            JSON.pretty_generate(to_simple_json, indent: "    ")
+            JSON.pretty_generate(to_simple_json, indent: '  ')
           end
         end
 
+        # Represents a key-value assignment in UCL
         class Assignment
-          attr_accessor :key, :value, :priority
+          attr_accessor :key, :value, :priority, :seq
 
-          def initialize(key, value, priority = nil)
+          def initialize(key, value, priority = nil, seq = nil)
             @key = key
             @value = value
             @priority = priority
+            @seq = seq
           end
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             result = "#{indent}#<WireGram::Languages::Ucl::UOM::Assignment:0xXXXXXXXX @key=#{@key.inspect}, @priority=#{@priority.inspect}>"
 
-            if @value
-              result += "\n#{@value.to_detailed_string(depth + 1, max_depth)}"
-            end
+            result += "\n#{@value.to_detailed_string(depth + 1, max_depth)}" if @value
 
             result
           end
 
           # Pretty-print UOM assignment for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             result = "#{indent_str}#<WireGram::Languages::Ucl::UOM::Assignment:0xXXXXXXXX @key=#{@key.inspect}, @priority=#{@priority.inspect}>"
 
-            if @value
-              result += "\n#{@value.to_pretty_string(indent + 1)}"
-            end
+            result += "\n#{@value.to_pretty_string(indent + 1)}" if @value
 
             result
           end
 
           # Convert UOM assignment to JSON format
-          def to_json
+          def to_json(*_args)
             {
               type: :assignment,
               key: @key,
@@ -141,6 +171,7 @@ module WireGram
           end
         end
 
+        # Represents an array value in UCL
         class ArrayValue
           attr_accessor :items
 
@@ -150,17 +181,15 @@ module WireGram
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             result = "#{indent}#<WireGram::Languages::Ucl::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
 
             if @items.any?
               @items.each_with_index do |item, index|
                 result += "\n#{indent}  [#{index}]"
-                if item
-                  result += "\n#{item.to_detailed_string(depth + 2, max_depth)}"
-                end
+                result += "\n#{item.to_detailed_string(depth + 2, max_depth)}" if item
               end
             end
 
@@ -169,15 +198,13 @@ module WireGram
 
           # Pretty-print UOM array for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             result = "#{indent_str}#<WireGram::Languages::Ucl::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
 
             if @items.any?
               @items.each_with_index do |item, index|
                 result += "\n#{indent_str}  [#{index}]"
-                if item
-                  result += "\n#{item.to_pretty_string(indent + 2)}"
-                end
+                result += "\n#{item.to_pretty_string(indent + 2)}" if item
               end
             end
 
@@ -185,7 +212,7 @@ module WireGram
           end
 
           # Convert UOM array to JSON format
-          def to_json
+          def to_json(*_args)
             {
               type: :array,
               items: @items.map(&:to_json)
@@ -211,6 +238,7 @@ module WireGram
           end
         end
 
+        # Represents a scalar value in UCL
         class Value
           attr_accessor :type, :value
 
@@ -221,9 +249,9 @@ module WireGram
 
           # Deep serialization for snapshots - shows actual content
           def to_detailed_string(depth = 0, max_depth = 3)
-            return "..." if depth > max_depth
+            return '...' if depth > max_depth
 
-            indent = "  " * depth
+            indent = '  ' * depth
             case @type
             when :string
               "#{indent}#<WireGram::Languages::Ucl::UOM::Value:0xXXXXXXXX @type=:string, @value=\"#{escape_ucl_string(@value)}\">"
@@ -236,7 +264,7 @@ module WireGram
 
           # Pretty-print UOM value for snapshots
           def to_pretty_string(indent = 0)
-            indent_str = "  " * indent
+            indent_str = '  ' * indent
             case @type
             when :string
               "#{indent_str}#<WireGram::Languages::Ucl::UOM::Value:0xXXXXXXXX @type=:string, @value=\"#{escape_ucl_string(@value)}\">"
@@ -248,7 +276,7 @@ module WireGram
           end
 
           # Convert UOM value to JSON format
-          def to_json
+          def to_json(*_args)
             {
               type: @type,
               value: @value
@@ -278,14 +306,14 @@ module WireGram
 
           # Pretty JSON for snapshots
           def to_pretty_json
-            JSON.pretty_generate(to_simple_json)
+            JSON.pretty_generate(to_simple_json, indent: '  ')
           end
 
           private
 
           def escape_ucl_string(str)
             str.to_s.gsub(/\\/) { '\\\\' }
-                     .gsub(/"/) { '\\"' }
+               .gsub(/"/) { '\\"' }
           end
         end
 
@@ -294,9 +322,7 @@ module WireGram
           u = UOM.new
 
           # If top-level is a single-item array with an object (common test format), use the first item
-          if obj.is_a?(Array) && obj.length == 1 && obj[0].is_a?(Hash)
-            obj = obj[0]
-          end
+          obj = obj[0] if obj.is_a?(Array) && obj.length == 1 && obj[0].is_a?(Hash)
 
           if obj.is_a?(Hash)
             obj.each do |k, v|
@@ -314,11 +340,11 @@ module WireGram
           u
         end
 
-        def self.convert_value_to_uom(v)
-          case v
+        def self.convert_value_to_uom(val)
+          case val
           when Hash
             sec = Section.new(nil)
-            v.each do |kk, vv|
+            val.each do |kk, vv|
               # Use a temporary UOM to add assignment with sorting
               temp_uom = UOM.new
               temp_uom.add_assignment(temp_uom.root, kk.to_s, convert_value_to_uom(vv))
@@ -329,17 +355,17 @@ module WireGram
             sec.items.sort_by! { |item| item.key.to_s }
             sec
           when Array
-            ArrayValue.new(v.map { |e| convert_value_to_uom(e) })
+            ArrayValue.new(val.map { |e| convert_value_to_uom(e) })
           when String
-            Value.new(:string, v)
+            Value.new(:string, val)
           when Integer, Float
-            Value.new(:number, v.to_s)
+            Value.new(:number, val.to_s)
           when TrueClass, FalseClass
-            Value.new(:boolean, v)
+            Value.new(:boolean, val)
           when NilClass
             Value.new(:null, nil)
           else
-            Value.new(:string, v.to_s)
+            Value.new(:string, val.to_s)
           end
         end
 
@@ -347,53 +373,53 @@ module WireGram
           @root = Section.new(nil)
         end
 
-        def root
-          @root
-        end
+        attr_reader :root
 
         def add_assignment(section, key, value, priority = nil)
+          # Maintain a sequence counter on the UOM for stable ordering
+          @__assign_seq ||= 0
+
           # If there is an existing assignment with same key and priority rules
           existing = section.items.find { |i| i.is_a?(Assignment) && i.key == key }
 
           if existing && priority && existing.priority
             # Both have priority: keep the higher priority
             if priority > existing.priority
-              # replace existing
+              # replace existing, retain original sequence
               section.items.map! do |itm|
                 if itm == existing
-                  Assignment.new(key, value, priority)
+                  Assignment.new(key, value, priority, existing.seq)
                 else
                   itm
                 end
               end
-            else
-              # keep existing
             end
           elsif existing && priority && !existing.priority
-            # New one has priority, override existing
+            # New one has priority, override existing (retain seq)
             section.items.map! do |itm|
               if itm == existing
-                Assignment.new(key, value, priority)
+                Assignment.new(key, value, priority, existing.seq)
               else
                 itm
               end
             end
           elsif existing && !priority
-            # No priority: append duplicate (preserve history)
-            section.items << Assignment.new(key, value, nil)
+            # No priority: append duplicate (preserve history) with new sequence
+            section.items << Assignment.new(key, value, nil, @__assign_seq += 1)
           else
-            section.items << Assignment.new(key, value, priority)
+            # First time assignment for this key
+            section.items << Assignment.new(key, value, priority, @__assign_seq += 1)
           end
 
-          # Sort items by key for consistent output
-          section.items.sort_by! { |item| item.key.to_s }
+          # Sort items by key and sequence for consistent output and stable ordering of duplicates
+          section.items.sort_by! { |item| [item.key.to_s, item.seq || 0] }
         end
 
         # Render normalized string; this is where formatting rules live
         def to_normalized_string
           if @root.items.empty?
             # Top-level empty object should render as an empty object
-            return "{}"
+            return '{}'
           end
 
           render_section(@root, 0).strip
@@ -410,52 +436,52 @@ module WireGram
 
           # Collect all assignments from root section
           @root.items.each do |item|
-            if item.is_a?(Assignment)
-              key = item.key
-              value = item.value
+            next unless item.is_a?(Assignment)
 
-              # Initialize array for this key if it doesn't exist
-              grouped[key] ||= []
+            key = item.key
+            value = item.value
 
-              # Convert UOM value to appropriate JSON type
-              case value
-              when Value
-                case value.type
-                when :string
-                  grouped[key] << value.value
-                when :number
-                  # Convert string numbers to actual numbers
-                  if value.value.include?('.') || value.value.include?('e') || value.value.include?('E')
-                    grouped[key] << value.value.to_f
-                  else
-                    grouped[key] << value.value.to_i
-                  end
-                when :boolean
-                  grouped[key] << value.value
-                when :null
-                  grouped[key] << nil
-                else
-                  grouped[key] << value.value
-                end
-              else
-                # Handle other types (sections, arrays, etc.)
-                if value.respond_to?(:to_simple_json)
-                  grouped[key] << value.to_simple_json
-                else
-                  grouped[key] << value.to_s
-                end
-              end
-            end
+            # Initialize array for this key if it doesn't exist
+            grouped[key] ||= []
+
+            # Convert UOM value to appropriate JSON type
+            grouped[key] << case value
+                            when Value
+                              case value.type
+                              when :string
+                                value.value
+                              when :number
+                                # Convert string numbers to actual numbers
+                                if value.value.include?('.') || value.value.include?('e') || value.value.include?('E')
+                                  value.value.to_f
+                                else
+                                  value.value.to_i
+                                end
+                              when :boolean
+                                value.value
+                              when :null
+                                nil
+                              else
+                                value.value
+                              end
+                            else
+                              # Handle other types (sections, arrays, etc.)
+                              if value.respond_to?(:to_simple_json)
+                                value.to_simple_json
+                              else
+                                value.to_s
+                              end
+                            end
           end
 
           # Unwrap single-value arrays - UCL typically returns single values not wrapped
           result = {}
           grouped.each do |key, values|
-            if values.length == 1
-              result[key] = values[0]
-            else
-              result[key] = values
-            end
+            result[key] = if values.length == 1
+                            values[0]
+                          else
+                            values
+                          end
           end
           result
         end
@@ -473,7 +499,7 @@ module WireGram
                       else
                         item.value
                       end
-              { key: item.key, priority: item.priority, value: value }
+              { key: item.key, priority: item.priority, value: value, seq: (item.seq if item.respond_to?(:seq)) }
             else
               { node: item }
             end
@@ -499,7 +525,7 @@ module WireGram
                 lines << "#{indent_str}}"
               end
             elsif item.value.is_a?(ArrayValue)
-              values = item.value.items
+              item.value.items
 
               # libucl CONFIG format always uses multi-line block arrays with trailing commas
               lines << "#{indent_str}#{item.key} ["
@@ -516,35 +542,34 @@ module WireGram
           lines.join("\n")
         end
 
-        def render_value(v, indent = 0)
+        def render_value(val, indent = 0)
           indent_str = '    ' * indent
 
           # Handle nested UOM types
-          case
-          when v.is_a?(Section)
-            inner = render_section(v, indent + 1)
+          if val.is_a?(Section)
+            inner = render_section(val, indent + 1)
             # Represent as a block
             "{\n#{inner}\n#{indent_str}}"
-          when v.is_a?(ArrayValue)
+          elsif val.is_a?(ArrayValue)
             arr_lines = []
-            arr_lines << "["
-            v.items.each do |item|
+            arr_lines << '['
+            val.items.each do |item|
               item_lines = render_value(item, indent + 1).lines.map(&:chomp)
               item_lines.each_with_index do |line, i|
-                suffix = (i == item_lines.length - 1) ? ',' : ''
+                suffix = i == item_lines.length - 1 ? ',' : ''
                 arr_lines << "#{indent_str}    #{line}#{suffix}"
               end
             end
             arr_lines << "#{indent_str}]"
             arr_lines.join("\n")
-          when defined?(Value) && v.is_a?(Value)
-            case v.type
+          elsif defined?(Value) && val.is_a?(Value)
+            case val.type
             when :string
-              quote_string(v.value)
+              quote_string(val.value)
             when :number
               # For numbers, check if they need formatting
               # Keep scientific notation as-is
-              num_str = v.value.to_s
+              num_str = val.value.to_s
               if num_str.include?('e') || num_str.include?('E')
                 # Scientific notation - keep as-is
                 num_str
@@ -557,7 +582,7 @@ module WireGram
                   if last_digit != 0
                     # Non-zero last digit like "123.2" - format to 6 places
                     float_val = num_str.to_f
-                    sprintf("%.6f", float_val)
+                    format('%.6f', float_val)
                   else
                     # Zero last digit like "1.0" - keep as-is
                     num_str
@@ -571,15 +596,15 @@ module WireGram
                 num_str
               end
             when :boolean
-              v.value ? 'true' : 'false'
+              val.value ? 'true' : 'false'
             when :null
               'null'
             else
-              quote_string(v.value.to_s)
+              quote_string(val.value.to_s)
             end
           else
             # Fallback - stringify
-            quote_string(v.to_s)
+            quote_string(val.to_s)
           end
         end
 
@@ -587,13 +612,13 @@ module WireGram
           # Need to escape backslashes and quotes for output
           # Use gsub with block to avoid replacement string interpretation issues
           escaped = value.to_s
-            .gsub(/\\/) { '\\\\' }  # Escape backslashes first
-            .gsub(/"/) { '\\"' }    # Then escape quotes
-            .gsub("\n", '\\n')      # Use string literals for control chars
-            .gsub("\r", '\\r')
-            .gsub("\t", '\\t')
-            .gsub("\b", '\\b')      # backspace character
-            .gsub("\f", '\\f')
+                         .gsub(/\\/) { '\\\\' }  # Escape backslashes first
+                         .gsub(/"/) { '\\"' }    # Then escape quotes
+                         .gsub("\n", '\\n')      # Use string literals for control chars
+                         .gsub("\r", '\\r')
+                         .gsub("\t", '\\t')
+                         .gsub("\b", '\\b')      # backspace character
+                         .gsub("\f", '\\f')
           "\"#{escaped}\""
         end
       end

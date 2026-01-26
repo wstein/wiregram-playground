@@ -9,6 +9,7 @@ require_relative '../core/token_stream'
 
 module WireGram
   module Languages
+    # Universal Object Model for JSON
     module Json
       # JSON Language module - provides lexer, parser, transformer, UOM and serializer
       def self.process(input)
@@ -40,18 +41,14 @@ module WireGram
       # Process with pretty formatting
       def self.process_pretty(input, indent = '  ')
         result = process(input)
-        if result[:uom]
-          result[:output] = WireGram::Languages::Json::Serializer.serialize_pretty(result[:uom], indent)
-        end
+        result[:output] = WireGram::Languages::Json::Serializer.serialize_pretty(result[:uom], indent) if result[:uom]
         result
       end
 
       # Process to simple Ruby structure
       def self.process_simple(input)
         result = process(input)
-        if result[:uom]
-          result[:output] = WireGram::Languages::Json::Serializer.serialize_simple(result[:uom])
-        end
+        result[:output] = WireGram::Languages::Json::Serializer.serialize_simple(result[:uom]) if result[:uom]
         result
       end
 

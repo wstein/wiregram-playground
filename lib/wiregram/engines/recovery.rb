@@ -9,14 +9,15 @@ module WireGram
         # Find next statement boundary or safe point
         while position < tokens.length
           token = tokens[position]
-          return position if [:semicolon, :newline, :eof].include?(token[:type])
+          return position if %i[semicolon newline eof].include?(token[:type])
+
           position += 1
         end
         position
       end
 
       # Attempt to recover a partial AST from errors
-      def self.recover_partial_ast(errors, partial_ast)
+      def self.recover_partial_ast(_errors, partial_ast)
         # In a real implementation, this would use error patterns
         # to construct a best-effort AST
         partial_ast

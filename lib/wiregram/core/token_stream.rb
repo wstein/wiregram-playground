@@ -63,9 +63,12 @@ module WireGram
       # Array-like access (absolute index). Only supports forward access.
       def [](index)
         return nil if index < @base
+
         rel = index - @base
         while !@eof && @buffer.length <= rel
           token = @lexer.next_token
+          # Defensive: if lexer unexpectedly returns nil, treat it as EOF
+          token = { type: :eof, value: nil, position: @base + @buffer.length } if token.nil?
           @buffer << token
           @eof = true if token[:type] == :eof
         end
@@ -75,11 +78,12 @@ module WireGram
       # Allow parser to inform the stream to drop consumed tokens
       def consume_to(position)
         return if position <= @base
+
         drop = position - @base
-        if drop > 0
-          @buffer.shift(drop)
-          @base += drop
-        end
+        return unless drop.positive?
+
+        @buffer.shift(drop)
+        @base += drop
       end
 
       # Convenience: fetch next token and advance base

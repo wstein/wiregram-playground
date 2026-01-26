@@ -5,6 +5,7 @@ require_relative 'uom'
 module WireGram
   module Languages
     module Ucl
+      # Transformer to convert UCL AST to UOM
       class Transformer
         # Transform AST to UOM (normalization ready)
         require 'set'
@@ -40,7 +41,8 @@ module WireGram
             key_node = node.children[0]
             value_node = node.children[1]
 
-            return if value_node.nil?  # Skip if value failed to parse
+            return if value_node.nil? # Skip if value failed to parse
+
             key = extract_key(key_node)
 
             if value_node.type == :object
@@ -69,9 +71,7 @@ module WireGram
           when :directive
             # Handle directives from parser
             directive_info = node.value
-            if directive_info.is_a?(Hash) && directive_info[:name] == 'include'
-              resolve_include(section, directive_info)
-            end
+            resolve_include(section, directive_info) if directive_info.is_a?(Hash) && directive_info[:name] == 'include'
             # Other directives (.priority, .inherit, etc.) can be handled here later
           end
         end
@@ -81,9 +81,7 @@ module WireGram
           when :identifier, :string
             key = node.value
             # Normalize uppercase section names (e.g., ALIAS -> alias)
-            if key =~ /^[A-Z][A-Z0-9_\-]*$/
-              key = key.downcase
-            end
+            key = key.downcase if key =~ /^[A-Z][A-Z0-9_-]*$/
             key
           else
             'unknown'
@@ -91,16 +89,14 @@ module WireGram
         end
 
         def resolve_include(section, include_info)
-          name = include_info[:name]
+          include_info[:name]
           args = include_info[:args] || {}
           path = include_info[:path]
 
           return unless path
 
           # If try=true and path is a simple relative path without ${CURDIR} or env var, skip (libucl "try" semantics)
-          if (args['try'] == 'true' || args['try'] == true) && !(path.include?('${CURDIR}') || path.start_with?('$'))
-            return
-          end
+          return if ['true', true].include?(args['try']) && !(path.include?('${CURDIR}') || path.start_with?('$'))
 
           # Expand variables like ${CURDIR}
           resolved = expand_vars(path)
@@ -115,7 +111,7 @@ module WireGram
           end
 
           # If path contains wildcard and glob=true, expand
-          candidates = if (args['glob'] == 'true' || args['glob'] == true) || abs_path.include?('*')
+          candidates = if ['true', true].include?(args['glob']) || abs_path.include?('*')
                          Dir.glob(abs_path)
                        else
                          [abs_path]
@@ -161,11 +157,11 @@ module WireGram
           expand_vars_in_string(s)
         end
 
-        def expand_vars_in_string(s)
+        def expand_vars_in_string(str)
           out = String.new
           i = 0
-          while i < s.length
-            ch = s[i]
+          while i < str.length
+            ch = str[i]
             if ch != '$'
               out << ch
               i += 1
@@ -174,15 +170,15 @@ module WireGram
 
             # Count consecutive dollars
             j = i
-            j += 1 while j < s.length && s[j] == '$'
+            j += 1 while j < str.length && str[j] == '$'
             count = j - i
 
-            next_char = s[j]
+            next_char = str[j]
             # If the sequence isn't followed by a brace or an UPPERCASE letter (i.e., not a var or ${}),
             # then usually keep the dollar sequence verbatim (do not interpret pairs as escapes).
             unless next_char && (next_char == '{' || next_char.match(/[A-Z_]/))
               # Special-case: at end-of-string, if preceding character is UPPERCASE, collapse pairs
-              if next_char.nil? && i > 0 && s[i - 1].match(/[A-Z]/)
+              if next_char.nil? && i.positive? && str[i - 1].match(/[A-Z]/)
                 out << ('$' * (count / 2))
                 out << ('$' * (count % 2))
                 i = j
@@ -205,14 +201,14 @@ module WireGram
 
             # Single active dollar left
             i = j
-            if i < s.length && s[i] == '{'
+            if i < str.length && str[i] == '{'
               # find closing brace
-              k = s.index('}', i + 1)
+              k = str.index('}', i + 1)
               if k.nil?
                 out << '$'
                 next
               end
-              inner = s[(i + 1)...k]
+              inner = str[(i + 1)...k]
               if inner.start_with?('$')
                 # ${$VAR} -> keep braces, expand inner var
                 inner_var = inner[1..]
@@ -222,34 +218,32 @@ module WireGram
                 out << '${}'
               else
                 # ${VAR} -> expand only for all-uppercase variable names, otherwise keep literal
-                if inner =~ /^[A-Z][A-Z0-9_]*$/
-                  out << resolve_var(inner)
-                else
-                  out << "${#{inner}}"
-                end
+                out << if inner =~ /^[A-Z][A-Z0-9_]*$/
+                         resolve_var(inner)
+                       else
+                         "${#{inner}}"
+                       end
               end
               i = k + 1
             else
               # $VAR form
-              m = s[i..].match(/^([A-Za-z_][A-Za-z0-9_]*)/)
+              m = str[i..].match(/^([A-Za-z_][A-Za-z0-9_]*)/)
               if m
                 var = m[1]
                 # If var is mixed-case with uppercase prefix followed by lowercase, split
                 if var =~ /^([A-Z]+)([a-z].*)$/
-                  prefix = $1
-                  rest = $2
+                  prefix = ::Regexp.last_match(1)
+                  rest = ::Regexp.last_match(2)
                   out << resolve_var(prefix)
                   out << rest
-                  i += var.length
                 elsif var =~ /^[A-Z][A-Z0-9_]*$/
                   # all uppercase -> expand
                   out << resolve_var(var)
-                  i += var.length
                 else
                   # lowercase or mixed (non-uppercase) -> keep as literal $var
                   out << "$#{var}"
-                  i += var.length
                 end
+                i += var.length
               else
                 # Nothing valid, output single $
                 out << '$'
@@ -262,6 +256,7 @@ module WireGram
 
         def resolve_var(name)
           return 'unknown' if name.nil? || name.empty?
+
           @vars[name] || ENV[name] || 'unknown'
         end
 
@@ -279,10 +274,10 @@ module WireGram
             begin
               if val.start_with?('-')
                 sign = -1
-                hex = val[3..-1]
+                hex = val[3..]
               else
                 sign = 1
-                hex = val[2..-1]
+                hex = val[2..]
               end
               # invalid hex (with dot) will raise or be nonsense; default to string
               if hex.include?('.')
@@ -291,7 +286,7 @@ module WireGram
                 dec = (sign * hex.to_i(16)).to_s
                 UOM::Value.new(:number, dec)
               end
-            rescue
+            rescue StandardError
               UOM::Value.new(:string, val)
             end
           when :boolean

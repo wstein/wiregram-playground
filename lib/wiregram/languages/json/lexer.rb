@@ -27,16 +27,19 @@ module WireGram
           # If at end, return EOF token
           if @position >= @source.length
             token = { type: :eof, value: nil, position: @position }
-            unless @tokens.last && @tokens.last[:type] == :eof
-              @tokens << token
-            end
+            @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
             return token
           end
 
           prev_len = @tokens.length
 
           if try_tokenize_next
-            return @tokens.last if @tokens.length > prev_len
+            # In streaming mode, tokens are stored in @last_token; otherwise in @tokens
+            if @streaming
+              return @last_token if @last_token
+            elsif @tokens.length > prev_len
+              return @tokens.last
+            end
           else
             # Error recovery
             @errors << {
@@ -50,14 +53,17 @@ module WireGram
             return token
           end
 
-          # If we advanced to EOF, return EOF
+          # If we advanced to EOF, return EOF token (never nil)
           if @position >= @source.length
             token = { type: :eof, value: nil, position: @position }
-            unless @tokens.last && @tokens.last[:type] == :eof
-              @tokens << token
-            end
+            @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
             return token
           end
+
+          # Defensive fallback: ensure next_token never returns nil
+          token = { type: :eof, value: nil, position: @position }
+          @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
+          token
         end
 
         protected
@@ -67,17 +73,29 @@ module WireGram
 
           case char
           when '{'
-            add_token(:lbrace, '{'); advance; true
+            add_token(:lbrace, '{')
+            advance
+            true
           when '}'
-            add_token(:rbrace, '}'); advance; true
+            add_token(:rbrace, '}')
+            advance
+            true
           when '['
-            add_token(:lbracket, '['); advance; true
+            add_token(:lbracket, '[')
+            advance
+            true
           when ']'
-            add_token(:rbracket, ']'); advance; true
+            add_token(:rbracket, ']')
+            advance
+            true
           when ':'
-            add_token(:colon, ':'); advance; true
+            add_token(:colon, ':')
+            advance
+            true
           when ','
-            add_token(:comma, ','); advance; true
+            add_token(:comma, ',')
+            advance
+            true
           when '"'
             tokenize_string
           when '-', '0'..'9'
@@ -94,7 +112,7 @@ module WireGram
         def tokenize_string
           # Use StringScanner to match full quoted string including escapes
           @scanner.pos = @position
-          if matched = @scanner.scan(STRING_PATTERN)
+          if (matched = @scanner.scan(STRING_PATTERN))
             # Extract content (remove quotes)
             content = matched[1...-1]
             # Only unescape if string contains backslashes (fast path for unescaped strings)
@@ -114,7 +132,7 @@ module WireGram
           # Pre-allocate result buffer with estimated capacity (most strings don't have many escapes)
           result = String.new(capacity: str.length)
           i = 0
-          
+
           while i < str.length
             if str[i] == '\\' && i + 1 < str.length
               case str[i + 1]
@@ -148,7 +166,7 @@ module WireGram
                   hex = str[i + 2..i + 5]
                   begin
                     result << [hex.to_i(16)].pack('U')
-                  rescue
+                  rescue StandardError
                     result << '?'
                   end
                   i += 6
@@ -170,7 +188,7 @@ module WireGram
 
         def tokenize_number
           @scanner.pos = @position
-          if matched = @scanner.scan(NUMBER_PATTERN)
+          if (matched = @scanner.scan(NUMBER_PATTERN))
             value = matched.include?('.') || matched.match?(/[eE]/) ? matched.to_f : matched.to_i
             add_token(:number, value, position: @scanner.pos)
             @position = @scanner.pos

@@ -48,9 +48,7 @@ module WireGram
                 yield(p) if block_given? && p
               end
               # allow separators
-              if current_token && [:semicolon, :comma].include?(current_token[:type])
-                advance
-              end
+              advance if current_token && %i[semicolon comma].include?(current_token[:type])
             end
             expect(:rbrace)
           else
@@ -76,11 +74,12 @@ module WireGram
             children = []
             pairs = (node.children || []).select { |c| c && c.type == :pair }
             orig_keys = pairs.map { |p| p.children[0].value.to_s }
-            renumber_keys = orig_keys.length > 1 && orig_keys.uniq.length == 1 && orig_keys.first =~ /^key\d*$/.freeze
+            renumber_keys = orig_keys.length > 1 && orig_keys.uniq.length == 1 && orig_keys.first =~ /^key\d*$/
 
             idx = 0
             (node.children || []).each do |c|
               next unless c
+
               if c.type == :pair
                 idx += 1
                 key = if renumber_keys
@@ -100,6 +99,7 @@ module WireGram
             children = []
             (node.children || []).each do |c|
               next unless c
+
               if c.type == :pair
                 key = c.children[0].value.to_s
                 val = ast_to_uom(c.children[1])
@@ -116,13 +116,19 @@ module WireGram
             { type: :pair, key: key, value: ast_to_uom(val_node) }
           when :directive
             # Pass directive info directly to transformer
-            node.value  # Returns { name: ..., args: ..., path: ... }
+            node.value # Returns { name: ..., args: ..., path: ... }
           when :string, :number, :boolean, :null
             { type: node.type, value: node.value }
           when :array
             { type: :array, items: node.children.map { |c| ast_to_uom(c) } }
           else
-            { type: node.type, value: node.value, children: node.children ? node.children.map { |c| ast_to_uom(c) } : [] }
+            { type: node.type, value: node.value, children: if node.children
+                                                              node.children.map do |c|
+                                                                ast_to_uom(c)
+                                                              end
+                                                            else
+                                                              []
+                                                            end }
           end
         end
 
@@ -150,15 +156,12 @@ module WireGram
           members = []
 
           until at_end? || current_token[:type] == :rbrace
-            if current_token[:type] == :rbrace
-              break
-            end
+            break if current_token[:type] == :rbrace
+
             p = parse_pair
             members << p if p
             # allow ; , or newline separation
-            if current_token && [:semicolon, :comma].include?(current_token[:type])
-              advance
-            end
+            advance if current_token && %i[semicolon comma].include?(current_token[:type])
           end
 
           expect(:rbrace)
@@ -169,10 +172,11 @@ module WireGram
           # key can be string or identifier
           # Capture the key token first, then advance
           key_token = current_token
-          if key_token && [:string, :identifier].include?(key_token[:type])
+          if key_token && %i[string identifier].include?(key_token[:type])
             advance
           else
-            @errors << { type: :unexpected_token, expected: 'key', got: key_token ? key_token[:type] : :eof, position: key_token ? key_token[:position] : @position }
+            @errors << { type: :unexpected_token, expected: 'key', got: key_token ? key_token[:type] : :eof,
+                         position: key_token ? key_token[:position] : @position }
 
             # If the current token is an rbrace, consume it to avoid infinite loops
             if key_token && key_token[:type] == :rbrace
@@ -181,21 +185,19 @@ module WireGram
             end
 
             # Attempt to recover: advance until a likely separator or rbrace
-            while !at_end? && current_token && ![:semicolon, :comma, :rbrace].include?(current_token[:type])
-              advance
-            end
+            advance while !at_end? && current_token && !%i[semicolon comma rbrace].include?(current_token[:type])
             # consume separator if present
-            advance if current_token && [:semicolon, :comma].include?(current_token[:type])
+            advance if current_token && %i[semicolon comma].include?(current_token[:type])
             return nil
           end
 
           # Now determine how to parse the value
           # Case 1: Explicit separator (= or :)
-          if current_token && [:equals, :colon].include?(current_token[:type])
+          if current_token && %i[equals colon].include?(current_token[:type])
             advance # consume separator
             value = parse_value
           # Case 2: Implicit object or array value
-          elsif current_token && [:lbrace, :lbracket].include?(current_token[:type])
+          elsif current_token && %i[lbrace lbracket].include?(current_token[:type])
             value = parse_value
           # Case 3: UCL shorthand - identifiers followed by object
           # Example: section foo { ... } → section { foo { ... } }
@@ -216,9 +218,9 @@ module WireGram
               value = obj
               temp_identifiers.reverse.each do |nested_key|
                 nested_pair = WireGram::Core::Node.new(:pair, children: [
-                  WireGram::Core::Node.new(:identifier, value: nested_key),
-                  value
-                ])
+                                                         WireGram::Core::Node.new(:identifier, value: nested_key),
+                                                         value
+                                                       ])
                 value = WireGram::Core::Node.new(:object, children: [nested_pair])
               end
             else
@@ -230,18 +232,17 @@ module WireGram
                       end
             end
           # Case 4: Other value types
-          elsif current_token && [:string, :number, :boolean, :null].include?(current_token[:type])
+          elsif current_token && %i[string number boolean null].include?(current_token[:type])
             value = parse_value
           else
             # Missing value or unexpected token
-            @errors << { type: :unexpected_token, expected: :equals, got: current_token ? current_token[:type] : :eof, position: current_token ? current_token[:position] : @position }
+            @errors << { type: :unexpected_token, expected: :equals, got: current_token ? current_token[:type] : :eof,
+                         position: current_token ? current_token[:position] : @position }
             return nil
           end
 
           # allow trailing ; or ,
-          if current_token && [:semicolon, :comma].include?(current_token[:type])
-            advance
-          end
+          advance if current_token && %i[semicolon comma].include?(current_token[:type])
 
           key_node = if key_token[:type] == :string
                        WireGram::Core::Node.new(:string, value: key_token[:value])
@@ -252,22 +253,24 @@ module WireGram
           WireGram::Core::Node.new(:pair, children: [key_node, value])
         end
 
-        def parse_value(in_array = false)
+        def parse_value(in_array: false)
           token = current_token
           return nil unless token
 
           # Handle composite values (sequences like "12 value" as a single unquoted string)
           # Only treat these as composite if there are multiple tokens
-          if [:number, :identifier].include?(token[:type])
+          if %i[number identifier].include?(token[:type])
             # Build the list of terminators based on context
-            terminators = [:semicolon, :comma, :rbrace, :eof]
+            terminators = %i[semicolon comma rbrace eof]
             terminators << :rbracket if in_array
 
             collected = []
             while current_token && !terminators.include?(current_token[:type])
               # Stop at structural delimiters only if they start a new statement
               # (i.e., a string/identifier followed by = or :)
-              if [:string, :identifier].include?(current_token[:type]) && peek_token && [:equals, :colon].include?(peek_token[:type])
+              if %i[string
+                    identifier].include?(current_token[:type]) && peek_token && %i[equals
+                                                                                   colon].include?(peek_token[:type])
                 break
               end
 
@@ -304,23 +307,19 @@ module WireGram
                   parts << char
                 when :string
                   # Re-quote string tokens in composite values
-                  if idx > 0 && ![:lbracket, :rbracket, :lbrace, :rbrace].include?(collected[idx - 1][:type])
-                    parts << ' '
-                  end
+                  parts << ' ' if idx.positive? && !%i[lbracket rbracket lbrace rbrace].include?(collected[idx - 1][:type])
                   # Preserve the quotes in composite values
                   parts << "'#{t[:value]}'"
                 else
                   # Other tokens (identifiers, etc.)
-                  if idx > 0 && ![:lbracket, :rbracket, :lbrace, :rbrace].include?(collected[idx - 1][:type])
-                    parts << ' '
-                  end
+                  parts << ' ' if idx.positive? && !%i[lbracket rbracket lbrace rbrace].include?(collected[idx - 1][:type])
                   parts << t[:value].to_s
                 end
               end
               WireGram::Core::Node.new(:string, value: parts.join(''))
             end
           # Handle hex numbers and invalid hex directly (as numbers or strings)
-          elsif [:hex_number, :invalid_hex].include?(token[:type])
+          elsif %i[hex_number invalid_hex].include?(token[:type])
             advance
             if token[:type] == :hex_number
               WireGram::Core::Node.new(:hex_number, value: token[:value])
@@ -361,9 +360,10 @@ module WireGram
           items = []
 
           until at_end? || current_token[:type] == :rbracket
-            val = parse_value(true)  # Pass true to indicate we're in array context
+            val = parse_value(in_array: true) # Pass true to indicate we're in array context
             items << val if val
             break if current_token[:type] == :rbracket
+
             expect(:comma)
           end
 
@@ -382,7 +382,7 @@ module WireGram
           # Parse optional parameters in parentheses
           args = {}
           if current_token && current_token[:type] == :lparen
-            advance  # consume (
+            advance # consume (
             until current_token && current_token[:type] == :rparen
               # Parse key=value pairs
               if current_token && current_token[:type] == :identifier
@@ -391,23 +391,19 @@ module WireGram
                 if current_token && current_token[:type] == :equals
                   advance
                   param_value = if current_token
-                                   case current_token[:type]
-                                   when :string, :identifier
-                                     current_token[:value]
-                                   when :boolean, :number
-                                     current_token[:value]
-                                   else
-                                     nil
-                                   end
-                                 end
+                                  case current_token[:type]
+                                  when :string, :identifier
+                                    current_token[:value]
+                                  when :boolean, :number
+                                    current_token[:value]
+                                  end
+                                end
                   args[param_key] = param_value
                   advance if param_value
                 end
               end
               # Skip comma between parameters
-              if current_token && current_token[:type] == :comma
-                advance
-              end
+              advance if current_token && current_token[:type] == :comma
             end
             expect(:rparen)
           end
@@ -420,9 +416,7 @@ module WireGram
           end
 
           # Consume optional trailing semicolon or comma
-          if current_token && [:semicolon, :comma].include?(current_token[:type])
-            advance
-          end
+          advance if current_token && %i[semicolon comma].include?(current_token[:type])
 
           # Create a directive node
           WireGram::Core::Node.new(

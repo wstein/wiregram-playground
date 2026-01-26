@@ -28,6 +28,7 @@ module WireGram
                 node = parse_value
                 yield(node) if block_given?
                 break if current_token[:type] == :rbracket
+
                 expect(:comma)
               end
             end
@@ -78,10 +79,14 @@ module WireGram
               value = parse_value
 
               if key_token
-                members << WireGram::Core::Node.new(:pair, children: [WireGram::Core::Node.new(:string, value: key_token[:value]), value])
+                members << WireGram::Core::Node.new(:pair,
+                                                    children: [
+                                                      WireGram::Core::Node.new(:string, value: key_token[:value]), value
+                                                    ])
               end
 
               break unless current_token && current_token[:type] == :comma
+
               expect(:comma)
             end
           end
@@ -99,6 +104,7 @@ module WireGram
               value = parse_value
               items << value
               break if current_token[:type] == :rbracket
+
               expect(:comma)
             end
           end

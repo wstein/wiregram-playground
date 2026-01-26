@@ -34,17 +34,17 @@ module WireGram
       # Process a document change
       def process_change(uri, text)
         @documents[uri] = text
-        
-        if @handlers[:change]
-          fabric = WireGram.weave(text)
-          @handlers[:change].call(Document.new(uri, text, fabric))
-        end
+
+        return unless @handlers[:change]
+
+        fabric = WireGram.weave(text)
+        @handlers[:change].call(Document.new(uri, text, fabric))
       end
 
       # Get completions for a document at a position
       def get_completions(uri, position)
         return [] unless @handlers[:completion]
-        
+
         text = @documents[uri]
         return [] unless text
 
@@ -55,7 +55,7 @@ module WireGram
       # Get diagnostics for a document
       def get_diagnostics(uri)
         return [] unless @handlers[:diagnostics]
-        
+
         text = @documents[uri]
         return [] unless text
 

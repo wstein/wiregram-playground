@@ -19,7 +19,7 @@ module WireGram
 
       # Find unused variables
       def find_unused_variables
-        identifiers = @fabric.find_patterns(:identifiers)
+        @fabric.find_patterns(:identifiers)
         # Simple heuristic: variables defined but never referenced elsewhere
         # In a real implementation, this would do proper scope analysis
         []
@@ -37,18 +37,16 @@ module WireGram
       # Get all diagnostics
       def diagnostics
         issues = []
-        
+
         # Check for potential constant folding opportunities
         @fabric.ast.traverse do |node|
-          if [:add, :subtract, :multiply, :divide].include?(node.type)
-            if node.children.all? { |c| c.type == :number }
-              issues << {
-                type: :optimization,
-                message: "Constant expression can be folded",
-                node: node,
-                severity: :info
-              }
-            end
+          if %i[add subtract multiply divide].include?(node.type) && node.children.all? { |c| c.type == :number }
+            issues << {
+              type: :optimization,
+              message: 'Constant expression can be folded',
+              node: node,
+              severity: :info
+            }
           end
         end
 
@@ -59,7 +57,7 @@ module WireGram
 
       def calculate_depth(node, current_depth = 0)
         return current_depth unless node.is_a?(WireGram::Core::Node)
-        
+
         if node.children.empty?
           current_depth
         else

@@ -5,7 +5,7 @@
 # WireGram treats source code as a reversible digital fabric, providing a high-fidelity
 # engine for processing any structured language.
 module WireGram
-  VERSION = "0.1.0"
+  VERSION = '0.1.0'
 
   class Error < StandardError; end
   class ParseError < Error; end

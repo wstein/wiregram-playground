@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'optparse'
 require 'json'
 require 'webrick'
@@ -28,7 +29,7 @@ module WireGram
 
       def self.supports?(name, method)
         mod = module_for(name)
-        mod && mod.respond_to?(method)
+        mod&.respond_to?(method)
       end
     end
 
@@ -64,7 +65,7 @@ module WireGram
             action = @argv.shift || 'help'
             handle_language(language, action, @argv)
           else
-            STDERR.puts "Unknown command: #{command}"
+            warn "Unknown command: #{command}"
             print_help
             exit 1
           end
@@ -96,56 +97,54 @@ module WireGram
       end
 
       def list_languages
-        puts "Available languages:" 
+        puts 'Available languages:'
         Languages.available.each { |l| puts "  - #{l}" }
       end
 
       def start_server
         options = { port: 4567 }
         optp = OptionParser.new do |opts|
-          opts.on("--port PORT", Integer) { |p| options[:port] = p }
+          opts.on('--port PORT', Integer) { |p| options[:port] = p }
         end
         optp.parse!(@argv)
 
         server = WEBrick::HTTPServer.new(Port: options[:port], AccessLog: [], Logger: WEBrick::Log.new('/dev/null'))
 
         server.mount_proc '/v1/process' do |req, res|
-          begin
-            body = req.body || ''
-            payload = JSON.parse(body)
-            language = payload['language']
-            input = payload['input'] || ''
-            mode = payload['mode'] || 'process'
+          body = req.body || ''
+          payload = JSON.parse(body)
+          language = payload['language']
+          input = payload['input'] || ''
+          payload['mode'] || 'process'
 
-            unless Languages.available.include?(language)
-              res.status = 400
-              res.body = { error: 'unsupported language' }.to_json
-              next
-            end
-
-            mod = Languages.module_for(language)
-            result = if mod.respond_to?("process")
-                       if payload['pretty']
-                         mod.process_pretty(input)
-                       else
-                         mod.process(input)
-                       end
-                     else
-                       { error: 'process not available for language' }
-                     end
-
-            res['Content-Type'] = 'application/json'
-            res.body = result.to_json
-          rescue JSON::ParserError
+          unless Languages.available.include?(language)
             res.status = 400
-            res.body = { error: 'invalid json body' }.to_json
-          rescue => e
-            res.status = 500
-            res.body = { error: e.message }.to_json
+            res.body = { error: 'unsupported language' }.to_json
+            next
           end
+
+          mod = Languages.module_for(language)
+          result = if mod.respond_to?('process')
+                     if payload['pretty']
+                       mod.process_pretty(input)
+                     else
+                       mod.process(input)
+                     end
+                   else
+                     { error: 'process not available for language' }
+                   end
+
+          res['Content-Type'] = 'application/json'
+          res.body = result.to_json
+        rescue JSON::ParserError
+          res.status = 400
+          res.body = { error: 'invalid json body' }.to_json
+        rescue StandardError => e
+          res.status = 500
+          res.body = { error: e.message }.to_json
         end
 
-        trap 'INT' do server.shutdown end
+        trap('INT') { server.shutdown }
         puts "WireGram server running on http://localhost:#{options[:port]} (Ctrl-C to stop)"
         server.start
       end
@@ -153,13 +152,13 @@ module WireGram
       def handle_snapshot(argv)
         # Simple pass-through to rake tasks - lightweight integration
         opts = OptionParser.new do |o|
-          o.on('--generate') { |v| @generate = true }
+          o.on('--generate') { |_v| @generate = true }
           o.on('--language LANG') { |v| @lang = v }
         end
         begin
           opts.parse!(argv)
         rescue OptionParser::InvalidOption => e
-          STDERR.puts e.message
+          warn e.message
           exit 1
         end
 
@@ -170,14 +169,14 @@ module WireGram
             system('rake', 'snapshots:generate')
           end
         else
-          STDERR.puts 'Specify --generate and optionally --language <name>'
+          warn 'Specify --generate and optionally --language <name>'
         end
       end
 
       def handle_language(language, action, argv)
         mod = Languages.module_for(language)
         unless mod
-          STDERR.puts "Unknown language: #{language}"
+          warn "Unknown language: #{language}"
           exit 1
         end
 
@@ -204,7 +203,7 @@ module WireGram
             result = mod.tokenize(input)
             output_result({ tokens: result })
           else
-            STDERR.puts "tokenize not supported for #{language}"
+            warn "tokenize not supported for #{language}"
             exit 2
           end
         when 'parse'
@@ -212,7 +211,7 @@ module WireGram
           if mod.respond_to?(:parse_stream)
             # Stream AST nodes as they are built; emit one JSON object per line
             mod.parse_stream(input) do |node|
-              h = (node ? node.to_h : nil)
+              h = node&.to_h
               if @global[:format] == 'json' || ENV['WIREGRAM_FORMAT'] == 'json'
                 puts JSON.generate(h)
               else
@@ -223,11 +222,11 @@ module WireGram
             result = mod.parse(input)
             output_result({ ast: result })
           else
-            STDERR.puts "parse not supported for #{language}"
+            warn "parse not supported for #{language}"
             exit 2
           end
         else
-          STDERR.puts "Unknown action: #{action}"
+          warn "Unknown action: #{action}"
           print_language_help(language, mod)
           exit 1
         end
@@ -235,33 +234,31 @@ module WireGram
 
       def print_language_help(language, mod)
         puts "#{language} commands:"
-        puts "  inspect [--pretty]      Run full pipeline and show detailed result"
-        puts "  tokenize                Show tokens (if supported)"
-        puts "  parse                   Show AST (if supported)"
-        puts "Notes: Outputs are in plaintext by default. Use --format json to get JSON."
-        puts "Detected capabilities:"
-        [:process, :process_pretty, :tokenize, :parse].each do |m|
+        puts '  inspect [--pretty]      Run full pipeline and show detailed result'
+        puts '  tokenize                Show tokens (if supported)'
+        puts '  parse                   Show AST (if supported)'
+        puts 'Notes: Outputs are in plaintext by default. Use --format json to get JSON.'
+        puts 'Detected capabilities:'
+        %i[process process_pretty tokenize parse].each do |m|
           puts "  - #{m}: #{mod.respond_to?(m)}"
         end
       end
 
       def read_input(argv)
         # file path or STDIN
-        if argv && argv.first && !argv.first.start_with?('--') && File.file?(argv.first)
+        if argv&.first && !argv.first.start_with?('--') && File.file?(argv.first)
           File.read(argv.shift)
-        else
+        elsif $stdin.tty?
           # Avoid blocking when no stdin is provided (e.g., in tests)
           # If stdin is a TTY (interactive), treat as empty input
-          if STDIN.tty?
-            ""
-          else
-            STDIN.read
-          end
+          ''
+        else
+          $stdin.read
         end
       end
 
       def output_result(result)
-        max_depth = (ENV['WIREGRAM_AST_MAX_DEPTH'] && ENV['WIREGRAM_AST_MAX_DEPTH'].to_i) || 3
+        ENV['WIREGRAM_AST_MAX_DEPTH']&.to_i || 3
 
         # Normalize UOM output: drop raw :uom objects and expose a JSON-friendly :uom value
         if result.is_a?(Hash)
@@ -280,50 +277,34 @@ module WireGram
 
         if @global[:format] == 'json' || ENV['WIREGRAM_FORMAT'] == 'json'
           puts JSON.pretty_generate(deep_convert_nodes(result))
-        else
+        elsif result.is_a?(Hash)
           # Nicely print parts, with special handling for AST Node objects
-          if result.is_a?(Hash)
-            result.each do |k, v|
-              puts "== #{k} =="
+          result.each do |k, v|
+            puts "== #{k} =="
 
-              if v.is_a?(WireGram::Core::Node)
-                # Print AST as full JSON so it matches snapshot format
-                puts v.to_json
-              elsif v.is_a?(Array) && v.all? { |el| el.is_a?(WireGram::Core::Node) }
-                arr = v.map { |n| n.to_h }
-                puts JSON.pretty_generate(arr)
-              elsif v.is_a?(Array) || v.is_a?(Hash)
-                puts JSON.pretty_generate(deep_convert_nodes(v))
-              elsif v.is_a?(String)
-                s = v
-                printed = false
+            if v.is_a?(WireGram::Core::Node)
+              # Print AST as full JSON so it matches snapshot format
+              puts v.to_json
+            elsif v.is_a?(Array) && v.all? { |el| el.is_a?(WireGram::Core::Node) }
+              arr = v.map(&:to_h)
+              puts JSON.pretty_generate(arr)
+            elsif v.is_a?(Array) || v.is_a?(Hash)
+              puts JSON.pretty_generate(deep_convert_nodes(v))
+            elsif v.is_a?(String)
+              s = v
 
-                # If the string itself is JSON, pretty-print it
-                begin
-                  parsed = JSON.parse(s)
-                  puts JSON.pretty_generate(deep_convert_nodes(parsed))
-                  printed = true
-                rescue JSON::ParserError
-                  # Try to unescape JSON-style escape sequences (e.g. " and \n)
-                  begin
-                    unescaped = JSON.parse("\"#{s.gsub('"', '\\\"')}\"")
-                    puts unescaped
-                    printed = true
-                  rescue JSON::ParserError
-                    # fallthrough
-                  end
-                end
+              # If the string itself is JSON, pretty-print it
+              printed = try_print_as_json(s)
 
-                puts s unless printed
-              else
-                puts v.inspect
-              end
-
-              puts
+              puts s unless printed
+            else
+              puts v.inspect
             end
-          else
-            puts result.to_s
+
+            puts
           end
+        else
+          puts result
         end
       end
 
@@ -341,6 +322,21 @@ module WireGram
         else
           obj
         end
+      end
+
+      def try_print_as_json(str)
+        # Try to parse and pretty-print as JSON
+        parsed = JSON.parse(str)
+        puts JSON.pretty_generate(deep_convert_nodes(parsed))
+        true
+      rescue JSON::ParserError
+        # Try to unescape JSON-style escape sequences (e.g. " and \n)
+        unescaped = JSON.parse("\"#{str.gsub('"', '\\\"')}\"")
+        puts unescaped
+        true
+      rescue StandardError
+        # Could not parse as JSON
+        false
       end
     end
   end

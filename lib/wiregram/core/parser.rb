@@ -15,7 +15,7 @@ module WireGram
 
       # Parse the tokens into an AST
       def parse
-        raise NotImplementedError, "Subclasses must implement parse"
+        raise NotImplementedError, 'Subclasses must implement parse'
       end
 
       protected
@@ -41,9 +41,9 @@ module WireGram
           token
         else
           # Error recovery
-          @errors << { 
-            type: :unexpected_token, 
-            expected: type, 
+          @errors << {
+            type: :unexpected_token,
+            expected: type,
             got: token ? token[:type] : :eof,
             position: token ? token[:position] : @position
           }

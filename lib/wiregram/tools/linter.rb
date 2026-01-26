@@ -22,11 +22,11 @@ module WireGram
       # Lint a fabric
       def lint(fabric)
         @results = []
-        
+
         @rules.each do |rule|
           violations = rule[:check].call(fabric)
           violations = [violations] unless violations.is_a?(Array)
-          
+
           violations.compact.each do |violation|
             @results << {
               rule: rule[:name],
@@ -43,11 +43,11 @@ module WireGram
 
       # Format results for display
       def format_results
-        return "No issues found!" if @results.empty?
+        return 'No issues found!' if @results.empty?
 
         output = []
         output << "Found #{@results.length} issue(s):\n"
-        
+
         @results.each_with_index do |result, i|
           output << "#{i + 1}. [#{result[:severity].upcase}] #{result[:rule]}"
           output << "   #{result[:message]}"

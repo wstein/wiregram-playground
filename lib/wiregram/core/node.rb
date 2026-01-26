@@ -51,33 +51,31 @@ module WireGram
 
       # Deep serialization for snapshots - shows actual content with depth limiting
       def to_detailed_string(depth = 0, max_depth = 3)
-        return "..." if depth > max_depth
+        return '...' if depth > max_depth
 
-        indent = "  " * depth
+        indent = '  ' * depth
         result = "#{indent}#<Node type=#{@type}"
 
-        if @value
-          result += " value=#{@value.inspect}"
-        end
+        result += " value=#{@value.inspect}" if @value
 
         if @children.any?
           result += " children=#{@children.length}>"
           @children.each do |child|
-            if child.is_a?(Node)
-              result += "\n#{child.to_detailed_string(depth + 1, max_depth)}"
-            else
-              result += "\n#{indent}  #{child.inspect}"
-            end
+            result += if child.is_a?(Node)
+                        "\n#{child.to_detailed_string(depth + 1, max_depth)}"
+                      else
+                        "\n#{indent}  #{child.inspect}"
+                      end
           end
         else
-          result += ">"
+          result += '>'
         end
 
         result
       end
 
       # Convert to JSON format for snapshots
-      def to_json
+      def to_json(*_args)
         # Handle infinity values that can't be serialized to JSON
         hash = to_h
         JSON.pretty_generate(sanitize_for_json(hash))
@@ -93,7 +91,7 @@ module WireGram
           obj.map { |v| sanitize_for_json(v) }
         when Float
           if obj.infinite?
-            obj.positive? ? "Infinity" : "-Infinity"
+            obj.positive? ? 'Infinity' : '-Infinity'
           else
             obj
           end

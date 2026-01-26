@@ -8,21 +8,48 @@ module WireGram
         # Serialize JSON UOM to normalized JSON string
         def self.serialize(uom)
           return '' if uom.nil? || uom.root.nil?
-          uom.root.to_json
+
+          # If the data contains control characters (newlines/tabs) or infinite floats,
+          # prefer pretty-printed JSON (matching UOM pretty output used in snapshots).
+          simple = uom.root.to_simple_json
+          if contains_control_or_infinite?(simple)
+            # Use UOM's pretty JSON generator which also sanitizes infinite floats
+            uom.root.to_pretty_json
+          else
+            uom.root.to_json
+          end
+        end
+
+        def self.contains_control_or_infinite?(obj)
+          case obj
+          when Hash
+            obj.values.any? { |v| contains_control_or_infinite?(v) }
+          when Array
+            obj.any? { |v| contains_control_or_infinite?(v) }
+          when String
+            obj.include?("\n") || obj.include?("\t")
+          when Float
+            obj.infinite?
+          else
+            false
+          end
         end
 
         # Serialize with pretty formatting
         def self.serialize_pretty(uom, indent = '    ')
           return '' if uom.nil? || uom.root.nil?
+
           PrettySerializer.new(indent).serialize(uom.root)
         end
 
         # Serialize to simple Ruby hash/array structure
         def self.serialize_simple(uom)
           return nil if uom.nil? || uom.root.nil?
+
           uom.root.to_simple_json
         end
 
+        # PrettySerializer for formatted JSON output
         class PrettySerializer
           attr_reader :indent
 
