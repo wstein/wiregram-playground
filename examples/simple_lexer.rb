@@ -9,13 +9,13 @@
 require_relative '../lib/wiregram'
 require_relative '../lib/wiregram/languages/expression/lexer'
 
-puts "=== WireGram Simple Lexer Example ==="
+puts '=== WireGram Simple Lexer Example ==='
 puts
 
 # Sample code to tokenize
-source_code = "let x = 42 + 10"
+source_code = 'let x = 42 + 10'
 
-puts "Source code:"
+puts 'Source code:'
 puts "  #{source_code}"
 puts
 
@@ -25,7 +25,7 @@ lexer = WireGram::Languages::Expression::Lexer.new(source_code)
 # Tokenize the source
 tokens = lexer.tokenize
 
-puts "Tokens:"
+puts 'Tokens:'
 tokens.each_with_index do |token, i|
   puts "  #{i}. #{token[:type].to_s.ljust(12)} #{token[:value].inspect}"
 end
@@ -34,30 +34,30 @@ puts
 # Example with more complex expression
 complex_source = 'let result = (10 + 5) * 2 - 3'
 
-puts "Complex source code:"
+puts 'Complex source code:'
 puts "  #{complex_source}"
 puts
 
 lexer2 = WireGram::Languages::Expression::Lexer.new(complex_source)
 tokens2 = lexer2.tokenize
 
-puts "Tokens:"
+puts 'Tokens:'
 tokens2.each_with_index do |token, i|
   puts "  #{i}. #{token[:type].to_s.ljust(12)} #{token[:value].inspect}"
 end
 puts
 
 # Example with error recovery
-bad_source = "let x = 42 + @invalid"
+bad_source = 'let x = 42 + @invalid'
 
-puts "Source with invalid character:"
+puts 'Source with invalid character:'
 puts "  #{bad_source}"
 puts
 
 lexer3 = WireGram::Languages::Expression::Lexer.new(bad_source)
 tokens3 = lexer3.tokenize
 
-puts "Tokens (with error recovery):"
+puts 'Tokens (with error recovery):'
 tokens3.each_with_index do |token, i|
   puts "  #{i}. #{token[:type].to_s.ljust(12)} #{token[:value].inspect}"
 end

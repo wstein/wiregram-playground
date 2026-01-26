@@ -8,12 +8,12 @@
 
 require_relative '../lib/wiregram'
 
-puts "=== WireGram Code Analyzer Example ==="
+puts '=== WireGram Code Analyzer Example ==='
 puts
 
 # Example 1: Finding arithmetic operations
-source1 = "let x = 42 + 10 * 2 - 5"
-puts "Source code:"
+source1 = 'let x = 42 + 10 * 2 - 5'
+puts 'Source code:'
 puts "  #{source1}"
 puts
 
@@ -30,15 +30,15 @@ puts
 
 # Analyze complexity
 complexity = analyzer1.complexity
-puts "Complexity metrics:"
+puts 'Complexity metrics:'
 puts "  Operations: #{complexity[:operations_count]}"
 puts "  Tree depth: #{complexity[:tree_depth]}"
 puts
 
 # Example 2: Finding optimization opportunities
-source2 = "let result = 10 + 20"
-puts "\n" + "=" * 50
-puts "Source code (with constant expression):"
+source2 = 'let result = 10 + 20'
+puts "\n#{"=" * 50}"
+puts 'Source code (with constant expression):'
 puts "  #{source2}"
 puts
 
@@ -47,9 +47,9 @@ analyzer2 = fabric2.analyze
 
 # Get diagnostics
 diagnostics = analyzer2.diagnostics
-puts "Diagnostics:"
+puts 'Diagnostics:'
 if diagnostics.empty?
-  puts "  No issues found"
+  puts '  No issues found'
 else
   diagnostics.each do |diag|
     puts "  [#{diag[:severity].upcase}] #{diag[:message]}"
@@ -58,9 +58,9 @@ end
 puts
 
 # Example 3: Pattern analysis
-source3 = "let a = 5 + 3 let b = 10 * 2 let c = a + b"
-puts "\n" + "=" * 50
-puts "Source code (multiple statements):"
+source3 = 'let a = 5 + 3 let b = 10 * 2 let c = a + b'
+puts "\n#{"=" * 50}"
+puts 'Source code (multiple statements):'
 puts "  #{source3}"
 puts
 

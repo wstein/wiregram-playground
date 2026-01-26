@@ -71,7 +71,7 @@ namespace :test do
   end
 
   desc 'Run specific test file'
-  task :file, [:file_path] do |t, args|
+  task :file, [:file_path] do |_t, args|
     if args.file_path
       RSpec::Core::RakeTask.new(:file_spec) do |spec|
         spec.pattern = args.file_path
@@ -85,7 +85,7 @@ namespace :test do
 end
 
 # Alias main test task
-task :test => 'test:all'
+task test: 'test:all'
 
 # Snapshot tasks
 namespace :snapshots do
@@ -109,10 +109,10 @@ namespace :snapshots do
   end
 
   desc 'Update existing snapshots for all languages'
-  task :update => :generate
+  task update: :generate
 
   desc 'Generate snapshots for specific language'
-  task :generate_for, [:language] do |t, args|
+  task :generate_for, [:language] do |_t, args|
     if args.language && LANGUAGES.include?(args.language)
       ENV['UPDATE_SNAPSHOTS'] = '1'
 
@@ -125,7 +125,7 @@ namespace :snapshots do
 
       puts "#{args.language} snapshot generation complete!"
     else
-      puts "Invalid language. Available languages: #{LANGUAGES.join(', ')}"
+      puts "Invalid language. Available languages: #{LANGUAGES.join(", ")}"
     end
   end
 
@@ -150,7 +150,7 @@ namespace :snapshots do
     if missing_snapshots.empty?
       puts 'All snapshots verified successfully!'
     else
-      puts "Missing snapshots for: #{missing_snapshots.join(', ')}"
+      puts "Missing snapshots for: #{missing_snapshots.join(", ")}"
       puts 'Run `rake snapshots:generate` to generate missing snapshots'
     end
   end
@@ -197,7 +197,7 @@ namespace :doc do
         File.open(doc_file, 'w') do |f|
           f.puts "# #{language.capitalize} API Documentation"
           f.puts
-          f.puts "## Available Methods"
+          f.puts '## Available Methods'
           f.puts
           lang_module.methods(false).sort.each do |method|
             f.puts "- `#{method}`"
@@ -218,25 +218,26 @@ namespace :doc do
         puts "Opening documentation: #{index_file}"
         # Try different methods to open the file
         begin
-          if RUBY_PLATFORM =~ /darwin/
+          case RUBY_PLATFORM
+          when /darwin/
             system("open #{index_file}")
-          elsif RUBY_PLATFORM =~ /linux|bsd/
+          when /linux|bsd/
             system("xdg-open #{index_file}")
-          elsif RUBY_PLATFORM =~ /mswin|mingw|cygwin/
+          when /mswin|mingw|cygwin/
             system("start #{index_file}")
           else
             puts "Please open #{index_file} manually"
           end
-        rescue
+        rescue StandardError
           puts "Please open #{index_file} manually"
         end
       else
         puts "No index.html found in #{doc_dir}"
-        puts "Run `rake doc:generate` first"
+        puts 'Run `rake doc:generate` first'
       end
     else
       puts "No documentation found in #{doc_dir}"
-      puts "Run `rake doc:generate` first"
+      puts 'Run `rake doc:generate` first'
     end
   end
 end
@@ -259,17 +260,17 @@ namespace :utils do
       lang_dir = File.join('lib/wiregram/languages', language)
       spec_dir = File.join('spec/languages', language)
 
-      if Dir.exist?(lang_dir) && Dir.exist?(spec_dir)
-        source_files = Dir.glob(File.join(lang_dir, '**/*.rb')).size
-        test_files = Dir.glob(File.join(spec_dir, '**/*_spec.rb')).size
-        fixture_files = Dir.glob(File.join(spec_dir, 'fixtures/**/*')).size
+      next unless Dir.exist?(lang_dir) && Dir.exist?(spec_dir)
 
-        puts "  #{language.capitalize}:"
-        puts "    Source files: #{source_files}"
-        puts "    Test files: #{test_files}"
-        puts "    Fixture files: #{fixture_files}"
-        puts
-      end
+      source_files = Dir.glob(File.join(lang_dir, '**/*.rb')).size
+      test_files = Dir.glob(File.join(spec_dir, '**/*_spec.rb')).size
+      fixture_files = Dir.glob(File.join(spec_dir, 'fixtures/**/*')).size
+
+      puts "  #{language.capitalize}:"
+      puts "    Source files: #{source_files}"
+      puts "    Test files: #{test_files}"
+      puts "    Fixture files: #{fixture_files}"
+      puts
     end
   end
 
@@ -286,7 +287,7 @@ namespace :utils do
         begin
           load example_file
           puts "  #{example_name} completed successfully"
-        rescue => e
+        rescue StandardError => e
           puts "  #{example_name} failed: #{e.message}"
         end
       end
@@ -348,12 +349,10 @@ namespace :dev do
 
     # Check language modules
     LANGUAGES.each do |language|
-      begin
-        require "wiregram/languages/#{language}"
-        puts "✓ #{language.capitalize} language module loads successfully"
-      rescue => e
-        puts "✗ #{language.capitalize} language module failed to load: #{e.message}"
-      end
+      require "wiregram/languages/#{language}"
+      puts "✓ #{language.capitalize} language module loads successfully"
+    rescue StandardError => e
+      puts "✗ #{language.capitalize} language module failed to load: #{e.message}"
     end
   end
 
@@ -443,4 +442,4 @@ task :help do
 end
 
 # Set default task
-task :default => :help
+task default: :help

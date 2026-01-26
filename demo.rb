@@ -5,7 +5,7 @@
 #
 # This script demonstrates the core features of the WireGram framework:
 # - Source code as reversible digital fabric
-# - Code analysis and pattern detection  
+# - Code analysis and pattern detection
 # - Automatic transformations and optimizations
 # - Error recovery mechanisms
 
@@ -14,7 +14,7 @@ require_relative 'lib/wiregram/tools/linter'
 require_relative 'lib/wiregram/tools/fixer'
 
 def separator
-  puts "\n" + "=" * 60 + "\n"
+  puts "\n#{"=" * 60}\n"
 end
 
 puts <<~BANNER
@@ -26,10 +26,10 @@ BANNER
 
 # Demonstration 1: Basic Weaving and Unweaving
 separator
-puts "1. REVERSIBLE DIGITAL FABRIC"
-puts "   Treating source code as a reversible fabric..."
+puts '1. REVERSIBLE DIGITAL FABRIC'
+puts '   Treating source code as a reversible fabric...'
 
-source = "let x = 42 + 10"
+source = 'let x = 42 + 10'
 puts "\nOriginal source code:"
 puts "  #{source}"
 
@@ -41,10 +41,10 @@ puts "\n✓ Perfect reversibility maintained!"
 
 # Demonstration 2: Pattern Analysis
 separator
-puts "2. PATTERN DETECTION & ANALYSIS"
-puts "   Finding patterns in the code fabric..."
+puts '2. PATTERN DETECTION & ANALYSIS'
+puts '   Finding patterns in the code fabric...'
 
-complex_source = "let result = 100 / 5 + 3 * 2"
+complex_source = 'let result = 100 / 5 + 3 * 2'
 puts "\nSource code:"
 puts "  #{complex_source}"
 
@@ -67,10 +67,10 @@ puts "  Tree depth: #{complexity[:tree_depth]}"
 
 # Demonstration 3: Code Transformation
 separator
-puts "3. AUTOMATIC TRANSFORMATIONS"
-puts "   Optimizing code through fabric transformations..."
+puts '3. AUTOMATIC TRANSFORMATIONS'
+puts '   Optimizing code through fabric transformations...'
 
-optimization_source = "let value = 25 + 15 * 2"
+optimization_source = 'let value = 25 + 15 * 2'
 puts "\nOriginal code:"
 puts "  #{optimization_source}"
 
@@ -83,43 +83,43 @@ puts "\n✓ Constant expressions automatically evaluated!"
 
 # Demonstration 4: Error Recovery
 separator
-puts "4. RESILIENT ERROR RECOVERY"
-puts "   Handling malformed input gracefully..."
+puts '4. RESILIENT ERROR RECOVERY'
+puts '   Handling malformed input gracefully...'
 
-malformed_source = "let x = 42 + @invalid"
+malformed_source = 'let x = 42 + @invalid'
 puts "\nSource with invalid character:"
 puts "  #{malformed_source}"
 
 begin
   lexer = WireGram::Languages::Expression::Lexer.new(malformed_source)
-  tokens = lexer.tokenize
-  
+  lexer.tokenize
+
   puts "\n✓ Lexer recovered and continued tokenization"
   puts "  Errors logged: #{lexer.errors.length}"
-  
+
   if lexer.errors.any?
     lexer.errors.each do |error|
       puts "    - Unknown character '#{error[:char]}' at position #{error[:position]}"
     end
   end
-rescue => e
+rescue StandardError => e
   puts "\nError: #{e.message}"
 end
 
 # Demonstration 5: Linting and Auto-fixing
 separator
-puts "5. INTELLIGENT LINTING & AUTO-FIXING"
-puts "   Building robust code quality tools..."
+puts '5. INTELLIGENT LINTING & AUTO-FIXING'
+puts '   Building robust code quality tools...'
 
 puts "\nCreating a linter with custom rules..."
 linter = WireGram::Tools::Linter.new do
-  rule "constant-expression", severity: :info do |fabric|
+  rule 'constant-expression', severity: :info do |fabric|
     analyzer = fabric.analyze
     analyzer.diagnostics.select { |d| d[:type] == :optimization }
   end
 end
 
-lint_source = "let x = 100 + 200"
+lint_source = 'let x = 100 + 200'
 puts "\nSource code:"
 puts "  #{lint_source}"
 
@@ -131,17 +131,17 @@ puts "\n#{linter.format_results}"
 if issues.any?
   puts "\nApplying automatic fixes..."
   fixed = fabric4.transform(:constant_folding)
-  puts "Fixed code:"
+  puts 'Fixed code:'
   puts "  #{fixed.to_source}"
   puts "\n✓ Code automatically optimized!"
 end
 
 # Demonstration 6: Custom Transformations
 separator
-puts "6. DECLARATIVE TRANSFORMATIONS"
-puts "   Defining custom code transformations..."
+puts '6. DECLARATIVE TRANSFORMATIONS'
+puts '   Defining custom code transformations...'
 
-transform_source = "10 + 5"
+transform_source = '10 + 5'
 puts "\nOriginal code:"
 puts "  #{transform_source}"
 
@@ -163,23 +163,23 @@ puts "\n✓ Custom transformation applied!"
 
 # Summary
 separator
-puts "SUMMARY"
+puts 'SUMMARY'
 puts
 
-puts "✓ WireGram successfully demonstrated:"
-puts "  • Reversible source code fabric abstraction"
-puts "  • High-fidelity parsing with error recovery"
-puts "  • Pattern detection and code analysis"
-puts "  • Automatic code transformations"
-puts "  • Declarative linting and fixing"
-puts "  • Foundation for language servers and tooling"
+puts '✓ WireGram successfully demonstrated:'
+puts '  • Reversible source code fabric abstraction'
+puts '  • High-fidelity parsing with error recovery'
+puts '  • Pattern detection and code analysis'
+puts '  • Automatic code transformations'
+puts '  • Declarative linting and fixing'
+puts '  • Foundation for language servers and tooling'
 
 puts "\n🎯 Ready for building next-generation:"
-puts "   → Language Servers"
-puts "   → Linters & Formatters"
-puts "   → Auto-fixers & Refactoring Tools"
-puts "   → Code Analysis & Optimization Tools"
+puts '   → Language Servers'
+puts '   → Linters & Formatters'
+puts '   → Auto-fixers & Refactoring Tools'
+puts '   → Code Analysis & Optimization Tools'
 
 separator
-puts "Explore more examples in the examples/ directory!"
+puts 'Explore more examples in the examples/ directory!'
 puts

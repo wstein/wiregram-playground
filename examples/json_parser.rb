@@ -18,7 +18,7 @@ def print_tree(node, indent = 0)
   end
 end
 
-puts "=== WireGram JSON Parser Example ==="
+puts '=== WireGram JSON Parser Example ==='
 puts
 
 source1 = '{"name": "Alice", "age": 30, "active": true, "tags": ["dev","ruby"]}'

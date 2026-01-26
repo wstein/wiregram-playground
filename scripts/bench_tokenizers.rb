@@ -17,20 +17,19 @@ else
   items_capacity = (size_mb * 1024 * 1024) / item.bytesize
   items_capacity = 10 if items_capacity < 10
   items_capacity.times { items << item }
-  src = "[" + items.join + "{}]"
+  src = "[#{items.join}{}]"
   puts "Generated JSON payload ~#{(src.bytesize / 1024.0 / 1024.0).round(2)} MB (#{items_capacity} items)"
 end
 
 # Helper to tokenize using next_token to measure per-token overhead
 def time_lex(klass, src)
   lexer = klass.new(src)
-  t = Benchmark.realtime do
+  Benchmark.realtime do
     loop do
       tok = lexer.next_token
       break if tok && tok[:type] == :eof
     end
   end
-  t
 end
 
 json_time = time_lex(WireGram::Languages::Json::Lexer, src)
