@@ -1,5 +1,19 @@
+# Dependency directories
 *.gem
 *.rbc
+.bundle/
+vendor/bundle
+lib/bundler/man/
+
+# Environment files
+.env
+.env.local
+.env*.local
+.env*.test
+.env*.development
+.env*.production
+
+# Ruby specific
 /.config
 /coverage/
 /InstalledFiles
@@ -10,13 +24,13 @@
 /test/version_tmp/
 /tmp/
 
-# Used by dotenv library to load environment variables.
-# .env
+# Documentation
+/.yardoc/
+/_yardoc/
+/doc/
+/rdoc/
 
-# Ignore Byebug command history file.
-.byebug_history
-
-## Specific to RubyMotion:
+# RubyMotion
 .dat*
 .repl_history
 build/
@@ -24,34 +38,72 @@ build/
 build-iPhoneOS/
 build-iPhoneSimulator/
 
-## Specific to RubyMotion (use of CocoaPods):
-#
-# We recommend against adding the Pods directory to your .gitignore. However
-# you should judge for yourself, the pros and cons are mentioned at:
-# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
-#
-# vendor/Pods/
+# Logs
+*.log
+*.log.*
+log/
+*.log.*
 
-## Documentation cache and generated files:
-/.yardoc/
-/_yardoc/
-/doc/
-/rdoc/
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-## Environment normalization:
-/.bundle/
-/vendor/bundle
-/lib/bundler/man/
+# IDE/Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# for a library or gem, you might want to ignore these files since the code is
-# intended to run in multiple environments; otherwise, check them in:
-# Gemfile.lock
-# .ruby-version
-# .ruby-gemset
+# Build output
+/build/
+/dist/
+/out/
 
-# unless supporting rvm < 1.11.0 or doing something fancy, ignore this:
-.rvmrc
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Used by RuboCop. Remote config files pulled in from inherit_from directive.
-# .rubocop-https?--*
-big.json
+# Crystal
+/bin/
+/lib/
+/shards/
+/shard.yml.lock
+/shard.override.yml.lock
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+*.db
+*.db-journal
+
+# Byebug
+.byebug_history
+
+# RuboCop
+.rubocop-https?--*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+
+# OS generated files
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
