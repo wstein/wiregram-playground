@@ -12,10 +12,10 @@
         "castwide.solargraph",
         "crystal-lang.crystal",
         "GitHub.vscode-pull-request-github",
-        "ms-azuretools.vscode-docker",
-        "tadashi.fish",
+        "mhutchie.git-graph",
+        "ms-azuretools.vscode-containers",
         "redhat.vscode-yaml",
-        "eamodio.gitlens"
+        "tadashi.fish"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "fish",
@@ -33,7 +33,8 @@
   ],
   "postCreateCommand": ".devcontainer/scripts/devcontainer-setup.sh",
   "remoteUser": "vscode",
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:1": {}
-  }
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=vscode-home,target=/home/vscode,type=volume"
+  ]
 }
