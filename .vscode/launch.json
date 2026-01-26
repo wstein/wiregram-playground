@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Ruby Lexer Benchmark (Terminal)",
+      "type": "pwa-node",
+      "request": "launch",
+      "program": "${workspaceFolder}/specs/001-wiregram-framework/research/bench/run_lexer_bench.rb",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Run Parser (script)",
+      "type": "pwa-node",
+      "request": "launch",
+      "program": "${workspaceFolder}/specs/001-wiregram-framework/research/parser-prototype/ruby/parser.rb",
+      "args": [
+        "${workspaceFolder}/specs/001-wiregram-framework/research/corpus/sample.minilang"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
