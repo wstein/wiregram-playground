@@ -35,12 +35,15 @@ module WireGram
         }.freeze
 
         def initialize(source)
-          super(source)
+          super
           @scanner = StringScanner.new(source)
         end
 
         protected
 
+        # rubocop:disable Metrics/CyclomaticComplexity
+        # Reason: Complex branching is intentional for performance-sensitive tokenization.
+        # The method is organized for fast-paths and minimal allocations.
         def try_tokenize_next
           skip_whitespace
           return true if @position >= @source.length
@@ -107,6 +110,7 @@ module WireGram
 
           false
         end
+        # rubocop:enable Metrics/CyclomaticComplexity
 
         private
 
@@ -232,7 +236,7 @@ module WireGram
                             i += 2
               when 'u'
                 if i + 5 < str.length
-                  hex = str[i + 2..i + 5]
+                  hex = str[(i + 2)..(i + 5)]
                   begin
                     result << [hex.to_i(16)].pack('U')
                   rescue StandardError
@@ -245,7 +249,7 @@ module WireGram
                 end
               when 'x'
                 if i + 3 < str.length
-                  hex = str[i + 2..i + 3]
+                  hex = str[(i + 2)..(i + 3)]
                   begin
                     result << hex.to_i(16).chr
                   rescue StandardError

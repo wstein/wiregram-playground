@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# Integration helpers for Cucumber feature tests.
+#
+# These provide small utilities used by the feature step definitions
+# (fixture loading, CLI invocation, IO capture, etc.).
 module IntegrationHelpers
   def language_module(language)
     case language
@@ -44,7 +48,9 @@ module IntegrationHelpers
 
   def run_cli(args, stdin: nil)
     stdin ||= StringIO.new('')
-    stdin.define_singleton_method(:tty?) { true }
+    stdin.define_singleton_method(:tty?) do
+      true
+    end
 
     @cli_exit_status = 0
     @cli_stdout = ''
@@ -52,11 +58,9 @@ module IntegrationHelpers
 
     with_stdin(stdin) do
       @cli_stdout, @cli_stderr = capture_io do
-        begin
-          WireGram::CLI::Runner.start(args)
-        rescue SystemExit => e
-          @cli_exit_status = e.status || 1
-        end
+        WireGram::CLI::Runner.start(args)
+      rescue SystemExit => e
+        @cli_exit_status = e.status || 1
       end
     end
   end

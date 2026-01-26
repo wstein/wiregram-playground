@@ -108,7 +108,7 @@ module WireGram
         end
         optp.parse!(@argv)
 
-        server = WEBrick::HTTPServer.new(Port: options[:port], AccessLog: [], Logger: WEBrick::Log.new('/dev/null'))
+        server = WEBrick::HTTPServer.new(Port: options[:port], AccessLog: [], Logger: WEBrick::Log.new(File::NULL))
 
         server.mount_proc '/v1/process' do |req, res|
           body = req.body || ''
@@ -144,7 +144,9 @@ module WireGram
           res.body = { error: e.message }.to_json
         end
 
-        trap('INT') { server.shutdown }
+        trap('INT') do
+          server.shutdown
+        end
         puts "WireGram server running on http://localhost:#{options[:port]} (Ctrl-C to stop)"
         server.start
       end
@@ -152,7 +154,9 @@ module WireGram
       def handle_snapshot(argv)
         # Simple pass-through to rake tasks - lightweight integration
         opts = OptionParser.new do |o|
-          o.on('--generate') { |_v| @generate = true }
+          o.on('--generate') do |_v|
+            @generate = true
+          end
           o.on('--language LANG') { |v| @lang = v }
         end
         begin

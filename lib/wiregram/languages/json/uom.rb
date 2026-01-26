@@ -139,8 +139,8 @@ module WireGram
           private
 
           def escape_json_string(str)
-            str.to_s.gsub(/\\/) { '\\\\' }
-               .gsub(/"/) { '\\"' }
+            str.to_s.gsub('\\') { '\\\\' }
+               .gsub('"') { '\\"' }
           end
         end
 
@@ -280,8 +280,8 @@ module WireGram
           end
 
           def escape_json_string(str)
-            str.to_s.gsub(/\\/) { '\\\\' }
-               .gsub(/"/) { '\\"' }
+            str.to_s.gsub('\\') { '\\\\' }
+               .gsub('"') { '\\"' }
           end
         end
 
@@ -442,8 +442,8 @@ module WireGram
           private
 
           def escape_json_string(str)
-            str.to_s.gsub(/\\/) { '\\\\' }
-               .gsub(/"/) { '\\"' }
+            str.to_s.gsub('\\') { '\\\\' }
+               .gsub('"') { '\\"' }
           end
         end
       end

@@ -45,7 +45,7 @@ module WireGram
 
       # Perform division with zero check
       def safe_divide(numerator, denominator)
-        denominator != 0 ? numerator / denominator : numerator
+        denominator.zero? ? numerator : numerator / denominator
       end
 
       # Constant folding optimization

@@ -4,6 +4,7 @@ AllCops:
   NewCops: disable
   Exclude:
     - "vendor/**/*"
+    - "ports/**/*"
 
 Style/StringLiterals:
   EnforcedStyle: single_quotes
@@ -37,16 +38,10 @@ Metrics/AbcSize:
   Enabled: false
 
 Metrics/CyclomaticComplexity:
-  Enabled: false
+  Max: 30
 
 Metrics/PerceivedComplexity:
   Enabled: false
 
 Metrics/BlockNesting:
   Max: 5
-  Exclude:
-    - "lib/wiregram/languages/**/lexer.rb"
-    - "lib/wiregram/languages/**/parser.rb"
-    - "lib/wiregram/languages/**/transformer.rb"
-    - "lib/wiregram/languages/**/serializer.rb"
-    - "lib/wiregram/languages/**/uom.rb"

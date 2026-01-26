@@ -14,8 +14,7 @@
         "GitHub.vscode-pull-request-github",
         "mhutchie.git-graph",
         "ms-azuretools.vscode-containers",
-        "redhat.vscode-yaml",
-        "tadashi.fish"
+        "redhat.vscode-yaml"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "fish",

@@ -16,7 +16,9 @@ else
   items = []
   items_capacity = (size_mb * 1024 * 1024) / item.bytesize
   items_capacity = 10 if items_capacity < 10
-  items_capacity.times { items << item }
+  items_capacity.times do
+    items << item
+  end
   src = "[#{items.join}{}]"
   puts "Generated JSON payload ~#{(src.bytesize / 1024.0 / 1024.0).round(2)} MB (#{items_capacity} items)"
 end

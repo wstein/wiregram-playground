@@ -55,10 +55,14 @@ operations = analyzer.find_patterns(:arithmetic_operations)
 literals = analyzer.find_patterns(:literals)
 
 puts "\n✓ Detected #{operations.length} arithmetic operations:"
-operations.each { |op| puts "    - #{op.type}" }
+operations.each do |op|
+  puts "    - #{op.type}"
+end
 
 puts "\n✓ Found #{literals.length} literal values:"
-literals.each { |lit| puts "    - #{lit.type}: #{lit.value}" }
+literals.each do |lit|
+  puts "    - #{lit.type}: #{lit.value}"
+end
 
 complexity = analyzer.complexity
 puts "\nComplexity metrics:"

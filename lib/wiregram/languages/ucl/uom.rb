@@ -312,8 +312,8 @@ module WireGram
           private
 
           def escape_ucl_string(str)
-            str.to_s.gsub(/\\/) { '\\\\' }
-               .gsub(/"/) { '\\"' }
+            str.to_s.gsub('\\') { '\\\\' }
+               .gsub('"') { '\\"' }
           end
         end
 
@@ -352,7 +352,9 @@ module WireGram
               sec.items.concat(temp_uom.root.items)
             end
             # Re-sort after all assignments
-            sec.items.sort_by! { |item| item.key.to_s }
+            sec.items.sort_by! do |item|
+              item.key.to_s
+            end
             sec
           when Array
             ArrayValue.new(val.map { |e| convert_value_to_uom(e) })
@@ -579,13 +581,13 @@ module WireGram
                 if parts.length == 2 && parts[1].length == 1
                   # One decimal place: check if it's non-zero
                   last_digit = parts[1][0].to_i
-                  if last_digit != 0
+                  if last_digit.zero?
+                    # Zero last digit like "1.0" - keep as-is
+                    num_str
+                  else
                     # Non-zero last digit like "123.2" - format to 6 places
                     float_val = num_str.to_f
                     format('%.6f', float_val)
-                  else
-                    # Zero last digit like "1.0" - keep as-is
-                    num_str
                   end
                 else
                   # Other decimal formats - keep as-is
@@ -612,8 +614,8 @@ module WireGram
           # Need to escape backslashes and quotes for output
           # Use gsub with block to avoid replacement string interpretation issues
           escaped = value.to_s
-                         .gsub(/\\/) { '\\\\' }  # Escape backslashes first
-                         .gsub(/"/) { '\\"' }    # Then escape quotes
+                         .gsub('\\') { '\\\\' }  # Escape backslashes first
+                         .gsub('"') { '\\"' }    # Then escape quotes
                          .gsub("\n", '\\n')      # Use string literals for control chars
                          .gsub("\r", '\\r')
                          .gsub("\t", '\\t')
