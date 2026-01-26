@@ -31,7 +31,9 @@ module WireGram
       # Find nodes matching a condition
       def find_all(&block)
         results = []
-        traverse { |node| results << node if block.call(node) }
+        traverse do |node|
+          results << node if block.call(node)
+        end
         results
       end
 

@@ -20,7 +20,7 @@ module WireGram
         LETTER_PATTERN = /[a-zA-Z_]/
 
         def initialize(source)
-          super(source)
+          super
           @scanner = StringScanner.new(source)
         end
 
@@ -134,7 +134,7 @@ module WireGram
                             i += 2
               when 'u'
                 if i + 5 < str.length
-                  hex = str[i + 2..i + 5]
+                  hex = str[(i + 2)..(i + 5)]
                   begin
                     result << [hex.to_i(16)].pack('U')
                   rescue StandardError

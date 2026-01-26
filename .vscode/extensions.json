@@ -2,10 +2,9 @@
   "recommendations": [
     "castwide.solargraph",
     "crystal-lang.crystal",
-    "redhat.vscode-yaml",
-    "tadashi.fish",
     "GitHub.vscode-pull-request-github",
+    "mhutchie.git-graph",
     "ms-azuretools.vscode-containers",
-    "mhutchie.git-graph"
+    "redhat.vscode-yaml"
   ]
 }

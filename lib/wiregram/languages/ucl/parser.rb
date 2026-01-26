@@ -151,6 +151,8 @@ module WireGram
 
         private
 
+        # rubocop:disable Metrics/CyclomaticComplexity
+        # Reason: Parser needs explicit branches for the many UCL syntactic cases; keeping logic clear aids maintenance.
         def parse_object
           expect(:lbrace)
           members = []
@@ -252,7 +254,10 @@ module WireGram
 
           WireGram::Core::Node.new(:pair, children: [key_node, value])
         end
+        # rubocop:enable Metrics/CyclomaticComplexity
 
+        # rubocop:disable Metrics/CyclomaticComplexity
+        # Reason: Parsing complex UCL values involves many small branches and nesting; splitting would reduce performance/clarity.
         def parse_value(in_array: false)
           token = current_token
           return nil unless token
@@ -307,16 +312,18 @@ module WireGram
                   parts << char
                 when :string
                   # Re-quote string tokens in composite values
-                  parts << ' ' if idx.positive? && !%i[lbracket rbracket lbrace rbrace].include?(collected[idx - 1][:type])
+                  parts << ' ' if idx.positive? && !%i[lbracket rbracket lbrace
+                                                       rbrace].include?(collected[idx - 1][:type])
                   # Preserve the quotes in composite values
                   parts << "'#{t[:value]}'"
                 else
                   # Other tokens (identifiers, etc.)
-                  parts << ' ' if idx.positive? && !%i[lbracket rbracket lbrace rbrace].include?(collected[idx - 1][:type])
+                  parts << ' ' if idx.positive? && !%i[lbracket rbracket lbrace
+                                                       rbrace].include?(collected[idx - 1][:type])
                   parts << t[:value].to_s
                 end
               end
-              WireGram::Core::Node.new(:string, value: parts.join(''))
+              WireGram::Core::Node.new(:string, value: parts.join)
             end
           # Handle hex numbers and invalid hex directly (as numbers or strings)
           elsif %i[hex_number invalid_hex].include?(token[:type])
@@ -354,6 +361,7 @@ module WireGram
             end
           end
         end
+        # rubocop:enable Metrics/CyclomaticComplexity
 
         def parse_array
           expect(:lbracket)
@@ -371,6 +379,8 @@ module WireGram
           WireGram::Core::Node.new(:array, children: items)
         end
 
+        # rubocop:disable Metrics/BlockNesting
+        # Reason: Directive parsing uses nested parameter parsing for clarity; splitting reduces clarity and performance.
         def parse_directive
           # Expect directive token (e.g., "include", "priority")
           dir_token = current_token
@@ -424,6 +434,7 @@ module WireGram
             value: { name: directive_name, args: args, path: path }
           )
         end
+        # rubocop:enable Metrics/BlockNesting
       end
     end
   end

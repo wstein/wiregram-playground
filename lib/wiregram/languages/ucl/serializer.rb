@@ -11,7 +11,7 @@ module WireGram
           # Use double-quoted strings in canonical output and escape control chars
           str = str.to_s
           # Double backslashes first (use block to avoid gsub replacement escaping pitfalls)
-          str = str.gsub(/\\/) { '\\\\' }
+          str = str.gsub('\\') { '\\\\' }
           str = str.gsub('"', '\\"')
           str = str.gsub("\n", '\\n')
           str = str.gsub("\r", '\\r')
@@ -105,7 +105,7 @@ module WireGram
             end
           else
             # fallback
-            !node.value.nil? ? node.value.to_s : ''
+            node.value.nil? ? '' : node.value.to_s
           end
         end
 

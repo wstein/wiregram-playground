@@ -26,7 +26,9 @@ require 'wiregram'
 require 'wiregram/languages/ucl'
 
 # Load support files
-Dir[File.expand_path('support/**/*.rb', __dir__)].sort.each { |f| require f }
+Dir[File.expand_path('support/**/*.rb', __dir__)].each do |f|
+  require f
+end
 
 RSpec.configure do |config|
   require 'timeout'
