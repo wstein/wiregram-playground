@@ -72,10 +72,10 @@ describe 'UCL Language Snapshots' do
       input = 'key = "value";'
       result = WireGram::Languages::Ucl.process(input)
 
-        # Convert UOM to pretty JSON format
-        uom_pretty = result[:uom].root.to_pretty_json
+      # Convert UOM to pretty JSON format
+      uom_pretty = result[:uom].root.to_pretty_json
 
-        assert_snapshot('simple_ucl_uom', uom_pretty, 'ucl')
+      assert_snapshot('simple_ucl_uom', uom_pretty, 'ucl')
     end
 
     it 'snapshots UOM for complex object' do
@@ -103,7 +103,6 @@ describe 'UCL Language Snapshots' do
 
       assert_snapshot('complex_ucl_output', result[:output], 'ucl')
     end
-
   end
 
   describe 'libucl test case snapshots' do
@@ -127,7 +126,9 @@ describe 'UCL Language Snapshots' do
 
       # Process through complete pipeline
       result = WireGram::Languages::Ucl.process(input)
-      tokens_block = result[:tokens].map { |t| "{type: #{t[:type]}, value: #{t[:value].inspect}, position: #{t[:position]}}" }.join("\n")
+      tokens_block = result[:tokens].map do |t|
+        "{type: #{t[:type]}, value: #{t[:value].inspect}, position: #{t[:position]}}"
+      end.join("\n")
 
       # Create a comprehensive snapshot with all outputs
       snapshot_content = <<~SNAPSHOT

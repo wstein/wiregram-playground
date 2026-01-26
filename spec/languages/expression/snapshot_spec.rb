@@ -189,7 +189,9 @@ describe 'Expression Language Snapshots' do
       # Process through complete pipeline
       result = WireGram::Languages::Expression.process(input)
 
-      tokens_block = result[:tokens].map { |t| "{type: #{t[:type]}, value: #{t[:value].inspect}, position: #{t[:position]}}" }.join("\n")
+      tokens_block = result[:tokens].map do |t|
+        "{type: #{t[:type]}, value: #{t[:value].inspect}, position: #{t[:position]}}"
+      end.join("\n")
 
       # Create a comprehensive snapshot with all outputs
       snapshot_content = <<~SNAPSHOT
@@ -225,7 +227,9 @@ describe 'Expression Language Snapshots' do
       # Process through complete pipeline
       result = WireGram::Languages::Expression.process(input)
 
-      tokens_block = result[:tokens].map { |t| "{type: #{t[:type]}, value: #{t[:value].inspect}, position: #{t[:position]}}" }.join("\n")
+      tokens_block = result[:tokens].map do |t|
+        "{type: #{t[:type]}, value: #{t[:value].inspect}, position: #{t[:position]}}"
+      end.join("\n")
 
       # Create a comprehensive snapshot with all outputs
       snapshot_content = <<~SNAPSHOT

@@ -4,7 +4,7 @@ require 'spec_helper'
 
 RSpec.describe 'UCL parser top-level array handling' do
   it 'parses a top-level array from a JSON fixture into an :array node' do
-    fixture = File.read(File.expand_path('../../../../vendor/libucl/tests/schema/maxProperties.json', __FILE__))
+    fixture = File.read(File.expand_path('../../../vendor/libucl/tests/schema/maxProperties.json', __dir__))
 
     ast = WireGram::Languages::Ucl.parse(fixture)
 
@@ -15,7 +15,7 @@ RSpec.describe 'UCL parser top-level array handling' do
   end
 
   it 'process handles JSON array fixtures and returns uom_json with expected keys' do
-    fixture = File.read(File.expand_path('../../../../vendor/libucl/tests/schema/maxProperties.json', __FILE__))
+    fixture = File.read(File.expand_path('../../../vendor/libucl/tests/schema/maxProperties.json', __dir__))
 
     result = WireGram::Languages::Ucl.process(fixture)
 

@@ -10,7 +10,7 @@ RSpec.describe WireGram::CLI::Runner do
   end
 
   it 'shows help for a language' do
-    expect { WireGram::CLI::Runner.start(['json', 'help']) }.not_to raise_error
+    expect { WireGram::CLI::Runner.start(%w[json help]) }.not_to raise_error
   end
 
   it 'inspects json from a file' do
@@ -29,6 +29,6 @@ RSpec.describe WireGram::CLI::Runner do
 
   it 'inspects json with no input (non-blocking)' do
     # When no stdin is provided, Runner should treat as empty input and return quickly
-    expect { WireGram::CLI::Runner.start(['json', 'inspect']) }.not_to raise_error
+    expect { WireGram::CLI::Runner.start(%w[json inspect]) }.not_to raise_error
   end
 end

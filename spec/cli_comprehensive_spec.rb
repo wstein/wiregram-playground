@@ -95,11 +95,11 @@ RSpec.describe 'WireGram CLI' do
     end
 
     it 'shows help for a language' do
-      expect { WireGram::CLI::Runner.start(['json', 'help']) }.not_to raise_error
+      expect { WireGram::CLI::Runner.start(%w[json help]) }.not_to raise_error
     end
 
     it 'rejects unknown language' do
-      expect { WireGram::CLI::Runner.start(['foobar', 'help']) }.to raise_error(SystemExit)
+      expect { WireGram::CLI::Runner.start(%w[foobar help]) }.to raise_error(SystemExit)
     end
   end
 end
