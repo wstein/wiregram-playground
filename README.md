@@ -173,26 +173,23 @@ end
 
 ```
 .
-├── lib/
+├── bin/                      # Ruby CLI entrypoints
+├── lib/                      # Ruby reference implementation
 │   ├── wiregram/
 │   │   ├── core/
-│   │   │   ├── fabric.rb        # Digital fabric abstraction
-│   │   │   ├── lexer.rb         # Base lexer
-│   │   │   ├── parser.rb        # Base parser
-│   │   │   └── node.rb          # AST node
 │   │   ├── engines/
-│   │   │   ├── transformer.rb   # Transformation engine
-│   │   │   ├── analyzer.rb      # Analysis engine
-│   │   │   └── recovery.rb      # Error recovery
 │   │   ├── languages/
-│   │   │   └── expression/      # Example language
 │   │   └── tools/
-│   │       ├── linter.rb
-│   │       ├── fixer.rb
-│   │       └── server.rb
 │   └── wiregram.rb
-├── examples/
-├── test/
+├── examples/                 # Ruby examples
+├── spec/                     # Ruby specs
+├── scripts/                  # Ruby helper scripts
+├── vendor/                   # Submodules and vendor code
+├── ports/                    # Non-Ruby ports (PoC)
+│   ├── jruby/
+│   ├── crystal/
+│   ├── kotlin/
+│   └── common/
 └── README.md
 ```
 

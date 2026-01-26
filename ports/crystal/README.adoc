@@ -1,0 +1,15 @@
+= Crystal Port (PoC)
+:toc: left
+:toclevels: 2
+:sectnums:
+
+This folder is reserved for the Crystal port of WireGram. The Ruby reference
+implementation remains at the repository root.
+
+== Suggested Layout
+* `src/` - Crystal sources.
+* `spec/` - Crystal specs.
+* `examples/` - Crystal examples.
+* `bin/` - CLI binaries or wrappers.
+* `scripts/` - Build and helper scripts.
+* `docs/` - Port-specific notes.
