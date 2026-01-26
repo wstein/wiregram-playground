@@ -580,39 +580,67 @@
 
 === UOM ===
 {
-    "strings": {
-        "newline": "line1\nline2",
-        "tab": "before\ttab\tafter",
-        "quotes": "He said \"Hello\"",
-        "backslash": "C:\\Windows\\System32",
-        "unicode": "Unicode: ABC",
-        "empty": ""
-    },
-    "numbers": {
-        "integer": 42,
-        "negative": -123,
-        "float": 3.14159,
-        "scientific": 1.23e-10,
-        "large": 9007199254740991,
-        "zero": 0
-    },
-    "booleans": {
-        "true": true,
-        "false": false
-    },
-    "nulls": {
-        "null_value": null
-    },
-    "special": {
-        "infinity": "Infinity",
-        "negative_infinity": "-Infinity",
-        "nan": null
-    }
+  "strings": {
+    "newline": "line1\nline2",
+    "tab": "before\ttab\tafter",
+    "quotes": "He said \"Hello\"",
+    "backslash": "C:\\Windows\\System32",
+    "unicode": "Unicode: ABC",
+    "empty": ""
+  },
+  "numbers": {
+    "integer": 42,
+    "negative": -123,
+    "float": 3.14159,
+    "scientific": 1.23e-10,
+    "large": 9007199254740991,
+    "zero": 0
+  },
+  "booleans": {
+    "true": true,
+    "false": false
+  },
+  "nulls": {
+    "null_value": null
+  },
+  "special": {
+    "infinity": "Infinity",
+    "negative_infinity": "-Infinity",
+    "nan": null
+  }
 }
 
 === OUTPUT ===
-{"strings": {"newline": "line1
-line2", "tab": "before	tab	after", "quotes": "He said \"Hello\"", "backslash": "C:\\Windows\\System32", "unicode": "Unicode: ABC", "empty": ""}, "numbers": {"integer": 42, "negative": -123, "float": 3.14159, "scientific": 1.23e-10, "large": 9007199254740991, "zero": 0}, "booleans": {"true": true, "false": false}, "nulls": {"null_value": null}, "special": {"infinity": Infinity, "negative_infinity": -Infinity, "nan": null}}
+{
+  "strings": {
+    "newline": "line1\nline2",
+    "tab": "before\ttab\tafter",
+    "quotes": "He said \"Hello\"",
+    "backslash": "C:\\Windows\\System32",
+    "unicode": "Unicode: ABC",
+    "empty": ""
+  },
+  "numbers": {
+    "integer": 42,
+    "negative": -123,
+    "float": 3.14159,
+    "scientific": 1.23e-10,
+    "large": 9007199254740991,
+    "zero": 0
+  },
+  "booleans": {
+    "true": true,
+    "false": false
+  },
+  "nulls": {
+    "null_value": null
+  },
+  "special": {
+    "infinity": "Infinity",
+    "negative_infinity": "-Infinity",
+    "nan": null
+  }
+}
 
 === ERRORS ===
 []
