@@ -48,6 +48,10 @@ module WireGram
         new(argv).run
       end
 
+      @simd = false
+      @symbolic_utf8 = false
+      @upfront_rules = false
+
       def initialize(argv : Array(String))
         @argv = argv.dup
         @global = {"format" => "text"} of String => String
@@ -71,6 +75,10 @@ module WireGram
           if command && Languages.available.includes?(command)
             language = command
             action = @argv.shift? || "help"
+
+            # Parse language-specific flags BEFORE handling the language
+            @argv = parse_common_flags(@argv)
+
             handle_language(language, action, @argv)
           else
             STDERR.puts "Unknown command: #{command}"
@@ -80,6 +88,19 @@ module WireGram
         end
       end
 
+      private def parse_common_flags(argv)
+        remaining = [] of String
+        OptionParser.parse(argv) do |opts|
+          opts.on("--simd", "Enable SIMD acceleration") { @simd = true }
+          opts.on("--symbolic-utf8", "Enable symbolic UTF-8 processing") { @symbolic_utf8 = true }
+          opts.on("--upfront-rules", "Enable upfront lexing rules (Stage 1)") { @upfront_rules = true }
+          opts.unknown_args do |args|
+            remaining = args
+          end
+        end
+        remaining
+      end
+
       def print_help
         puts <<-HELP
           WireGram umbrella CLI
@@ -87,17 +108,22 @@ module WireGram
           Usage:
             wiregram list                            # list available languages
             wiregram <language> help                 # show help for language
-            wiregram <language> inspect [--pretty]   # run full pipeline and show JSON output
-            wiregram <language> parse                # parse input (stdin or file)
-            wiregram <language> tokenize             # show tokens
+            wiregram <language> inspect [opts]       # run full pipeline and show JSON output
+            wiregram <language> parse [opts]         # parse input (stdin or file)
+            wiregram <language> tokenize [opts]      # show tokens
             wiregram server [--port 4567]            # start a JSON HTTP server for programmatic use
             wiregram snapshot --generate --language json
 
           Global options:
             --format json|text    Output format (default: text)
 
+          Optimization flags (can be used with inspect, parse, tokenize):
+            --simd                Enable NEON SIMD acceleration (M4)
+            --symbolic-utf8       Enable symbolic UTF-8 processing
+            --upfront-rules       Enable upfront lexing rules (Stage 1)
+
           Examples:
-            echo '{ "a":1 }' | wiregram json inspect --pretty
+            echo '{ "a":1 }' | wiregram json inspect --pretty --simd
             wiregram list
 
           For language-specific options: wiregram <language> help
@@ -375,12 +401,15 @@ module WireGram
       private def process_language(language : String, input : String, pretty : Bool)
         case language
         when "expression"
-          pretty ? WireGram::Languages::Expression.process_pretty(input) : WireGram::Languages::Expression.process(input)
+          # pretty ? WireGram::Languages::Expression.process_pretty(input) : WireGram::Languages::Expression.process(input)
+          # For expression, we'll keep it simple for now as it's less performance critical
+          WireGram::Languages::Expression.process(input)
         when "json"
-          pretty ? WireGram::Languages::Json.process_pretty(input) : WireGram::Languages::Json.process(input)
+          pretty ? WireGram::Languages::Json.process_pretty(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules) :
+                   WireGram::Languages::Json.process(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules)
         when "ucl"
           # UCL's process handles internal defaults and can be extended if needed
-          WireGram::Languages::Ucl.process(input)
+          WireGram::Languages::Ucl.process(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules)
         else
           raise "Unknown language: #{language}"
         end
@@ -391,9 +420,9 @@ module WireGram
         when "expression"
           WireGram::Languages::Expression.tokenize_stream(input) { |token| yield token }
         when "json"
-          WireGram::Languages::Json.tokenize_stream(input) { |token| yield token }
+          WireGram::Languages::Json.tokenize_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules) { |token| yield token }
         when "ucl"
-          WireGram::Languages::Ucl.tokenize_stream(input) { |token| yield token }
+          WireGram::Languages::Ucl.tokenize_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules) { |token| yield token }
         else
           raise "Unknown language: #{language}"
         end
@@ -404,9 +433,9 @@ module WireGram
         when "expression"
           WireGram::Languages::Expression.parse_stream(input) { |node| yield node }
         when "json"
-          WireGram::Languages::Json.parse_stream(input) { |node| yield node }
+          WireGram::Languages::Json.parse_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules) { |node| yield node }
         when "ucl"
-          WireGram::Languages::Ucl.parse_stream(input) { |node| yield node }
+          WireGram::Languages::Ucl.parse_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules) { |node| yield node }
         else
           raise "Unknown language: #{language}"
         end
