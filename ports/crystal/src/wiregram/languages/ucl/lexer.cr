@@ -57,7 +57,8 @@ module WireGram
           return true if skip_comment
 
           @scanner.pos = @position
-          char = current_char
+          byte = current_byte
+          return false unless byte
 
           # 1. Structural/Punctuation tokens (High Frequency)
           if (matched = @scanner.scan(STRUCTURAL_PATTERN))
@@ -68,31 +69,47 @@ module WireGram
           end
 
           # 2. Quoted strings
-          if char == "\""
+          if byte == 0x22 # '"'
             return tokenize_quoted_string_fast
-          elsif char == "'"
+          elsif byte == 0x27 # '\''
             return tokenize_single_quoted_string_fast
           end
 
           # 3. Numbers and hex literals (must check before dash-identifiers)
-          if char == "-" && peek_char(1) == "0" && peek_char(2) && /[xX]/.matches?(peek_char(2).not_nil!)
-            return tokenize_hex_or_invalid
-          elsif char == "-" && peek_char(1) && /\d/.matches?(peek_char(1).not_nil!)
-            return tokenize_number_fast
-          elsif char == "0" && peek_char(1) && /[xX]/.matches?(peek_char(1).not_nil!)
-            return tokenize_hex_or_invalid
-          elsif char && /\d/.matches?(char)
+          if byte == 0x2d # '-'
+            b1 = peek_byte(1)
+            b2 = peek_byte(2)
+            if b1 == 0x30 && b2 && (b2 == 0x78 || b2 == 0x58) # '-0x' or '-0X'
+              return tokenize_hex_or_invalid
+            elsif b1 && (0x30..0x39).includes?(b1) # '-[0-9]'
+              return tokenize_number_fast
+            end
+          elsif byte == 0x30 # '0'
+            b1 = peek_byte(1)
+            if b1 && (b1 == 0x78 || b1 == 0x58) # '0x' or '0X'
+              return tokenize_hex_or_invalid
+            end
+          elsif (0x30..0x39).includes?(byte) # '[0-9]'
             return tokenize_number_fast
           end
 
           # 4. Directives, Flags, Prefixes
-          case char
-          when "."
-            return tokenize_directive if peek_char(1) && /[a-zA-Z_]/.matches?(peek_char(1).not_nil!)
-          when "-"
-            return tokenize_identifier_or_keyword if peek_char(1) && /[A-Za-z_]/.matches?(peek_char(1).not_nil!)
-          when "%"
-            return tokenize_identifier_or_keyword if peek_char(1) && /[A-Za-z_]/.matches?(peek_char(1).not_nil!)
+          case byte
+          when 0x2e # '.'
+            b1 = peek_byte(1)
+            if b1 && ((0x61..0x7a).includes?(b1) || (0x41..0x5a).includes?(b1) || b1 == 0x5f) # [a-zA-Z_]
+              return tokenize_directive
+            end
+          when 0x2d # '-'
+            b1 = peek_byte(1)
+            if b1 && ((0x61..0x7a).includes?(b1) || (0x41..0x5a).includes?(b1) || b1 == 0x5f) # [a-zA-Z_]
+              return tokenize_identifier_or_keyword
+            end
+          when 0x25 # '%'
+            b1 = peek_byte(1)
+            if b1 && ((0x61..0x7a).includes?(b1) || (0x41..0x5a).includes?(b1) || b1 == 0x5f) # [a-zA-Z_]
+              return tokenize_identifier_or_keyword
+            end
           end
 
           # 5. Identifiers or Unquoted strings
@@ -101,14 +118,14 @@ module WireGram
 
           # If starting with a letter, check if the following characters lead into an interpolation
           # without scanning the entire remaining source (use scanner.check so we don't advance)
-          if char && /[a-zA-Z_]/.matches?(char)
+          if (0x61..0x7a).includes?(byte) || (0x41..0x5a).includes?(byte) || byte == 0x5f # [a-zA-Z_]
             @scanner.pos = @position
             if (m = @scanner.check(IDENTIFIER_PATTERN))
               after_pos = @position + m.bytesize
               return tokenize_unquoted_string if @source.byte_slice(after_pos, 2) == "${"
             end
             return tokenize_identifier_or_keyword
-          elsif char == "/"
+          elsif byte == 0x2f # '/'
             # Check for URL before treating as unquoted string
             return tokenize_unquoted_string if @scanner.check(URL_PATTERN)
           end
@@ -125,7 +142,8 @@ module WireGram
 
         def skip_comment
           @scanner.pos = @position
-          if current_char == "#"
+          byte = current_byte
+          if byte == 0x23 # '#'
             # Fast-skip to end of line
             if @scanner.scan(/#[^\n]*/)
               @position = @scanner.pos
@@ -134,7 +152,7 @@ module WireGram
               @position = nl ? nl + 1 : @source.bytesize
             end
             return true
-          elsif current_char == "/" && peek_char(1) == "*"
+          elsif byte == 0x2f && peek_byte(1) == 0x2a # '/' and '*'
             skip_nested_block_comment
             return true
           end
@@ -337,11 +355,13 @@ module WireGram
           else
             # Fallback for flags or complex unquoted strings if IDENTIFIER_PATTERN misses
             start = @position
-            advance if current_char == "-"
+            advance if current_byte == 0x2d # '-'
 
-            while (char = current_char)
-              break if /[\[\]{}();:,=\s]/.matches?(char)
-              break unless /[a-zA-Z0-9_%-]/.matches?(char)
+            while (byte = current_byte)
+              # [\[\]{}();:,=\s]
+              break if byte == 0x5b || byte == 0x5d || byte == 0x7b || byte == 0x7d || byte == 0x28 || byte == 0x29 || byte == 0x3b || byte == 0x3a || byte == 0x2c || byte == 0x3d || (byte <= 0x20)
+              # [a-zA-Z0-9_%-]
+              break unless (0x61..0x7a).includes?(byte) || (0x41..0x5a).includes?(byte) || (0x30..0x39).includes?(byte) || byte == 0x5f || byte == 0x25 || byte == 0x2d
               advance
             end
 
@@ -421,17 +441,17 @@ module WireGram
           start = @position
           interp_depth = 0
 
-          while (char = current_char)
-            if char == "$" && peek_char(1) == "{"
+          while (byte = current_byte)
+            if byte == 0x24 && peek_byte(1) == 0x7b # '$' and '{'
               advance
               advance
               interp_depth += 1
-            elsif char == "}" && interp_depth.positive?
+            elsif byte == 0x7d && interp_depth.positive? # '}'
               advance
               interp_depth -= 1
-            elsif interp_depth.zero? && /[\s,;:})"]/.matches?(char)
+            elsif interp_depth.zero? && (byte == 0x5b || byte == 0x5d || byte == 0x7b || byte == 0x7d || byte == 0x28 || byte == 0x29 || byte == 0x3b || byte == 0x3a || byte == 0x2c || byte == 0x3d || byte == 0x22 || (byte <= 0x20))
               # Stop at delimiters including quotes
-              break unless char == ":" && peek_char(1) == "/" && peek_char(2) == "/"
+              break unless byte == 0x3a && peek_byte(1) == 0x2f && peek_byte(2) == 0x2f # ':' and '/' and '/'
               advance
             else
               advance

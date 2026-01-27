@@ -22,40 +22,40 @@ module WireGram
         end
 
         private def try_tokenize_next
-          char = current_char
-          return false unless char
+          byte = current_byte
+          return false unless byte
 
-          case char
-          when "{"
+          case byte
+          when 0x7b # '{'
             add_token(WireGram::Core::TokenType::LBrace, "{")
             advance
             true
-          when "}"
+          when 0x7d # '}'
             add_token(WireGram::Core::TokenType::RBrace, "}")
             advance
             true
-          when "["
+          when 0x5b # '['
             add_token(WireGram::Core::TokenType::LBracket, "[")
             advance
             true
-          when "]"
+          when 0x5d # ']'
             add_token(WireGram::Core::TokenType::RBracket, "]")
             advance
             true
-          when ":"
+          when 0x3a # ':'
             add_token(WireGram::Core::TokenType::Colon, ":")
             advance
             true
-          when ","
+          when 0x2c # ','
             add_token(WireGram::Core::TokenType::Comma, ",")
             advance
             true
-          when "\""
+          when 0x22 # '"'
             tokenize_string
           else
-            if char == "-" || /\d/.matches?(char)
+            if byte == 0x2d || (0x30..0x39).includes?(byte) # '-' or '0'-'9'
               tokenize_number
-            elsif ["t", "f", "n"].includes?(char)
+            elsif byte == 0x74 || byte == 0x66 || byte == 0x6e # 't', 'f', 'n'
               tokenize_literal
             else
               false
