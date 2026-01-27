@@ -5,11 +5,12 @@ module WireGram
     # SIMD Accelerator for Apple M4 (NEON / AdvSIMD)
     # Uses inline assembly for maximum performance.
     module SimdAccelerator
-      # Scans a 16-byte block for structural characters: { } [ ] : , " \ and whitespace.
+      # Scans a 16-byte block for structural characters: { } [ ] : , " \ = ; # / and whitespace.
       # Returns a bitmask where each bit corresponds to a match in the block.
       #
       # Structural characters:
       # { (0x7b), } (0x7d), [ (0x5b), ] (0x5d), : (0x3a), , (0x2c), " (0x22), \ (0x5c)
+      # = (0x3d), ; (0x3b), # (0x23), / (0x2f)
       # Whitespace:
       # ' ' (0x20), \t (0x09), \n (0x0a), \r (0x0d)
       def self.find_structural_bits(ptr : Pointer(UInt8)) : {UInt16, Bool}
@@ -18,18 +19,15 @@ module WireGram
           # We load 16 bytes into a v-register.
           # We compare with multiple target characters.
 
-          # Optimization: We can use bitwise OR to combine matches.
-          # A more advanced approach (simdjson style) uses range-based classification,
-          # but for simplicity and clarity in Crystal's inline asm, we'll start with
-          # identifying the most common structural delimiters.
-
           mask = 0_u16
           max_byte = 0_u8
           asm("
             ld1 {v0.16b}, [$2]
             orr v5.16b, v0.16b, v0.16b
+            # match whitespace (<= 0x20)
             movi v1.16b, 32
             cmhs v2.16b, v1.16b, v0.16b
+            # match characters \" (34), \\ (92), { (123), } (125), [ (91), ] (93), : (58), , (44), = (61), ; (59), # (35), / (47)
             movi v3.16b, 34
             cmeq v4.16b, v0.16b, v3.16b
             orr v2.16b, v2.16b, v4.16b
@@ -54,6 +52,20 @@ module WireGram
             movi v3.16b, 44
             cmeq v4.16b, v0.16b, v3.16b
             orr v2.16b, v2.16b, v4.16b
+            movi v3.16b, 61
+            cmeq v4.16b, v0.16b, v3.16b
+            orr v2.16b, v2.16b, v4.16b
+            movi v3.16b, 59
+            cmeq v4.16b, v0.16b, v3.16b
+            orr v2.16b, v2.16b, v4.16b
+            movi v3.16b, 35
+            cmeq v4.16b, v0.16b, v3.16b
+            orr v2.16b, v2.16b, v4.16b
+            movi v3.16b, 47
+            cmeq v4.16b, v0.16b, v3.16b
+            orr v2.16b, v2.16b, v4.16b
+
+            # Extract bitmask from comparison results
             ushr v0.16b, v2.16b, 7
             movi v1.16b, 1
             and v0.16b, v0.16b, v1.16b
@@ -111,7 +123,7 @@ module WireGram
           16.times do |i|
             b = ptr[i]
             is_ascii = false if b >= 0x80
-            if b <= 0x20 || b == 0x7b || b == 0x7d || b == 0x5b || b == 0x5d || b == 0x3a || b == 0x2c || b == 0x22 || b == 0x5c
+            if b <= 0x20 || b == 0x7b || b == 0x7d || b == 0x5b || b == 0x5d || b == 0x3a || b == 0x2c || b == 0x22 || b == 0x5c || b == 0x3d || b == 0x3b || b == 0x23 || b == 0x2f
               mask |= (1_u16 << i)
             end
           end
