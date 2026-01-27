@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
-require_relative '../core/node'
+require "../core/node"
+require "../core/fabric"
 
 module WireGram
   module Engines
     # Analyzer - Analyzes digital fabric for patterns and issues
     class Analyzer
-      attr_reader :fabric
+      getter fabric : WireGram::Core::Fabric
 
-      def initialize(fabric)
+      def initialize(fabric : WireGram::Core::Fabric)
         @fabric = fabric
       end
 
@@ -22,28 +23,29 @@ module WireGram
         @fabric.find_patterns(:identifiers)
         # Simple heuristic: variables defined but never referenced elsewhere
         # In a real implementation, this would do proper scope analysis
-        []
+        [] of WireGram::Core::Node
       end
 
       # Analyze complexity
       def complexity
         operations = @fabric.find_patterns(:arithmetic_operations)
         {
-          operations_count: operations.length,
+          operations_count: operations.size,
           tree_depth: calculate_depth(@fabric.ast)
         }
       end
 
       # Get all diagnostics
       def diagnostics
-        issues = []
+        issues = [] of Hash(Symbol, String | Symbol | WireGram::Core::Node)
 
         # Check for potential constant folding opportunities
         @fabric.ast.traverse do |node|
-          if %i[add subtract multiply divide].include?(node.type) && node.children.all? { |c| c.type == :number }
+          if [WireGram::Core::NodeType::Add, WireGram::Core::NodeType::Subtract, WireGram::Core::NodeType::Multiply, WireGram::Core::NodeType::Divide].includes?(node.type) &&
+             node.children.all? { |c| c.type == WireGram::Core::NodeType::Number }
             issues << {
               type: :optimization,
-              message: 'Constant expression can be folded',
+              message: "Constant expression can be folded",
               node: node,
               severity: :info
             }
@@ -53,11 +55,7 @@ module WireGram
         issues
       end
 
-      private
-
-      def calculate_depth(node, current_depth = 0)
-        return current_depth unless node.is_a?(WireGram::Core::Node)
-
+      private def calculate_depth(node : WireGram::Core::Node, current_depth = 0)
         if node.children.empty?
           current_depth
         else

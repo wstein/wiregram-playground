@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'strscan'
-require_relative '../../core/lexer'
+require "../../core/lexer"
+require "../../core/scanner"
 
 module WireGram
   module Languages
@@ -9,7 +9,7 @@ module WireGram
       # High-performance lexer for simple expression language using StringScanner
       # Supports: numbers, identifiers, operators, keywords (let)
       class Lexer < WireGram::Core::BaseLexer
-        KEYWORDS = %w[let].freeze
+        KEYWORDS = %w[let]
 
         # Pre-compiled regex patterns for performance
         WHITESPACE_PATTERN = /\s+/
@@ -21,7 +21,7 @@ module WireGram
 
         def initialize(source)
           super
-          @scanner = StringScanner.new(source)
+          @scanner = WireGram::Core::Scanner.new(source)
         end
 
         def skip_whitespace
@@ -30,48 +30,58 @@ module WireGram
           @position = @scanner.pos
         end
 
-        protected
-
-        def try_tokenize_next
+        private def try_tokenize_next
           char = current_char
+          return false unless char
 
           case char
-          when '+' then add_token(:plus, '+')
-                        advance
-                        true
-          when '-' then add_token(:minus, '-')
-                        advance
-                        true
-          when '*' then add_token(:star, '*')
-                        advance
-                        true
-          when '/' then add_token(:slash, '/')
-                        advance
-                        true
-          when '=' then add_token(:equals, '=')
-                        advance
-                        true
-          when '(' then add_token(:lparen, '(')
-                        advance
-                        true
-          when ')' then add_token(:rparen, ')')
-                        advance
-                        true
-          when '"' then tokenize_string_fast
-          when /\d/ then tokenize_number_fast
-          when /[a-zA-Z_]/ then tokenize_identifier_fast
-          else false
+          when "+"
+            add_token(WireGram::Core::TokenType::Plus, "+")
+            advance
+            true
+          when "-"
+            add_token(WireGram::Core::TokenType::Minus, "-")
+            advance
+            true
+          when "*"
+            add_token(WireGram::Core::TokenType::Star, "*")
+            advance
+            true
+          when "/"
+            add_token(WireGram::Core::TokenType::Slash, "/")
+            advance
+            true
+          when "="
+            add_token(WireGram::Core::TokenType::Equals, "=")
+            advance
+            true
+          when "("
+            add_token(WireGram::Core::TokenType::LParen, "(")
+            advance
+            true
+          when ")"
+            add_token(WireGram::Core::TokenType::RParen, ")")
+            advance
+            true
+          when "\""
+            tokenize_string_fast
+          else
+            if /\d/.matches?(char)
+              tokenize_number_fast
+            elsif /[a-zA-Z_]/.matches?(char)
+              tokenize_identifier_fast
+            else
+              false
+            end
           end
         end
 
-        private
-
-        def tokenize_number_fast
+        private def tokenize_number_fast
           @scanner.pos = @position
           if @scanner.scan(NUMBER_PATTERN)
-            matched = @scanner.matched
-            value = matched.include?('.') ? matched.to_f : matched.to_i
-            add_token(:number, value, position: @scanner.pos)
+            matched = @scanner.matched.not_nil!
+            value = matched.includes?(".") ? matched.to_f : matched.to_i64
+            add_token(WireGram::Core::TokenType::Number, value, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -82,8 +92,8 @@ module WireGram
         def tokenize_identifier_fast
           @scanner.pos = @position
           if @scanner.scan(IDENTIFIER_PATTERN)
-            value = @scanner.matched
-            type = KEYWORDS.include?(value) ? :keyword : :identifier
+            value = @scanner.matched.not_nil!
+            type = KEYWORDS.includes?(value) ? WireGram::Core::TokenType::Keyword : WireGram::Core::TokenType::Identifier
             add_token(type, value, position: @scanner.pos)
             @position = @scanner.pos
             true
@@ -98,8 +108,8 @@ module WireGram
             # Remove surrounding quotes
             content = matched[1...-1]
             # Fast-path: avoid unescaping for common case with no backslashes
-            unescaped = content.include?('\\') ? unescape_string(content) : content
-            add_token(:string, unescaped, position: @scanner.pos)
+            unescaped = content.includes?("\\") ? unescape_string(content) : content
+            add_token(WireGram::Core::TokenType::String, unescaped, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -109,52 +119,60 @@ module WireGram
 
         def unescape_string(str)
           # Fast path: if no backslashes, return as-is
-          return str unless str.include?('\\')
+          return str unless str.includes?("\\")
 
-          result = String.new(capacity: str.length)
+          builder = String::Builder.new
           i = 0
-          while i < str.length
-            if str[i] == '\\' && i + 1 < str.length
+          while i < str.size
+            if str[i] == '\\' && i + 1 < str.size
               case str[i + 1]
-              when '"' then result << '"'
+              when '"'
+                builder << '"'
                             i += 2
-              when '\\' then result << '\\'
+              when '\\'
+                builder << '\\'
                              i += 2
-              when '/' then result << '/'
+              when '/'
+                builder << '/'
                             i += 2
-              when 'b' then result << "\b"
+              when 'b'
+                builder << '\b'
                             i += 2
-              when 'f' then result << "\f"
+              when 'f'
+                builder << '\f'
                             i += 2
-              when 'n' then result << "\n"
+              when 'n'
+                builder << '\n'
                             i += 2
-              when 'r' then result << "\r"
+              when 'r'
+                builder << '\r'
                             i += 2
-              when 't' then result << "\t"
+              when 't'
+                builder << '\t'
                             i += 2
               when 'u'
-                if i + 5 < str.length
+                if i + 5 < str.size
                   hex = str[(i + 2)..(i + 5)]
                   begin
-                    result << [hex.to_i(16)].pack('U')
-                  rescue StandardError
-                    result << '?'
+                    builder << hex.to_i(16).chr
+                  rescue
+                    builder << '?'
                   end
                   i += 6
                 else
-                  result << str[i]
+                  builder << str[i]
                   i += 1
                 end
               else
-                result << str[i + 1]
+                builder << str[i + 1]
                 i += 2
               end
             else
-              result << str[i]
+              builder << str[i]
               i += 1
             end
           end
-          result
+          builder.to_s
         end
       end
     end

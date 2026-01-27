@@ -1,71 +1,86 @@
 # frozen_string_literal: true
 
-require 'optparse'
-require 'json'
-require 'webrick'
+require "json"
+require "http/server"
+require "option_parser"
 
 # Pre-load all language modules
-require 'wiregram/languages/expression'
-require 'wiregram/languages/json'
-require 'wiregram/languages/ucl'
+require "./languages/expression"
+require "./languages/json"
+require "./languages/ucl"
 
 module WireGram
   module CLI
     # Small helper to discover language modules
     class Languages
       LANG_MAP = {
-        'expression' => WireGram::Languages::Expression,
-        'json' => WireGram::Languages::Json,
-        'ucl' => WireGram::Languages::Ucl
-      }.freeze
+        "expression" => WireGram::Languages::Expression,
+        "json" => WireGram::Languages::Json,
+        "ucl" => WireGram::Languages::Ucl
+      }
 
-      def self.available
+      def self.available : Array(String)
         LANG_MAP.keys
       end
 
-      def self.module_for(name)
-        LANG_MAP[name]
+      def self.module_for(name : String)
+        LANG_MAP[name]?
       end
 
-      def self.supports?(name, method)
-        mod = module_for(name)
-        mod&.respond_to?(method)
+      def self.supports?(name : String, method : Symbol) : Bool
+        case name
+        when "expression", "json"
+          case method
+          when :process, :process_pretty, :tokenize, :tokenize_stream, :parse, :parse_stream
+            true
+          else
+            false
+          end
+        when "ucl"
+          case method
+          when :process, :tokenize, :tokenize_stream, :parse, :parse_stream
+            true
+          else
+            false
+          end
+        else
+          false
+        end
       end
     end
 
     # Runner implements commands and parsing
     class Runner
-      def self.start(argv)
+      def self.start(argv : Array(String))
         new(argv).run
       end
 
-      def initialize(argv)
+      def initialize(argv : Array(String))
         @argv = argv.dup
-        @global = {
-          format: 'text'
-        }
+        @global = {"format" => "text"} of String => String
       end
 
       def run
-        command = @argv.shift
+        consume_global_options
+        command = @argv.shift?
 
         case command
-        when nil, 'help', '--help', '-h'
+        when nil, "help", "--help", "-h"
           print_help
-        when 'list'
+        when "list"
           list_languages
-        when 'server'
+        when "server"
           start_server
-        when 'snapshot'
+        when "snapshot"
           handle_snapshot(@argv)
         else
           # treat as language command: <language> <action> [opts]
-          if Languages.available.include?(command)
+          if command && Languages.available.includes?(command)
             language = command
-            action = @argv.shift || 'help'
+            action = @argv.shift? || "help"
             handle_language(language, action, @argv)
           else
-            warn "Unknown command: #{command}"
+            STDERR.puts "Unknown command: #{command}"
             print_help
             exit 1
           end
@@ -73,7 +88,7 @@ module WireGram
       end
 
       def print_help
-        puts <<~HELP
+        puts <<-HELP
           WireGram umbrella CLI
 
           Usage:
@@ -97,190 +112,159 @@ module WireGram
       end
 
       def list_languages
-        puts 'Available languages:'
-        Languages.available.each { |l| puts "  - #{l}" }
+        puts "Available languages:"
+        Languages.available.each { |lang| puts "  - #{lang}" }
       end
 
       def start_server
-        options = { port: 4567 }
-        optp = OptionParser.new do |opts|
-          opts.on('--port PORT', Integer) { |p| options[:port] = p }
-        end
-        optp.parse!(@argv)
-
-        server = WEBrick::HTTPServer.new(Port: options[:port], AccessLog: [], Logger: WEBrick::Log.new(File::NULL))
-
-        server.mount_proc '/v1/process' do |req, res|
-          body = req.body || ''
-          payload = JSON.parse(body)
-          language = payload['language']
-          input = payload['input'] || ''
-          payload['mode'] || 'process'
-
-          unless Languages.available.include?(language)
-            res.status = 400
-            res.body = { error: 'unsupported language' }.to_json
-            next
+        options = {"port" => 4567} of String => Int32
+        parser = OptionParser.new do |opts|
+          opts.on("--port PORT", "HTTP port (default: 4567)") do |port|
+            options["port"] = port.to_i
           end
+        end
+        parser.parse(@argv)
 
-          mod = Languages.module_for(language)
-          result = if mod.respond_to?('process')
-                     if payload['pretty']
-                       mod.process_pretty(input)
-                     else
-                       mod.process(input)
-                     end
-                   else
-                     { error: 'process not available for language' }
-                   end
+        server = HTTP::Server.new do |context|
+          if context.request.path == "/v1/process"
+            if context.request.method != "POST"
+              context.response.status = HTTP::Status::METHOD_NOT_ALLOWED
+              next
+            end
 
-          res['Content-Type'] = 'application/json'
-          res.body = result.to_json
-        rescue JSON::ParserError
-          res.status = 400
-          res.body = { error: 'invalid json body' }.to_json
-        rescue StandardError => e
-          res.status = 500
-          res.body = { error: e.message }.to_json
+            body = context.request.body.try(&.gets_to_end) || ""
+            payload = JSON.parse(body)
+
+            language = payload["language"]?.try(&.as_s)
+            input = payload["input"]?.try(&.as_s) || ""
+            pretty = payload["pretty"]?.try(&.as_bool) || false
+
+            unless language && Languages.available.includes?(language)
+              context.response.status = HTTP::Status::BAD_REQUEST
+              context.response.content_type = "application/json"
+              context.response.print(json_compact({ error: "unsupported language" }))
+              next
+            end
+
+            result = process_language(language, input, pretty)
+
+            context.response.content_type = "application/json"
+            context.response.print(json_compact(deep_convert_nodes(result)))
+          else
+            context.response.status = HTTP::Status::NOT_FOUND
+          end
+        rescue JSON::ParseException
+          context.response.status = HTTP::Status::BAD_REQUEST
+          context.response.content_type = "application/json"
+          context.response.print(json_compact({ error: "invalid json body" }))
+        rescue ex
+          context.response.status = HTTP::Status::INTERNAL_SERVER_ERROR
+          context.response.content_type = "application/json"
+          context.response.print(json_compact({ error: ex.message }))
         end
 
-        trap('INT') do
-          server.shutdown
+        Signal::INT.trap do
+          server.close
         end
-        puts "WireGram server running on http://localhost:#{options[:port]} (Ctrl-C to stop)"
-        server.start
+
+        puts "WireGram server running on http://localhost:#{options["port"]} (Ctrl-C to stop)"
+        server.bind_tcp(options["port"])
+        server.listen
       end
 
-      def handle_snapshot(argv)
-        # Simple pass-through to rake tasks - lightweight integration
+      def handle_snapshot(argv : Array(String))
+        generate = false
+        lang = nil
+
         opts = OptionParser.new do |o|
-          o.on('--generate') do |_v|
-            @generate = true
-          end
-          o.on('--language LANG') { |v| @lang = v }
+          o.on("--generate", "Generate snapshots") { generate = true }
+          o.on("--language LANG", "Limit to language") { |v| lang = v }
         end
+
         begin
-          opts.parse!(argv)
-        rescue OptionParser::InvalidOption => e
-          warn e.message
+          opts.parse(argv)
+        rescue ex : OptionParser::InvalidOption
+          STDERR.puts ex.message
           exit 1
         end
 
-        if @generate
-          if @lang
-            system('rake', 'snapshots:generate_for', @lang)
+        if generate
+          if lang
+            system("rake", ["snapshots:generate_for", lang.not_nil!])
           else
-            system('rake', 'snapshots:generate')
+            system("rake", ["snapshots:generate"])
           end
         else
-          warn 'Specify --generate and optionally --language <name>'
+          STDERR.puts "Specify --generate and optionally --language <name>"
         end
       end
 
-      def handle_language(language, action, argv)
-        mod = Languages.module_for(language)
-        unless mod
-          warn "Unknown language: #{language}"
+      def handle_language(language : String, action : String, argv : Array(String))
+        unless Languages.available.includes?(language)
+          STDERR.puts "Unknown language: #{language}"
           exit 1
         end
 
         case action
-        when 'help', '--help', '-h'
-          print_language_help(language, mod)
-        when 'inspect'
+        when "help", "--help", "-h"
+          print_language_help(language)
+        when "inspect"
           input = read_input(argv)
-          pretty = argv.include?('--pretty')
-          result = if pretty && mod.respond_to?(:process_pretty)
-                     mod.process_pretty(input)
-                   else
-                     mod.process(input)
-                   end
+          pretty = argv.includes?("--pretty")
+          result = process_language(language, input, pretty)
           output_result(result)
-        when 'tokenize'
+        when "tokenize"
           input = read_input(argv)
-          if mod.respond_to?(:tokenize_stream)
-            # Stream tokens one per line as JSON (efficient for large files)
-            mod.tokenize_stream(input) do |token|
-              puts JSON.generate(token)
-            end
-          elsif mod.respond_to?(:tokenize)
-            result = mod.tokenize(input)
-            output_result({ tokens: result })
-          else
-            warn "tokenize not supported for #{language}"
-            exit 2
+          tokenize_stream(language, input) do |token|
+            puts json_compact(token_to_hash(token))
           end
-        when 'parse'
+        when "parse"
           input = read_input(argv)
-          if mod.respond_to?(:parse_stream)
-            # Stream AST nodes as they are built; emit one JSON object per line
-            mod.parse_stream(input) do |node|
-              h = node&.to_h
-              if @global[:format] == 'json' || ENV['WIREGRAM_FORMAT'] == 'json'
-                puts JSON.generate(h)
-              else
-                puts JSON.pretty_generate(h)
-              end
+          parse_stream(language, input) do |node|
+            h = node ? node.to_h : nil
+            if @global["format"] == "json" || ENV["WIREGRAM_FORMAT"]? == "json"
+              puts json_compact(h)
+            else
+              puts json_pretty(h)
             end
-          elsif mod.respond_to?(:parse)
-            result = mod.parse(input)
-            output_result({ ast: result })
-          else
-            warn "parse not supported for #{language}"
-            exit 2
           end
         else
-          warn "Unknown action: #{action}"
-          print_language_help(language, mod)
+          STDERR.puts "Unknown action: #{action}"
+          print_language_help(language)
           exit 1
         end
       end
 
-      def print_language_help(language, mod)
+      def print_language_help(language : String)
         puts "#{language} commands:"
-        puts '  inspect [--pretty]      Run full pipeline and show detailed result'
-        puts '  tokenize                Show tokens (if supported)'
-        puts '  parse                   Show AST (if supported)'
-        puts 'Notes: Outputs are in plaintext by default. Use --format json to get JSON.'
-        puts 'Detected capabilities:'
+        puts "  inspect [--pretty]      Run full pipeline and show detailed result"
+        puts "  tokenize                Show tokens (if supported)"
+        puts "  parse                   Show AST (if supported)"
+        puts "Notes: Outputs are in plaintext by default. Use --format json to get JSON."
+        puts "Detected capabilities:"
         %i[process process_pretty tokenize parse].each do |m|
-          puts "  - #{m}: #{mod.respond_to?(m)}"
+          puts "  - #{m}: #{Languages.supports?(language, m)}"
         end
       end
 
-      def read_input(argv)
+      def read_input(argv : Array(String))
         # file path or STDIN
-        if argv&.first && !argv.first.start_with?('--') && File.file?(argv.first)
+        if argv.first? && !argv.first.starts_with?("--") && File.file?(argv.first)
           File.read(argv.shift)
-        elsif $stdin.tty?
+        elsif STDIN.tty?
           # Avoid blocking when no stdin is provided (e.g., in tests)
           # If stdin is a TTY (interactive), treat as empty input
-          ''
+          ""
         else
-          $stdin.read
+          STDIN.gets_to_end
         end
       end
 
       def output_result(result)
-        ENV['WIREGRAM_AST_MAX_DEPTH']&.to_i || 3
+        ENV["WIREGRAM_AST_MAX_DEPTH"]? ? ENV["WIREGRAM_AST_MAX_DEPTH"].to_s.to_i : 3
 
-        # Normalize UOM output: drop raw :uom objects and expose a JSON-friendly :uom value
-        if result.is_a?(Hash)
-          if result.key?(:uom_json)
-            result[:uom] = result.delete(:uom_json)
-          elsif result.key?(:uom)
-            u = result[:uom]
-            if u.respond_to?(:to_simple_json)
-              result[:uom] = u.to_simple_json
-            else
-              # Drop raw UOM objects that aren't JSON-friendly
-              result.delete(:uom)
-            end
-          end
-        end
-
-        if @global[:format] == 'json' || ENV['WIREGRAM_FORMAT'] == 'json'
-          puts JSON.pretty_generate(deep_convert_nodes(result))
+        if @global["format"] == "json" || ENV["WIREGRAM_FORMAT"]? == "json"
+          puts json_pretty(deep_convert_nodes(result))
         elsif result.is_a?(Hash)
           # Nicely print parts, with special handling for AST Node objects
           result.each do |k, v|
@@ -289,17 +273,22 @@ module WireGram
             if v.is_a?(WireGram::Core::Node)
               # Print AST as full JSON so it matches snapshot format
               puts v.to_json
-            elsif v.is_a?(Array) && v.all? { |el| el.is_a?(WireGram::Core::Node) }
-              arr = v.map(&:to_h)
-              puts JSON.pretty_generate(arr)
+            elsif v.is_a?(WireGram::Languages::Expression::UOM)
+              root = v.root
+              puts json_pretty(root ? JSON.parse(root.not_nil!.to_json) : nil)
+            # elsif v.is_a?(WireGram::Languages::Json::Uom)
+            #   result = "null"
+            #   if v.root
+            #     result = v.root.not_nil!.to_json_string
+            #   end
+            #   puts json_pretty(result)
+            # elsif v.is_a?(WireGram::Languages::Ucl::UOM)
+            #   puts json_pretty(v.to_simple_json)
             elsif v.is_a?(Array) || v.is_a?(Hash)
-              puts JSON.pretty_generate(deep_convert_nodes(v))
+              puts json_pretty(deep_convert_nodes(v))
             elsif v.is_a?(String)
               s = v
-
-              # If the string itself is JSON, pretty-print it
               printed = try_print_as_json(s)
-
               puts s unless printed
             else
               puts v.inspect
@@ -312,36 +301,131 @@ module WireGram
         end
       end
 
-      # Convert objects containing Node instances to Hash/Array structures suitable for JSON
-      def deep_convert_nodes(obj)
+      # Convert objects containing Node instances to JSON::Any for pretty output.
+      def deep_convert_nodes(obj) : JSON::Any
         case obj
         when WireGram::Core::Node
-          obj.to_h
-        when Hash
-          obj.transform_values { |v| deep_convert_nodes(v) }
-        when Array
-          obj.map { |v| deep_convert_nodes(v) }
-        when String
-          obj
+          json_any_from(obj.to_h)
+        when WireGram::Languages::Expression::UOM
+          root = obj.root
+          json_any_from(root ? JSON.parse(root.not_nil!.to_json) : nil)
+        when WireGram::Languages::Json::UOM
+          root = obj.root
+          json_any_from(root ? JSON.parse(root.not_nil!.to_json_string) : nil)
+        # when WireGram::Languages::Ucl::UOM
+        #   json_any_from(obj.to_simple_json)
         else
-          obj
+          json_any_from(obj)
         end
       end
 
-      def try_print_as_json(str)
-        # Try to parse and pretty-print as JSON
+      private def json_any_from(value) : JSON::Any
+        case value
+        when JSON::Any
+          value
+        when Hash
+          mapped = {} of String => JSON::Any
+          value.each do |k, v|
+            mapped[k.to_s] = json_any_from(v)
+          end
+          JSON::Any.new(mapped)
+        when Array
+          JSON::Any.new(value.map { |v| json_any_from(v) })
+        when WireGram::Core::Token
+          json_any_from(value.to_h)
+        when WireGram::Core::Node
+          json_any_from(value.to_h)
+        when WireGram::Languages::Json::UOM
+          root = value.root
+          json_any_from(root ? JSON.parse(root.not_nil!.to_json_string) : nil)
+        when WireGram::Languages::Expression::UOM
+          root = value.root
+          json_any_from(root ? JSON.parse(root.not_nil!.to_json) : nil)
+        when WireGram::Core::TokenType, Symbol
+          JSON::Any.new(value.to_s)
+        when Int32
+          JSON::Any.new(value.to_i64)
+        else
+          JSON::Any.new(value)
+        end
+      end
+
+      def try_print_as_json(str : String)
         parsed = JSON.parse(str)
-        puts JSON.pretty_generate(deep_convert_nodes(parsed))
+        puts json_pretty(deep_convert_nodes(parsed))
         true
-      rescue JSON::ParserError
-        # Try to unescape JSON-style escape sequences (e.g. " and \n)
-        unescaped = JSON.parse("\"#{str.gsub('"', '\\\"')}\"")
+      rescue JSON::ParseException
+        escaped = str.gsub("\"", "\\\"")
+        unescaped = JSON.parse("\"#{escaped}\"")
         puts unescaped
         true
-      rescue StandardError
-        # Could not parse as JSON
+      rescue ex : Exception
         false
+      end
+
+      private def consume_global_options
+        index = @argv.index("--format")
+        if index && (value = @argv[index + 1]?)
+          @global["format"] = value
+          @argv.delete_at(index + 1)
+          @argv.delete_at(index)
+        end
+      end
+
+      private def process_language(language : String, input : String, pretty : Bool)
+        case language
+        when "expression"
+          pretty ? WireGram::Languages::Expression.process_pretty(input) : WireGram::Languages::Expression.process(input)
+        when "json"
+          pretty ? WireGram::Languages::Json.process_pretty(input) : WireGram::Languages::Json.process(input)
+        else
+          raise "Unknown language: #{language}"
+        end
+      end
+
+      private def tokenize_stream(language : String, input : String, &block : WireGram::Core::Token ->)
+        case language
+        when "expression"
+          WireGram::Languages::Expression.tokenize_stream(input) { |token| yield token }
+        when "json"
+          WireGram::Languages::Json.tokenize_stream(input) { |token| yield token }
+        # when "ucl"
+        #   WireGram::Languages::Ucl.tokenize_stream(input) { |token| yield token }
+        else
+          raise "Unknown language: #{language}"
+        end
+      end
+
+      private def parse_stream(language : String, input : String, &block : WireGram::Core::Node? ->)
+        case language
+        when "expression"
+          WireGram::Languages::Expression.parse_stream(input) { |node| yield node }
+        when "json"
+          WireGram::Languages::Json.parse_stream(input) { |node| yield node }
+        # when "ucl"
+        #   WireGram::Languages::Ucl.parse_stream(input) { |node| yield node }
+        else
+          raise "Unknown language: #{language}"
+        end
+      end
+
+      private def token_to_hash(token : WireGram::Core::Token)
+        json_any_from(token.to_h)
+      end
+
+      private def json_pretty(obj)
+        JSON.build(indent: "  ") do |json|
+          obj.to_json(json)
+        end
+      end
+
+      private def json_compact(obj)
+        JSON.build do |json|
+          obj.to_json(json)
+        end
       end
     end
   end
 end
+
+WireGram::CLI::Runner.start(ARGV)
