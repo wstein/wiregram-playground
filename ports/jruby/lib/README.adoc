@@ -1,3 +1,0 @@
-= JRuby Library
-
-JRuby-specific library code or compatibility shims.
