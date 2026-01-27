@@ -9,12 +9,15 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "castwide.solargraph",
         "crystal-lang.crystal",
+        "EditorConfig.EditorConfig",
         "GitHub.vscode-pull-request-github",
+        "golang.go",
         "mhutchie.git-graph",
         "ms-azuretools.vscode-containers",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "saoudrizwan.claude-dev",
+        "Shopify.ruby-lsp"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "fish",
@@ -30,10 +33,13 @@
   "forwardPorts": [
     8080
   ],
-  "postCreateCommand": ".devcontainer/scripts/devcontainer-setup.sh",
+  "postCreateCommand": "sh .devcontainer/scripts/devcontainer-setup.sh",
+  "runArgs": ["--cap-add=SYS_ADMIN","--security-opt=seccomp=unconfined","--device=/dev/fuse"],
   "remoteUser": "vscode",
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
-    "source=vscode-home,target=/home/vscode,type=volume"
+    "source=vscode-home,target=/home/vscode,type=volume",
+    "source=nix,target=/nix,type=volume",
+    "source=${localEnv:HOME}/.config,target=/home/vscode/.hostconfig,readonly,type=bind"
   ]
 }

@@ -2,21 +2,12 @@
 set -euo pipefail
 
 # Devcontainer setup script (idempotent)
-# Installs asdf, Ruby, Crystal, JRuby, bun, bundler, gh, pandoc, jq, ripgrep, fd
 
 SCRIPTS_DIR="/tmp/devcontainer-scripts"
 export ASDF_DIR="$HOME/.asdf"
 
 info() { echo "[devcontainer] $*"; }
 warn() { echo "[devcontainer][WARN] $*"; }
-
-# 1) Install system packages that might still be missing
-info "Installing/ensuring CLI packages..."
-if command -v sudo >/dev/null 2>&1; then
-  sudo dnf -y install jq ripgrep fd-find fish pandoc gh || true
-else
-  dnf -y install jq ripgrep fd-find fish pandoc gh || true
-fi
 
 # 2) Install asdf version manager (if not present)
 if [ ! -d "$ASDF_DIR" ]; then
@@ -57,7 +48,7 @@ install_with_asdf_plugin() {
 }
 
 # Ruby 3.4.x
-install_with_asdf_plugin ruby https://github.com/asdf-vm/asdf-ruby.git 3.4.0 || true
+#install_with_asdf_plugin ruby https://github.com/asdf-vm/asdf-ruby.git 3.4.0 || true
 # Crystal 1.19.1 (plugin provided by asdf-community)
 install_with_asdf_plugin crystal https://github.com/asdf-community/asdf-crystal.git 1.19.1 || true
 # JRuby latest stable — use latest listed
@@ -73,9 +64,9 @@ if asdf list-all jruby >/dev/null 2>&1; then
 fi
 
 # 4) Ensure bundler is present for Ruby
-if command -v gem >/dev/null 2>&1; then
-  gem install bundler --no-document || true
-fi
+# if command -v gem >/dev/null 2>&1; then
+#   gem install bundler --no-document || true
+# fi
 
 # 5) Install bun (modern JS runtime/manager) — official install script
 if [ ! -d "$HOME/.bun" ]; then
@@ -87,30 +78,16 @@ else
   info "bun already installed"
 fi
 
-# 6) Check for deprecated / replaced tools and provide replacements
-# Example: silver searcher 'ag' often superseded by ripgrep 'rg'
-if command -v ag >/dev/null 2>&1; then
-  warn "The Silver Searcher (ag) is installed but deprecated in favor of ripgrep (rg). Consider removing ag and using rg."
-fi
-
-# 7) VS Code extension replacement checks (idempotent)
-# If old Ruby extension exists, ensure Solargraph recommended
-if command -v code >/dev/null 2>&1; then
-  info "Ensuring recommended VS Code extensions are installed"
-  # Replace deprecated Ruby extension if present
-  if code --list-extensions | grep -q "rebornix.ruby"; then
-    warn "'rebornix.ruby' is deprecated; replacing with 'castwide.solargraph'"
-    code --uninstall-extension rebornix.ruby || true
-    code --install-extension castwide.solargraph || true
+# 7) Configure Starship prompt for fish (if installed)
+if command -v starship >/dev/null 2>&1; then
+  info "Configuring Starship for fish"
+  mkdir -p "$HOME/.config/fish"
+  # Add initialization line if not present
+  if ! grep -q 'starship init fish' "$HOME/.config/fish/config.fish" 2>/dev/null; then
+    echo 'status --is-interactive; and starship init fish | source' >> "$HOME/.config/fish/config.fish"
   else
-    code --install-extension castwide.solargraph || true
+    info "Starship already configured in fish"
   fi
-  code --install-extension crystal-lang.crystal || true
-  code --install-extension GitHub.vscode-pull-request-github || true
-  code --install-extension ms-azuretools.vscode-docker || true
-  code --install-extension tadashi.fish || true
-else
-  info "VS Code CLI 'code' not available in container; skip extension install."
 fi
 
 # 8) Basic checks and outputs
