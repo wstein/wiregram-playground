@@ -11,7 +11,6 @@ module WireGram
         # Pre-compiled regex patterns for performance
         STRING_PATTERN = /"(?:\\.|[^"\\])*"/
         WHITESPACE_PATTERN = /\s+/
-        NUMBER_PATTERN = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/
         TRUE_PATTERN = /true/
         FALSE_PATTERN = /false/
         NULL_PATTERN = /null/
@@ -140,23 +139,78 @@ module WireGram
 
         def tokenize_number
           @scanner.pos = @position
-          if (matched = @scanner.scan(NUMBER_PATTERN))
-            number_text = matched
-            if number_text.includes?(".") || number_text.includes?('e') || number_text.includes?('E')
-              begin
-                value = number_text.to_f
-              rescue ex : ArgumentError
-                value = number_text.starts_with?("-") ? -Float64::INFINITY : Float64::INFINITY
-              end
-            else
-              value = number_text.to_i64
-            end
-            add_token(WireGram::Core::TokenType::Number, value, position: @scanner.pos)
-            @position = @scanner.pos
-            true
-          else
-            false
+          start = @position
+
+          # Optional minus
+          if current_byte == 0x2d # '-'
+            advance
           end
+
+          # Integer part
+          byte = current_byte
+          unless byte && (0x30..0x39).includes?(byte)
+            @position = start
+            return false
+          end
+
+          if byte == 0x30 # '0'
+            advance
+          else
+            # 1-9 followed by any number of digits
+            advance
+            while (byte = current_byte) && (0x30..0x39).includes?(byte)
+              advance
+            end
+          end
+
+          # Fractional part
+          if current_byte == 0x2e # '.'
+            # Check if what follows is a digit before advancing past '.'
+            next_byte = peek_byte(1)
+            if next_byte && (0x30..0x39).includes?(next_byte)
+              advance # skip '.'
+              while (byte = current_byte) && (0x30..0x39).includes?(byte)
+                advance
+              end
+            end
+          end
+
+          # Exponent part
+          byte = current_byte
+          if byte == 0x65 || byte == 0x45 # 'e' or 'E'
+            # Check if valid exponent follows
+            e_offset = 1
+            e_next = peek_byte(e_offset)
+            if e_next == 0x2b || e_next == 0x2d # '+' or '-'
+              e_offset += 1
+              e_next = peek_byte(e_offset)
+            end
+
+            if e_next && (0x30..0x39).includes?(e_next)
+              advance # skip 'e' or 'E'
+              byte = current_byte
+              if byte == 0x2b || byte == 0x2d # '+' or '-'
+                advance
+              end
+              while (byte = current_byte) && (0x30..0x39).includes?(byte)
+                advance
+              end
+            end
+          end
+
+          number_text = @source.byte_slice(start, @position - start)
+          if number_text.includes?(".") || number_text.includes?('e') || number_text.includes?('E')
+            begin
+              value = number_text.to_f
+            rescue ex : ArgumentError
+              value = number_text.starts_with?("-") ? -Float64::INFINITY : Float64::INFINITY
+            end
+          else
+            value = number_text.to_i64
+          end
+          add_token(WireGram::Core::TokenType::Number, value, position: @position)
+          @scanner.pos = @position
+          true
         end
 
         def tokenize_literal
