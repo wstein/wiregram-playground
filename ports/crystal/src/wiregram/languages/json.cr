@@ -15,11 +15,10 @@ module WireGram
       # JSON Language module - provides lexer, parser, transformer, UOM and serializer
       alias JsonResultValue = String | WireGram::Core::Node | Array(WireGram::Core::Token) | WireGram::Languages::Json::UOM | WireGram::Languages::Json::UOM::SimpleJson | Array(Hash(Symbol, String | Int32 | WireGram::Core::TokenType | Symbol | Nil)) | Nil
 
-      def self.process(input)
+      def self.process(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
         result = {} of Symbol => JsonResultValue
 
-        lexer = WireGram::Languages::Json::Lexer.new(input)
-
+        lexer = WireGram::Languages::Json::Lexer.new(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         # Use a lazy token stream so parser requests tokens on demand
         token_stream = WireGram::Core::TokenStream.new(lexer)
 
@@ -43,31 +42,31 @@ module WireGram
       end
 
       # Process with pretty formatting
-      def self.process_pretty(input, indent : String = "  ")
-        result = process(input)
+      def self.process_pretty(input, indent : String = "  ", use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
+        result = process(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         uom = result[:uom].as(WireGram::Languages::Json::UOM)
         result[:output] = WireGram::Languages::Json::Serializer.serialize_pretty(uom, indent)
         result
       end
 
       # Process to simple Ruby structure
-      def self.process_simple(input)
-        result = process(input)
+      def self.process_simple(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
+        result = process(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         uom = result[:uom].as(WireGram::Languages::Json::UOM)
         result[:output] = WireGram::Languages::Json::Serializer.serialize_simple(uom)
         result
       end
 
       # Tokenize input
-      def self.tokenize(input)
-        lexer = WireGram::Languages::Json::Lexer.new(input)
+      def self.tokenize(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
+        lexer = WireGram::Languages::Json::Lexer.new(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         token_stream = WireGram::Core::TokenStream.new(lexer)
         token_stream.tokens
       end
 
       # Stream tokens one-by-one (memory efficient for large files)
-      def self.tokenize_stream(input, &block : WireGram::Core::Token ->)
-        lexer = WireGram::Languages::Json::Lexer.new(input)
+      def self.tokenize_stream(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, &block : WireGram::Core::Token ->)
+        lexer = WireGram::Languages::Json::Lexer.new(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         lexer.enable_streaming!
         loop do
           token = lexer.next_token
@@ -77,16 +76,16 @@ module WireGram
       end
 
       # Parse input to AST
-      def self.parse(input)
-        lexer = WireGram::Languages::Json::Lexer.new(input)
+      def self.parse(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
+        lexer = WireGram::Languages::Json::Lexer.new(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         token_stream = WireGram::Core::TokenStream.new(lexer)
         parser = WireGram::Languages::Json::Parser.new(token_stream)
         parser.parse
       end
 
       # Stream AST nodes as they are parsed. Yields Node objects.
-      def self.parse_stream(input, &block : WireGram::Core::Node? ->)
-        lexer = WireGram::Languages::Json::Lexer.new(input)
+      def self.parse_stream(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, &block : WireGram::Core::Node? ->)
+        lexer = WireGram::Languages::Json::Lexer.new(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules)
         lexer.enable_streaming!
         token_stream = WireGram::Core::StreamingTokenStream.new(lexer)
         parser = WireGram::Languages::Json::Parser.new(token_stream)

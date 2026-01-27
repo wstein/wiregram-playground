@@ -27,9 +27,13 @@ module WireGram
           0x29_u8 => WireGram::Core::TokenType::RParen     # ')'
         }
 
-        def initialize(source)
-          super
+        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
+          super(source)
+          @use_simd = use_simd
+          @use_symbolic_utf8 = use_symbolic_utf8
+          @use_upfront_rules = use_upfront_rules
           @scanner = WireGram::Core::Scanner.new(source)
+          build_structural_index! if use_upfront_rules
         end
 
         # rubocop:disable Metrics/CyclomaticComplexity
