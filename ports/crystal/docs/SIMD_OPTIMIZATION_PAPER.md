@@ -32,7 +32,27 @@ The following benchmarks were conducted on an Apple M4 using a 19MB UCL file (`r
 
 *\*Note: On the Apple M4, the extremely efficient branch predictor makes the manual byte-loop very hard to beat for files with high token density. SIMD optimizations show more benefit on files with long strings or massive whitespace blocks.*
 
-## Hardware Specifics: Apple M4
+## 5. Deeper Optimizations (Stage 2 Teleportation)
+
+### 5.1 Stage 2 Architecture: Teleportation
+Stage 1 (SIMD Structural Indexing) creates a roadmap of the entire source. In Stage 2, the lexer can "teleport" between structural positions.
+
+When the lexer encounters an unquoted string or a literal, instead of scanning byte-by-byte or using a regex, it simply jumps to the next index in the structural roadmap. This effectively skips the content of large literals in O(1) jump time.
+
+### 5.2 Implementation Details
+- **`teleport_to_next`**: A new primitive in `BaseLexer` that advances `@position` to the next structural character found in Stage 1.
+- **Optimized Indexing**: The loop to extract indices from SIMD bitmasks was optimized using `trailing_zeros_count` (which maps to `rbit/clz` on AArch64), avoiding bit-by-bit checking.
+
+## 6. Future Suggestions and Ratings
+
+| Optimization | Description | Potential Impact | Complexity | Rating |
+|--------------|-------------|------------------|------------|--------|
+| **Branchless Stage 2** | Use a jump table or computed goto based on the structural character at the current index to avoid `case/when` overhead. | High (20-30%) | High | ★★★★☆ |
+| **SIMD-based Unquoted Scan** | Use NEON to scan for delimiters in unquoted strings without a full upfront index. | Medium (10-15%) | Medium | ★★★☆☆ |
+| **Parallel Stage 1** | Run Stage 1 indexing in a separate fiber/thread while Stage 2 starts processing the first chunks. | High (Parallelism) | High | ★★★☆☆ |
+| **Stage 2 Bit-packing** | Store the structural index as a bitmask or a more compact stream to reduce memory bandwidth. | Low (5-10%) | Medium | ★★☆☆☆ |
+
+## 7. Hardware Specifics: Apple M4
 - **Architecture:** ARMv9.4-A.
 - **NEON Performance:** 4x 128-bit NEON units.
 - **L1 Cache:** 192KB Instruction, 128KB Data per P-core.

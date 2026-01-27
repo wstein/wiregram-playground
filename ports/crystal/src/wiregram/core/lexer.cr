@@ -43,24 +43,10 @@ module WireGram
         if @use_simd
           while i + 15 < size
             mask, _ = SimdAccelerator.find_structural_bits(ptr + i)
-            if mask > 0
-              # Unrolled bit checking
-              indices << (i + 0) if (mask & 1) > 0
-              indices << (i + 1) if (mask & 2) > 0
-              indices << (i + 2) if (mask & 4) > 0
-              indices << (i + 3) if (mask & 8) > 0
-              indices << (i + 4) if (mask & 16) > 0
-              indices << (i + 5) if (mask & 32) > 0
-              indices << (i + 6) if (mask & 64) > 0
-              indices << (i + 7) if (mask & 128) > 0
-              indices << (i + 8) if (mask & 256) > 0
-              indices << (i + 9) if (mask & 512) > 0
-              indices << (i + 10) if (mask & 1024) > 0
-              indices << (i + 11) if (mask & 2048) > 0
-              indices << (i + 12) if (mask & 4096) > 0
-              indices << (i + 13) if (mask & 8192) > 0
-              indices << (i + 14) if (mask & 16384) > 0
-              indices << (i + 15) if (mask & 32768) > 0
+            while mask > 0
+              tz = mask.trailing_zeros_count
+              indices << (i + tz)
+              mask &= (mask - 1)
             end
             i += 16
           end
@@ -84,6 +70,22 @@ module WireGram
         return unless indices
 
         while @current_structural_ptr < indices.size && indices[@current_structural_ptr] < @position
+          @current_structural_ptr += 1
+        end
+
+        if @current_structural_ptr < indices.size
+          @position = indices[@current_structural_ptr]
+        else
+          @position = @bytes.size
+        end
+      end
+
+      # Teleport to the next structural character, skipping non-structural data.
+      # This is used for skipping content of strings or unquoted literals.
+      protected def teleport_to_next
+        return advance unless @use_upfront_rules && (indices = @structural_indices)
+
+        while @current_structural_ptr < indices.size && indices[@current_structural_ptr] <= @position
           @current_structural_ptr += 1
         end
 

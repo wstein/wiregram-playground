@@ -68,7 +68,28 @@ module WireGram
 
         private def tokenize_string
           @scanner.pos = @position
-          if (matched = @scanner.scan(STRING_PATTERN))
+          start = @position
+          advance # skip opening quote
+
+          if @use_upfront_rules
+            loop do
+              teleport_to_next
+              byte = current_byte
+              break unless byte
+              if byte == 0x22 # '"'
+                advance
+                break
+              elsif byte == 0x5c # '\\'
+                advance
+                advance if current_byte
+              end
+            end
+            matched = @source.byte_slice(start, @position - start)
+            content = matched[1...-1]
+            unescaped = content.includes?("\\") ? unescape_string(content) : content
+            add_token(WireGram::Core::TokenType::String, unescaped, position: @position)
+            true
+          elsif (matched = @scanner.scan(STRING_PATTERN))
             # Extract content (remove quotes)
             content = matched[1...-1]
             # Only unescape if string contains backslashes (fast path for unescaped strings)

@@ -215,6 +215,27 @@ module WireGram
           start = @position
           advance # skip opening quote
 
+          if @use_upfront_rules
+            loop do
+              teleport_to_next
+              byte = current_byte
+              break unless byte
+              if byte == 0x22 # '"'
+                advance
+                break
+              elsif byte == 0x5c # '\\'
+                advance
+                advance if current_byte
+              end
+            end
+            matched = @source.byte_slice(start, @position - start)
+            content = matched[1...-1]
+            unescaped = content.includes?("\\") ? unescape_quoted_string(content) : content
+            extras = { :quoted => true, :quote_type => :double } of Symbol => WireGram::Core::TokenExtraValue
+            add_token(WireGram::Core::TokenType::String, unescaped, extras: extras, position: @position)
+            return true
+          end
+
           while (byte = current_byte)
             if byte == 0x22 # '"'
               advance
@@ -427,6 +448,19 @@ module WireGram
         def tokenize_unquoted_string
           start = @position
           src = @source
+
+          if @use_upfront_rules
+            teleport_to_next
+            # We don't handle interpolation as easily with teleportation if it's not a structural character,
+            # but '${' starts with '$' which is NOT structural, but '{' IS.
+            # Actually, UCL unquoted strings are tricky.
+            # Let's see if we can just teleport to the NEXT structural char.
+            # find_delimiter already listed: \s , ; : } ) "
+            # structural_index includes: \s { } [ ] : , " \
+            # They are very similar.
+            add_token(WireGram::Core::TokenType::String, src.byte_slice(start, @position - start), position: @position)
+            return true
+          end
 
           # If URL at current position, consume entire URL until next delimiter (allow ':' in URL)
           if is_url_start?
