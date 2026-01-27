@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+# typed: false
 
 require_relative 'node'
 
@@ -7,8 +8,11 @@ module WireGram
     # Digital Fabric - A reversible representation of source code
     # The fabric maintains both the structured (AST) and textual representations
     class Fabric
+      extend T::Sig
+
       attr_reader :source, :ast, :tokens
 
+      sig { params(source: String, ast: Node, tokens: T.nilable(T::Array[T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])]])).void }
       def initialize(source, ast, tokens = [])
         @source = source
         @ast = ast
@@ -16,11 +20,13 @@ module WireGram
       end
 
       # Unweave the fabric back to source code
+      sig { returns(String) }
       def to_source
         unweave(@ast)
       end
 
       # Find patterns in the fabric
+      sig { params(pattern_type: Symbol).returns(T::Array[Node]) }
       def find_patterns(pattern_type)
         case pattern_type
         when :arithmetic_operations
@@ -35,12 +41,14 @@ module WireGram
       end
 
       # Analyze the fabric
+      sig { returns(WireGram::Engines::Analyzer) }
       def analyze
         require_relative '../engines/analyzer'
         WireGram::Engines::Analyzer.new(self)
       end
 
       # Transform the fabric
+      sig { params(transformation: T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol)]), block: T.nilable(T.proc.void)).returns(WireGram::Engines::Transformer) }
       def transform(transformation = nil, &block)
         require_relative '../engines/transformer'
         transformer = WireGram::Engines::Transformer.new(self)
@@ -50,6 +58,7 @@ module WireGram
       private
 
       # Unweave AST back to source code
+      sig { params(node: Node).returns(String) }
       def unweave(node)
         case node.type
         when :program

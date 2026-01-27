@@ -1,10 +1,14 @@
 # frozen_string_literal: true
+# typed: false
 
 module WireGram
   module Core
     # TokenStream provides lazy access to tokens produced by a lexer
     # It requests tokens from the lexer on demand and caches them.
     class TokenStream
+      extend T::Sig
+
+      sig { params(lexer: BaseLexer).void }
       def initialize(lexer)
         @lexer = lexer
         @cache = []
@@ -12,17 +16,20 @@ module WireGram
       end
 
       # Array-like access for parser compatibility
+      sig { params(index: Integer).returns(T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])])) }
       def [](index)
         ensure_filled(index)
         @cache[index]
       end
 
+      sig { returns(Integer) }
       def length
         ensure_all
         @cache.length
       end
 
       # Returns all tokens (forces complete tokenization)
+      sig { returns(T::Array[T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])]]) }
       def tokens
         ensure_all
         @cache
@@ -30,6 +37,7 @@ module WireGram
 
       private
 
+      sig { params(index: Integer).void }
       def ensure_filled(index)
         while @cache.length <= index && !@eof_produced
           token = @lexer.next_token
@@ -38,6 +46,7 @@ module WireGram
         end
       end
 
+      sig { void }
       def ensure_all
         ensure_filled(0) unless @cache.any?
         until @eof_produced
@@ -52,6 +61,9 @@ module WireGram
     # It avoids accumulating all tokens in memory by keeping a small sliding window
     # buffer and driving the lexer directly.
     class StreamingTokenStream
+      extend T::Sig
+
+      sig { params(lexer: BaseLexer, buffer_size: T.nilable(Integer)).void }
       def initialize(lexer, buffer_size = 8)
         @lexer = lexer
         @base = 0
@@ -61,6 +73,7 @@ module WireGram
       end
 
       # Array-like access (absolute index). Only supports forward access.
+      sig { params(index: Integer).returns(T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])])) }
       def [](index)
         return nil if index < @base
 
@@ -76,6 +89,7 @@ module WireGram
       end
 
       # Allow parser to inform the stream to drop consumed tokens
+      sig { params(position: Integer).void }
       def consume_to(position)
         return if position <= @base
 
@@ -87,6 +101,7 @@ module WireGram
       end
 
       # Convenience: fetch next token and advance base
+      sig { returns(T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])])) }
       def next
         token = self[@base]
         consume_to(@base + 1)

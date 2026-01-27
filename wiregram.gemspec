@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
 
   spec.files = Dir[
     'lib/**/*.rb',
-    'sig/**/*.rbs',
+    'sorbet/**/*.rbi',
     'LICENSE',
     'README.md',
     'Rakefile'
@@ -26,7 +26,9 @@ Gem::Specification.new do |spec|
   spec.executables = ['wiregram']
   spec.require_paths = ['lib']
 
-  spec.add_development_dependency 'rbs', '~> 3.10'
+  spec.add_development_dependency 'sorbet', '>= 0'
+  spec.add_development_dependency 'tapioca', '>= 0'
+  spec.add_dependency 'sorbet-runtime', '>= 0'
   spec.add_development_dependency 'rspec', '~> 3.13'
   spec.add_development_dependency 'cucumber', '~> 10.2'
   spec.add_development_dependency 'rubocop', '~> 1.82'

@@ -29,16 +29,9 @@ module WireGram
 
       def self.supports?(name : String, method : Symbol) : Bool
         case name
-        when "expression", "json"
+        when "expression", "json", "ucl"
           case method
           when :process, :process_pretty, :tokenize, :tokenize_stream, :parse, :parse_stream
-            true
-          else
-            false
-          end
-        when "ucl"
-          case method
-          when :process, :tokenize, :tokenize_stream, :parse, :parse_stream
             true
           else
             false
@@ -282,8 +275,8 @@ module WireGram
             #     result = v.root.not_nil!.to_json_string
             #   end
             #   puts json_pretty(result)
-            # elsif v.is_a?(WireGram::Languages::Ucl::UOM)
-            #   puts json_pretty(v.to_simple_json)
+            elsif v.is_a?(WireGram::Languages::Ucl::UOM)
+              puts json_pretty(v.to_simple_json)
             elsif v.is_a?(Array) || v.is_a?(Hash)
               puts json_pretty(deep_convert_nodes(v))
             elsif v.is_a?(String)
@@ -312,8 +305,8 @@ module WireGram
         when WireGram::Languages::Json::UOM
           root = obj.root
           json_any_from(root ? JSON.parse(root.not_nil!.to_json_string) : nil)
-        # when WireGram::Languages::Ucl::UOM
-        #   json_any_from(obj.to_simple_json)
+        when WireGram::Languages::Ucl::UOM
+          json_any_from(obj.to_simple_json)
         else
           json_any_from(obj)
         end
@@ -330,7 +323,11 @@ module WireGram
           end
           JSON::Any.new(mapped)
         when Array
-          JSON::Any.new(value.map { |v| json_any_from(v) })
+          mapped_arr = [] of JSON::Any
+          value.each do |v|
+            mapped_arr << json_any_from(v)
+          end
+          JSON::Any.new(mapped_arr)
         when WireGram::Core::Token
           json_any_from(value.to_h)
         when WireGram::Core::Node
@@ -341,12 +338,18 @@ module WireGram
         when WireGram::Languages::Expression::UOM
           root = value.root
           json_any_from(root ? JSON.parse(root.not_nil!.to_json) : nil)
+        when WireGram::Languages::Ucl::UOM
+          json_any_from(value.to_simple_json)
+        when WireGram::Languages::Ucl::UOM::RawNumber
+          JSON::Any.new(value.raw)
         when WireGram::Core::TokenType, Symbol
           JSON::Any.new(value.to_s)
         when Int32
           JSON::Any.new(value.to_i64)
-        else
+        when Int64, Float64, String, Bool, Nil
           JSON::Any.new(value)
+        else
+          JSON::Any.new(value.to_s)
         end
       end
 
@@ -355,10 +358,7 @@ module WireGram
         puts json_pretty(deep_convert_nodes(parsed))
         true
       rescue JSON::ParseException
-        escaped = str.gsub("\"", "\\\"")
-        unescaped = JSON.parse("\"#{escaped}\"")
-        puts unescaped
-        true
+        false
       rescue ex : Exception
         false
       end
@@ -378,6 +378,9 @@ module WireGram
           pretty ? WireGram::Languages::Expression.process_pretty(input) : WireGram::Languages::Expression.process(input)
         when "json"
           pretty ? WireGram::Languages::Json.process_pretty(input) : WireGram::Languages::Json.process(input)
+        when "ucl"
+          # UCL's process handles internal defaults and can be extended if needed
+          WireGram::Languages::Ucl.process(input)
         else
           raise "Unknown language: #{language}"
         end
@@ -389,8 +392,8 @@ module WireGram
           WireGram::Languages::Expression.tokenize_stream(input) { |token| yield token }
         when "json"
           WireGram::Languages::Json.tokenize_stream(input) { |token| yield token }
-        # when "ucl"
-        #   WireGram::Languages::Ucl.tokenize_stream(input) { |token| yield token }
+        when "ucl"
+          WireGram::Languages::Ucl.tokenize_stream(input) { |token| yield token }
         else
           raise "Unknown language: #{language}"
         end
@@ -402,8 +405,8 @@ module WireGram
           WireGram::Languages::Expression.parse_stream(input) { |node| yield node }
         when "json"
           WireGram::Languages::Json.parse_stream(input) { |node| yield node }
-        # when "ucl"
-        #   WireGram::Languages::Ucl.parse_stream(input) { |node| yield node }
+        when "ucl"
+          WireGram::Languages::Ucl.parse_stream(input) { |node| yield node }
         else
           raise "Unknown language: #{language}"
         end

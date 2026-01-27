@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+# typed: false
 
 require 'json'
 
@@ -7,8 +8,11 @@ module WireGram
     # AST Node - Represents a node in the abstract syntax tree
     # Nodes are immutable and reversible
     class Node
+      extend T::Sig
+
       attr_reader :type, :value, :children, :metadata
 
+      sig { params(type: Symbol, value: T.nilable(T.any(String, Integer, Symbol, T::Boolean)), children: T.nilable(T::Array[Node]), metadata: T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol)])).void }
       def initialize(type, value: nil, children: [], metadata: {})
         @type = type
         @value = value
@@ -18,17 +22,20 @@ module WireGram
       end
 
       # Create a new node with updated properties
+      sig { params(type: T.nilable(Symbol), value: T.nilable(T.any(String, Integer, Symbol, T::Boolean)), children: T.nilable(T::Array[Node]), metadata: T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol)])).returns(Node) }
       def with(type: @type, value: @value, children: @children, metadata: @metadata)
         self.class.new(type, value: value, children: children, metadata: metadata)
       end
 
       # Traverse the tree depth-first
+      sig { params(block: T.proc.params(node: Node).void).void }
       def traverse(&block)
         block.call(self)
         @children.each { |child| child.traverse(&block) if child.is_a?(Node) }
       end
 
       # Find nodes matching a condition
+      sig { params(block: T.proc.returns(T::Boolean)).returns(T::Array[Node]) }
       def find_all(&block)
         results = []
         traverse do |node|
@@ -38,6 +45,7 @@ module WireGram
       end
 
       # Convert to hash representation
+      sig { returns(T::Hash[Symbol, T.untyped]) }
       def to_h
         {
           type: @type,
@@ -47,11 +55,13 @@ module WireGram
         }
       end
 
+      sig { returns(String) }
       def inspect
         "#<Node type=#{@type} value=#{@value.inspect} children=#{@children.length}>"
       end
 
       # Deep serialization for snapshots - shows actual content with depth limiting
+      sig { params(depth: T.nilable(Integer), max_depth: T.nilable(Integer)).returns(String) }
       def to_detailed_string(depth = 0, max_depth = 3)
         return '...' if depth > max_depth
 
@@ -77,6 +87,7 @@ module WireGram
       end
 
       # Convert to JSON format for snapshots
+      sig { params(_args: T.untyped).returns(String) }
       def to_json(*_args)
         # Handle infinity values that can't be serialized to JSON
         hash = to_h

@@ -6,69 +6,55 @@ require "../../core/scanner"
 module WireGram
   module Languages
     module Expression
-      # High-performance lexer for simple expression language using StringScanner
+      # High-performance lexer for simple expression language using byte-based scanning
       # Supports: numbers, identifiers, operators, keywords (let)
       class Lexer < WireGram::Core::BaseLexer
-        KEYWORDS = %w[let]
-
-        # Pre-compiled regex patterns for performance
-        WHITESPACE_PATTERN = /\s+/
-        NUMBER_PATTERN = /\d+(?:\.\d+)?/
-        IDENTIFIER_PATTERN = /[a-zA-Z_][a-zA-Z0-9_]*/
-        STRING_PATTERN = /"(?:\\.|[^"\\])*"/
-        DIGIT_PATTERN = /\d/
-        LETTER_PATTERN = /[a-zA-Z_]/
+        KEYWORDS = {"let" => true}
 
         def initialize(source)
           super
           @scanner = WireGram::Core::Scanner.new(source)
         end
 
-        def skip_whitespace
-          @scanner.pos = @position
-          @scanner.skip(WHITESPACE_PATTERN)
-          @position = @scanner.pos
-        end
-
         private def try_tokenize_next
-          char = current_char
-          return false unless char
+          byte = current_byte
+          return false unless byte
 
-          case char
-          when "+"
+          case byte
+          when 0x2b # '+'
             add_token(WireGram::Core::TokenType::Plus, "+")
             advance
             true
-          when "-"
+          when 0x2d # '-'
             add_token(WireGram::Core::TokenType::Minus, "-")
             advance
             true
-          when "*"
+          when 0x2a # '*'
             add_token(WireGram::Core::TokenType::Star, "*")
             advance
             true
-          when "/"
+          when 0x2f # '/'
             add_token(WireGram::Core::TokenType::Slash, "/")
             advance
             true
-          when "="
+          when 0x3d # '='
             add_token(WireGram::Core::TokenType::Equals, "=")
             advance
             true
-          when "("
+          when 0x28 # '('
             add_token(WireGram::Core::TokenType::LParen, "(")
             advance
             true
-          when ")"
+          when 0x29 # ')'
             add_token(WireGram::Core::TokenType::RParen, ")")
             advance
             true
-          when "\""
+          when 0x22 # '"'
             tokenize_string_fast
           else
-            if /\d/.matches?(char)
+            if (0x30..0x39).includes?(byte) # '0'-'9'
               tokenize_number_fast
-            elsif /[a-zA-Z_]/.matches?(char)
+            elsif (0x61..0x7a).includes?(byte) || (0x41..0x5a).includes?(byte) || byte == 0x5f # [a-zA-Z_]
               tokenize_identifier_fast
             else
               false
@@ -77,44 +63,68 @@ module WireGram
         end
 
         private def tokenize_number_fast
-          @scanner.pos = @position
-          if @scanner.scan(NUMBER_PATTERN)
-            matched = @scanner.matched.not_nil!
-            value = matched.includes?(".") ? matched.to_f : matched.to_i64
-            add_token(WireGram::Core::TokenType::Number, value, position: @scanner.pos)
-            @position = @scanner.pos
-            true
-          else
-            false
+          start = @position
+          # We know first byte is a digit from caller
+          advance
+
+          while (byte = current_byte) && (0x30..0x39).includes?(byte)
+            advance
           end
+
+          if current_byte == 0x2e # '.'
+            next_byte = peek_byte(1)
+            if next_byte && (0x30..0x39).includes?(next_byte)
+              advance # skip '.'
+              while (byte = current_byte) && (0x30..0x39).includes?(byte)
+                advance
+              end
+            end
+          end
+
+          matched = @source.byte_slice(start, @position - start)
+          value = matched.includes?('.') ? matched.to_f : matched.to_i64
+          add_token(WireGram::Core::TokenType::Number, value, position: @position)
+          true
         end
 
         def tokenize_identifier_fast
-          @scanner.pos = @position
-          if @scanner.scan(IDENTIFIER_PATTERN)
-            value = @scanner.matched.not_nil!
-            type = KEYWORDS.includes?(value) ? WireGram::Core::TokenType::Keyword : WireGram::Core::TokenType::Identifier
-            add_token(type, value, position: @scanner.pos)
-            @position = @scanner.pos
-            true
-          else
-            false
+          start = @position
+          # We know first byte is [a-zA-Z_] from caller
+          advance
+
+          while (byte = current_byte) && ((0x61..0x7a).includes?(byte) || (0x41..0x5a).includes?(byte) || (0x30..0x39).includes?(byte) || byte == 0x5f)
+            advance
           end
+
+          value = @source.byte_slice(start, @position - start)
+          type = KEYWORDS.has_key?(value) ? WireGram::Core::TokenType::Keyword : WireGram::Core::TokenType::Identifier
+          add_token(type, value, position: @position)
+          true
         end
 
         def tokenize_string_fast
-          @scanner.pos = @position
-          if (matched = @scanner.scan(STRING_PATTERN))
-            # Remove surrounding quotes
-            content = matched[1...-1]
-            # Fast-path: avoid unescaping for common case with no backslashes
-            unescaped = content.includes?("\\") ? unescape_string(content) : content
-            add_token(WireGram::Core::TokenType::String, unescaped, position: @scanner.pos)
-            @position = @scanner.pos
-            true
-          else
-            false
+          start = @position
+          advance # skip opening quote
+
+          while (byte = current_byte)
+            if byte == 0x22 # '"'
+              advance
+              matched = @source.byte_slice(start, @position - start)
+              # Remove surrounding quotes
+              content = matched[1...-1]
+              # Fast-path: avoid unescaping for common case with no backslashes
+              unescaped = content.includes?("\\") ? unescape_string(content) : content
+              add_token(WireGram::Core::TokenType::String, unescaped, position: @position)
+              return true
+            elsif byte == 0x5c # '\\'
+              advance
+              advance if current_byte # skip escaped char
+            else
+              advance
+            end
           end
+
+          false # Unterminated string
         end
 
         def unescape_string(str)

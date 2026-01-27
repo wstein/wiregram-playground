@@ -12,6 +12,10 @@ module WireGram
 
           def initialize(@raw : String)
           end
+
+          def to_json(builder : JSON::Builder)
+            builder.raw(@raw)
+          end
         end
 
         alias JsonValue = String | Int32 | Int64 | Float64 | Bool | Nil | RawNumber | Array(JsonValue) | Hash(String, JsonValue)

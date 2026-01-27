@@ -1,19 +1,23 @@
 # frozen_string_literal: true
+# typed: false
 
 module WireGram
   module Core
     # Base Lexer - Foundation for tokenization
     # Provides error recovery and resilient tokenization
     class BaseLexer
+      extend T::Sig
+
       attr_reader :source, :position, :tokens, :errors
 
+      sig { params(source: String).void }
       def initialize(source)
-        @source = source
-        @position = 0
-        @tokens = []
-        @errors = []
-        @streaming = false
-        @last_token = nil
+        @source = T.let(source, String)
+        @position = T.let(0, Integer)
+        @tokens = T.let([], T::Array[T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])]])
+        @errors = T.let([], T::Array[T::Hash[Symbol, T.any(String, Integer, Symbol, T::Array[String])]])
+        @streaming = T.let(false, T::Boolean)
+        @last_token = T.let(nil, T.nilable(T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])]))
       end
 
       # Public API to enable/disable streaming mode. When enabled, tokens are
@@ -23,11 +27,13 @@ module WireGram
         @streaming = true
       end
 
+      sig { void }
       def disable_streaming!
         @streaming = false
       end
 
       # Tokenize the source code eagerly (compatibility)
+      sig { returns(T::Array[T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])]]) }
       def tokenize
         @tokens = []
         @errors = []
@@ -44,6 +50,7 @@ module WireGram
 
       # Produce the next token from the source on demand.
       # This enables lazy tokenization for parsers that request tokens incrementally.
+      sig { returns(T::Hash[Symbol, T.any(String, Integer, Symbol, T::Boolean, NilClass, T::Array[T.any(String, Integer)])]) }
       def next_token
         skip_whitespace
 
@@ -104,26 +111,32 @@ module WireGram
       protected
 
       # To be implemented by subclasses
+      sig { returns(T::Boolean) }
       def try_tokenize_next
         raise NotImplementedError, 'Subclasses must implement try_tokenize_next'
       end
 
+      sig { returns(T.nilable(String)) }
       def current_char
         @source[@position]
       end
 
+      sig { params(offset: T.nilable(Integer)).returns(T.nilable(String)) }
       def peek_char(offset = 1)
         @source[@position + offset]
       end
 
+      sig { void }
       def advance
         @position += 1
       end
 
+      sig { void }
       def skip_whitespace
         advance while current_char&.match?(/\s/)
       end
 
+      sig { params(type: Symbol, value: T.untyped, extras: T.nilable(T::Hash[Symbol, T.untyped])).returns(T.untyped) }
       def add_token(type, value = nil, extras = {})
         token = { type: type, value: value, position: @position }
         token.merge!(extras) if extras && !extras.empty?
