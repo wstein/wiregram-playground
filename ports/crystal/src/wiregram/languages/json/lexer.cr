@@ -142,7 +142,7 @@ module WireGram
           @scanner.pos = @position
           if (matched = @scanner.scan(NUMBER_PATTERN))
             number_text = matched
-            if number_text.includes?(".") || number_text.matches?(/[eE]/)
+            if number_text.includes?(".") || number_text.includes?('e') || number_text.includes?('E')
               begin
                 value = number_text.to_f
               rescue ex : ArgumentError
