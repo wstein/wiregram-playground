@@ -1,22 +1,25 @@
 # frozen_string_literal: true
 
-require_relative 'node'
+require "./node"
+require "./token"
+require "../engines/analyzer"
+require "../engines/transformer"
+require "../languages/ucl/serializer"
 
 module WireGram
   module Core
     # Digital Fabric - A reversible representation of source code
     # The fabric maintains both the structured (AST) and textual representations
     class Fabric
-      attr_reader :source, :ast, :tokens
+      getter source : String
+      getter ast : Node
+      getter tokens : Array(Token)
 
-      def initialize(source, ast, tokens = [])
-        @source = source
-        @ast = ast
-        @tokens = tokens
+      def initialize(@source : String, @ast : Node, @tokens : Array(Token) = [] of Token)
       end
 
       # Unweave the fabric back to source code
-      def to_source
+      def to_source : String
         unweave(@ast)
       end
 
@@ -24,70 +27,70 @@ module WireGram
       def find_patterns(pattern_type)
         case pattern_type
         when :arithmetic_operations
-          @ast.find_all { |node| %i[add subtract multiply divide].include?(node.type) }
+          @ast.find_all { |node| [NodeType::Add, NodeType::Subtract, NodeType::Multiply, NodeType::Divide].includes?(node.type) }
         when :literals
-          @ast.find_all { |node| %i[number string].include?(node.type) }
+          @ast.find_all { |node| [NodeType::Number, NodeType::String].includes?(node.type) }
         when :identifiers
-          @ast.find_all { |node| node.type == :identifier }
+          @ast.find_all { |node| node.type == NodeType::Identifier }
         else
-          []
+          [] of Node
         end
       end
 
       # Analyze the fabric
       def analyze
-        require_relative '../engines/analyzer'
         WireGram::Engines::Analyzer.new(self)
       end
 
       # Transform the fabric
-      def transform(transformation = nil, &block)
-        require_relative '../engines/transformer'
+      def transform(transformation = nil)
+        transformer = WireGram::Engines::Transformer.new(self)
+        transformer.apply(transformation)
+      end
+
+      def transform(transformation = nil, &block : WireGram::Core::Node -> WireGram::Core::Node?)
         transformer = WireGram::Engines::Transformer.new(self)
         transformer.apply(transformation, &block)
       end
 
-      private
-
       # Unweave AST back to source code
-      def unweave(node)
+      private def unweave(node : Node) : String
         case node.type
-        when :program
-          node.children.map { |child| unweave(child) }.join(' ')
-        when :ucl_program
+        when NodeType::Program
+          node.children.map { |child| unweave(child) }.join(" ")
+        when NodeType::UclProgram
           # Use UCL serializer for normalized output
-          require_relative '../languages/ucl/serializer'
           WireGram::Languages::Ucl::Serializer.serialize_program(node, renumber: false)
-        when :pair
+        when NodeType::Pair
           key = node.children[0]
           value = node.children[1]
           key_text = key.value.to_s
           value_text = unweave(value)
           "#{key_text} = #{value_text};"
-        when :object
+        when NodeType::Object
           inner = node.children.map { |c| "  #{unweave(c)}" }.join("\n")
           "{\n#{inner}\n}"
-        when :array
+        when NodeType::Array
           "[#{node.children.map { |c| unweave(c) }.join(", ")}]"
-        when :number
+        when NodeType::Number
           node.value.to_s
-        when :string
+        when NodeType::String
           "\"#{node.value}\""
-        when :identifier
+        when NodeType::Identifier
           node.value.to_s
-        when :boolean
-          node.value ? 'true' : 'false'
-        when :null
-          'null'
-        when :add
+        when NodeType::Boolean
+          node.value.as(Bool) ? "true" : "false"
+        when NodeType::Null
+          "null"
+        when NodeType::Add
           "#{unweave(node.children[0])} + #{unweave(node.children[1])}"
-        when :subtract
+        when NodeType::Subtract
           "#{unweave(node.children[0])} - #{unweave(node.children[1])}"
-        when :multiply
+        when NodeType::Multiply
           "#{unweave(node.children[0])} * #{unweave(node.children[1])}"
-        when :divide
+        when NodeType::Divide
           "#{unweave(node.children[0])} / #{unweave(node.children[1])}"
-        when :assign
+        when NodeType::Assign
           "let #{node.children[0].value} = #{unweave(node.children[1])}"
         else
           node.value.to_s

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'json'
+require "json"
 
 module WireGram
   module Languages
@@ -8,52 +8,100 @@ module WireGram
       # Universal Object Model for JSON
       # Represents JSON data in a normalized, language-agnostic format
       class UOM
-        attr_accessor :root
+        alias SimpleJson = Bool | Int64 | Float64 | String | Nil | Array(SimpleJson) | Hash(String, SimpleJson)
 
-        def initialize(root = nil)
-          @root = root
+        property root : ValueBase?
+
+        def initialize(@root : ValueBase? = nil)
         end
 
         def to_normalized_string
-          return '' if @root.nil?
+          return "" unless @root
 
-          @root.to_json
+          @root.not_nil!.to_json_string
         end
 
-        def to_simple_json
-          return nil if @root.nil?
+        def to_simple_json : SimpleJson?
+          return nil unless @root
 
-          @root.to_simple_json
+          @root.not_nil!.to_simple_json
+        end
+
+        def self.pretty_json(value)
+          JSON.build(indent: "  ") do |json|
+            write_json(json, value)
+          end
+        end
+
+        def self.write_json(json : JSON::Builder, value)
+          case value
+          when ValueBase
+            write_json(json, value.to_simple_json)
+          when Hash
+            json.object do
+              value.each do |k, v|
+                json.field k.to_s do
+                  write_json(json, v)
+                end
+              end
+            end
+          when Array
+            json.array do
+              value.each { |v| write_json(json, v) }
+            end
+          when Float64
+            if value.infinite?
+              json.string(value.positive? ? "Infinity" : "-Infinity")
+            else
+              json.scalar(value)
+            end
+          else
+            json.scalar(value)
+          end
+        end
+
+        abstract class ValueBase
+          abstract def to_json_string : String
+          abstract def to_simple_json : SimpleJson
+          abstract def to_json_format
+          abstract def to_pretty_json : String
+          abstract def to_pretty_string(indent : Int32 = 0) : String
+          abstract def to_detailed_string(depth : Int32 = 0, max_depth : Int32 = 3) : String
+
+          def to_json : String
+            to_json_string
+          end
+
+          def to_json(builder : JSON::Builder)
+            builder.raw(to_json_string)
+          end
         end
 
         # JSON Value base class
-        class Value
-          attr_reader :type, :value
+        class Value < ValueBase
+          getter type : Symbol
+          getter value : String | Int64 | Float64 | Bool | Nil
 
-          def initialize(type, value)
-            @type = type
-            @value = value
-            freeze
+          def initialize(@type : Symbol, @value)
           end
 
-          def to_json(*_args)
+          def to_json_string : String
             case @type
             when :string
-              # Use JSON.generate to correctly escape control characters and unicode
-              ::JSON.generate(@value)
+              @value.to_s.to_json
             when :number
-              # Represent infinite floats as quoted strings ("Infinity" / "-Infinity")
-              if @value.is_a?(Float) && @value.infinite?
-                ::JSON.generate(@value.positive? ? 'Infinity' : '-Infinity')
+              number = @value
+              if number.is_a?(Float64) && number.infinite?
+                (number.positive? ? "Infinity" : "-Infinity").to_json
               else
-                ::JSON.generate(@value)
+                number.to_json
               end
             when :boolean
-              @value.to_s
+              @value.as(Bool).to_s
             when :null
-              'null'
+              "null"
             else
-              ::JSON.generate(@value.to_s)
+              @value.to_s.to_json
             end
           end
 
@@ -61,8 +109,8 @@ module WireGram
             other.is_a?(Value) && other.type == @type && other.value == @value
           end
 
-          def inspect
-            "#<#{self.class.name} #{to_h.inspect}>"
+          def inspect : String
+            "#<#{self.class.name} type=#{@type} value=#{@value.inspect}>"
           end
 
           # Convert UOM value to JSON format
@@ -74,7 +122,7 @@ module WireGram
           end
 
           # Simple JSON - just the value (keep for backward compatibility)
-          def to_simple_json
+          def to_simple_json : SimpleJson
             case @type
             when :string, :number, :boolean
               @value
@@ -86,49 +134,31 @@ module WireGram
           end
 
           # Pretty JSON for snapshots
-          def to_pretty_json
-            JSON.pretty_generate(to_simple_json, indent: '  ')
-          rescue JSON::GeneratorError
-            to_pretty_string
+          def to_pretty_json : String
+            UOM.pretty_json(to_simple_json)
           end
 
           # Pretty-print UOM for snapshots
-          def to_pretty_string(indent = 0)
-            indent_str = '  ' * indent
-            case self
-            when ObjectValue
-              result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectValue:0xXXXXXXXX @items=#{@items.length}>"
-              if @items.any?
-                @items.each do |key, value|
-                  result += "\n#{indent_str}  [#{key.inspect}]"
-                  result += "\n#{value.to_pretty_string(indent + 2)}" if value
-                end
-              end
-              result
-            when ArrayValue
-              result = "#{indent_str}#<WireGram::Languages::Json::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
-              if @items.any?
-                @items.each_with_index do |item, index|
-                  result += "\n#{indent_str}  [#{index}]"
-                  result += "\n#{item.to_pretty_string(indent + 2)}" if item
-                end
-              end
-              result
-            when Value
+          def to_pretty_string(indent = 0) : String
+            indent_str = "  " * indent
+            case @type
+            when :string
+              "#{indent_str}#<WireGram::Languages::Json::UOM::Value:0xXXXXXXXX @type=:string, @value=\"#{@value}\">"
+            when :number, :boolean, :null
               "#{indent_str}#<WireGram::Languages::Json::UOM::Value:0xXXXXXXXX @type=#{@type}, @value=#{@value.inspect}>"
             else
-              "#{indent_str}#<#{self.class.name}:0xXXXXXXXX>"
+              "#{indent_str}#<WireGram::Languages::Json::UOM::Value:0xXXXXXXXX @type=#{@type}, @value=#{@value.inspect}>"
             end
           end
 
           # Deep serialization for snapshots - shows actual content
-          def to_detailed_string(depth = 0, max_depth = 3)
-            return '...' if depth > max_depth
+          def to_detailed_string(depth = 0, max_depth = 3) : String
+            return "..." if depth > max_depth
 
-            indent = '  ' * depth
+            indent = "  " * depth
             case @type
             when :string
-              "#{indent}#<Json::UOM::Value type=#{@type} value=\"#{escape_json_string(@value)}\">"
+              "#{indent}#<Json::UOM::Value type=#{@type} value=\"#{escape_json_string(@value.to_s)}\">"
             when :number, :boolean, :null
               "#{indent}#<Json::UOM::Value type=#{@type} value=#{@value.inspect}>"
             else
@@ -136,11 +166,8 @@ module WireGram
             end
           end
 
-          private
-
-          def escape_json_string(str)
-            str.to_s.gsub('\\') { '\\\\' }
-               .gsub('"') { '\\"' }
+          private def escape_json_string(str : String) : String
+            str.gsub("\\", "\\\\").gsub("\"", "\\\"")
           end
         end
 
@@ -153,7 +180,7 @@ module WireGram
 
         # JSON Number value
         class NumberValue < Value
-          def initialize(value)
+          def initialize(value : Int64 | Float64)
             super(:number, value)
           end
         end
@@ -173,33 +200,29 @@ module WireGram
         end
 
         # JSON Object (key-value pairs)
-        class ObjectValue
-          attr_reader :items
+        class ObjectValue < ValueBase
+          getter items : Array(ObjectItem)
 
-          def initialize(items = [])
-            @items = items.freeze
-            freeze
+          def initialize(@items : Array(ObjectItem) = [] of ObjectItem)
           end
 
-          def to_json(*_args)
-            if @items.empty?
-              '{}'
-            else
-              pairs = @items.map do |item|
-                next if item.value.nil?
+          def to_json_string : String
+            return "{}" if @items.empty?
 
-                "\"#{escape_json_string(item.key)}\": #{item.value.to_json}"
-              end.compact
-              "{#{pairs.join(", ")}}"
-            end
+            pairs = @items.map do |item|
+              value = item.value
+              next nil unless value
+              "\"#{escape_json_string(item.key)}\": #{value.to_json_string}"
+            end.compact
+            "{#{pairs.join(", ")}}"
           end
 
-          def to_simple_json
-            result = {}
+          def to_simple_json : SimpleJson
+            result = {} of String => SimpleJson
             @items.each do |item|
-              next if item.value.nil?
-
-              result[item.key] = item.value.to_simple_json
+              value = item.value
+              next unless value
+              result[item.key] = value.to_simple_json
             end
             result
           end
@@ -208,56 +231,35 @@ module WireGram
             other.is_a?(ObjectValue) && other.items == @items
           end
 
-          def inspect
-            "#<Json::UOM::ObjectValue items=#{@items.length}>"
+          def inspect : String
+            "#<Json::UOM::ObjectValue items=#{@items.size}>"
           end
 
           # Convert UOM object to JSON format
           def to_json_format
             {
               type: :object,
-              items: @items.map(&:to_json_format)
+              items: @items.map(&.to_json_format)
             }
           end
 
           # Pretty JSON for snapshots (render as actual JSON data structure)
-          def to_pretty_json
-            JSON.pretty_generate(sanitize_for_json(to_simple_json), indent: '  ')
-          rescue JSON::GeneratorError
-            to_pretty_string
+          def to_pretty_json : String
+            UOM.pretty_json(to_simple_json)
           end
 
           # Deep serialization for snapshots - shows actual content
+          def to_detailed_string(depth = 0, max_depth = 3) : String
+            return "..." if depth > max_depth
 
-          private
-
-          def sanitize_for_json(obj)
-            case obj
-            when Hash
-              obj.transform_values { |v| sanitize_for_json(v) }
-            when Array
-              obj.map { |v| sanitize_for_json(v) }
-            when Float
-              if obj.infinite?
-                obj.positive? ? 'Infinity' : '-Infinity'
-              else
-                obj
-              end
-            else
-              obj
-            end
-          end
-
-          def to_detailed_string(depth = 0, max_depth = 3)
-            return '...' if depth > max_depth
-
-            indent = '  ' * depth
-            result = "#{indent}#<Json::UOM::ObjectValue items=#{@items.length}>"
+            indent = "  " * depth
+            result = "#{indent}#<Json::UOM::ObjectValue items=#{@items.size}>"
 
             if @items.any?
               @items.each do |item|
                 result += "\n#{indent}  #<Json::UOM::ObjectItem key=\"#{escape_json_string(item.key)}\">"
-                result += "\n#{item.value.to_detailed_string(depth + 2, max_depth)}" if item.value
+                value = item.value
+                result += "\n#{value.to_detailed_string(depth + 2, max_depth)}" if value
               end
             end
 
@@ -265,82 +267,80 @@ module WireGram
           end
 
           # Pretty-print UOM object for snapshots
-          def to_pretty_string(indent = 0)
-            indent_str = '  ' * indent
-            result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectValue:0xXXXXXXXX @items=#{@items.length}>"
+          def to_pretty_string(indent = 0) : String
+            indent_str = "  " * indent
+            result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectValue:0xXXXXXXXX @items=#{@items.size}>"
 
             if @items.any?
               @items.each do |item|
                 result += "\n#{indent_str}  #<WireGram::Languages::Json::UOM::ObjectItem:0xXXXXXXXX @key=\"#{escape_json_string(item.key)}\">"
-                result += "\n#{item.value.to_pretty_string(indent + 2)}" if item.value
+                value = item.value
+                result += "\n#{value.to_pretty_string(indent + 2)}" if value
               end
             end
 
             result
           end
 
-          def escape_json_string(str)
-            str.to_s.gsub('\\') { '\\\\' }
-               .gsub('"') { '\\"' }
+          private def escape_json_string(str : String) : String
+            str.gsub("\\", "\\\\").gsub("\"", "\\\"")
           end
         end
 
         # JSON Array
-        class ArrayValue
-          attr_reader :items
+        class ArrayValue < ValueBase
+          getter items : Array(ValueBase)
 
-          def initialize(items = [])
-            @items = items.freeze
-            freeze
+          def initialize(@items : Array(ValueBase) = [] of ValueBase)
           end
 
-          def to_json(*_args)
-            if @items.empty?
-              '[]'
-            else
-              elements = @items.map(&:to_json)
-              "[#{elements.join(", ")}]"
+          def to_json_string : String
+            return "[]" if @items.empty?
+
+            elements = @items.map(&.to_json_string)
+            "[#{elements.join(", ")}]"
+          end
+
+          def to_simple_json : SimpleJson
+            items = [] of SimpleJson
+            @items.each do |item|
+              items << item.to_simple_json
             end
-          end
-
-          def to_simple_json
-            @items.map(&:to_simple_json)
+            items
           end
 
           def ==(other)
             other.is_a?(ArrayValue) && other.items == @items
           end
 
-          def inspect
-            "#<Json::UOM::ArrayValue items=#{@items.length}>"
+          def inspect : String
+            "#<Json::UOM::ArrayValue items=#{@items.size}>"
           end
 
           # Convert UOM array to JSON format
           def to_json_format
             {
               type: :array,
-              items: @items.map(&:to_json_format)
+              items: @items.map(&.to_json_format)
             }
           end
 
           # Pretty JSON for snapshots (render as actual JSON data structure)
-          def to_pretty_json
-            JSON.pretty_generate(sanitize_for_json(to_simple_json), indent: '  ')
-          rescue JSON::GeneratorError
-            to_pretty_string
+          def to_pretty_json : String
+            UOM.pretty_json(to_simple_json)
           end
 
           # Deep serialization for snapshots - shows actual content
-          def to_detailed_string(depth = 0, max_depth = 3)
-            return '...' if depth > max_depth
+          def to_detailed_string(depth = 0, max_depth = 3) : String
+            return "..." if depth > max_depth
 
-            indent = '  ' * depth
-            result = "#{indent}#<Json::UOM::ArrayValue items=#{@items.length}>"
+            indent = "  " * depth
+            result = "#{indent}#<Json::UOM::ArrayValue items=#{@items.size}>"
 
             if @items.any?
               @items.each_with_index do |item, index|
                 result += "\n#{indent}  [#{index}]"
-                result += "\n#{item.to_detailed_string(depth + 2, max_depth)}" if item
+                result += "\n#{item.to_detailed_string(depth + 2, max_depth)}"
               end
             end
 
@@ -348,63 +348,54 @@ module WireGram
           end
 
           # Pretty-print UOM array for snapshots
-          def to_pretty_string(indent = 0)
-            indent_str = '  ' * indent
-            result = "#{indent_str}#<WireGram::Languages::Json::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.length}>"
+          def to_pretty_string(indent = 0) : String
+            indent_str = "  " * indent
+            result = "#{indent_str}#<WireGram::Languages::Json::UOM::ArrayValue:0xXXXXXXXX @items=#{@items.size}>"
 
             if @items.any?
               @items.each_with_index do |item, index|
                 result += "\n#{indent_str}  [#{index}]"
-                result += "\n#{item.to_pretty_string(indent + 2)}" if item
+                result += "\n#{item.to_pretty_string(indent + 2)}"
               end
             end
 
             result
           end
-
-          private
-
-          def sanitize_for_json(obj)
-            case obj
-            when Hash
-              obj.transform_values { |v| sanitize_for_json(v) }
-            when Array
-              obj.map { |v| sanitize_for_json(v) }
-            when Float
-              if obj.infinite?
-                obj.positive? ? 'Infinity' : '-Infinity'
-              else
-                obj
-              end
-            else
-              obj
-            end
-          end
         end
 
         # JSON Object Item (key-value pair)
         class ObjectItem
-          attr_reader :key, :value
+          getter key : String
+          getter value : ValueBase?
 
-          def initialize(key, value)
+          def initialize(key, value : ValueBase?)
             @key = key.to_s
             @value = value
-            freeze
           end
 
-          def to_json(*_args)
-            "\"#{escape_json_string(@key)}\": #{@value.to_json}"
+          def to_json_string : String
+            value = @value
+            return "\"#{escape_json_string(@key)}\": null" unless value
+
+            "\"#{escape_json_string(@key)}\": #{value.to_json_string}"
+          end
+
+          def to_json : String
+            to_json_string
           end
 
           def to_simple_json
-            [@key, @value.to_simple_json]
+            value = @value
+            return [@key, nil] unless value
+
+            [@key, value.to_simple_json]
           end
 
           def ==(other)
             other.is_a?(ObjectItem) && other.key == @key && other.value == @value
           end
 
-          def inspect
+          def inspect : String
             "#<Json::UOM::ObjectItem key=#{@key.inspect} value=#{@value.inspect}>"
           end
 
@@ -413,37 +404,36 @@ module WireGram
             {
               type: :object_item,
               key: @key,
-              value: @value.to_json_format
+              value: @value ? @value.not_nil!.to_json_format : nil
             }
           end
 
           # Deep serialization for snapshots - shows actual content
-          def to_detailed_string(depth = 0, max_depth = 3)
-            return '...' if depth > max_depth
+          def to_detailed_string(depth = 0, max_depth = 3) : String
+            return "..." if depth > max_depth
 
-            indent = '  ' * depth
+            indent = "  " * depth
             result = "#{indent}#<Json::UOM::ObjectItem key=\"#{escape_json_string(@key)}\">"
 
-            result += "\n#{@value.to_detailed_string(depth + 1, max_depth)}" if @value
+            value = @value
+            result += "\n#{value.to_detailed_string(depth + 1, max_depth)}" if value
 
             result
           end
 
           # Pretty-print UOM object item for snapshots
-          def to_pretty_string(indent = 0)
-            indent_str = '  ' * indent
+          def to_pretty_string(indent = 0) : String
+            indent_str = "  " * indent
             result = "#{indent_str}#<WireGram::Languages::Json::UOM::ObjectItem:0xXXXXXXXX @key=\"#{escape_json_string(@key)}\">"
 
-            result += "\n#{@value.to_pretty_string(indent + 1)}" if @value
+            value = @value
+            result += "\n#{value.to_pretty_string(indent + 1)}" if value
 
             result
           end
 
-          private
-
-          def escape_json_string(str)
-            str.to_s.gsub('\\') { '\\\\' }
-               .gsub('"') { '\\"' }
+          private def escape_json_string(str : String) : String
+            str.gsub("\\", "\\\\").gsub("\"", "\\\"")
           end
         end
       end

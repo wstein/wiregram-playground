@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require 'strscan'
-require_relative '../../core/lexer'
+require "../../core/lexer"
+require "../../core/scanner"
 
 module WireGram
   module Languages
     module Json
-      # High-performance JSON lexer using StringScanner
+      # High-performance JSON lexer using a lightweight scanner
       class Lexer < WireGram::Core::BaseLexer
         # Pre-compiled regex patterns for performance
         STRING_PATTERN = /"(?:\\.|[^"\\])*"/
@@ -18,106 +18,59 @@ module WireGram
 
         def initialize(source)
           super
-          @scanner = StringScanner.new(source)
+          @scanner = WireGram::Core::Scanner.new(source)
         end
 
-        def next_token
-          skip_whitespace
-
-          # If at end, return EOF token
-          if @position >= @source.length
-            token = { type: :eof, value: nil, position: @position }
-            @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
-            return token
-          end
-
-          prev_len = @tokens.length
-
-          if try_tokenize_next
-            # In streaming mode, tokens are stored in @last_token; otherwise in @tokens
-            if @streaming
-              return @last_token if @last_token
-            elsif @tokens.length > prev_len
-              return @tokens.last
-            end
-          else
-            # Error recovery
-            @errors << {
-              type: :unknown_character,
-              char: current_char,
-              position: @position
-            }
-            token = { type: :unknown, value: current_char, position: @position }
-            advance
-            @tokens << token
-            return token
-          end
-
-          # If we advanced to EOF, return EOF token (never nil)
-          if @position >= @source.length
-            token = { type: :eof, value: nil, position: @position }
-            @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
-            return token
-          end
-
-          # Defensive fallback: ensure next_token never returns nil
-          token = { type: :eof, value: nil, position: @position }
-          @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
-          token
-        end
-
-        protected
-
-        def try_tokenize_next
+        private def try_tokenize_next
           char = current_char
+          return false unless char
 
           case char
-          when '{'
-            add_token(:lbrace, '{')
+          when "{"
+            add_token(WireGram::Core::TokenType::LBrace, "{")
             advance
             true
-          when '}'
-            add_token(:rbrace, '}')
+          when "}"
+            add_token(WireGram::Core::TokenType::RBrace, "}")
             advance
             true
-          when '['
-            add_token(:lbracket, '[')
+          when "["
+            add_token(WireGram::Core::TokenType::LBracket, "[")
             advance
             true
-          when ']'
-            add_token(:rbracket, ']')
+          when "]"
+            add_token(WireGram::Core::TokenType::RBracket, "]")
             advance
             true
-          when ':'
-            add_token(:colon, ':')
+          when ":"
+            add_token(WireGram::Core::TokenType::Colon, ":")
             advance
             true
-          when ','
-            add_token(:comma, ',')
+          when ","
+            add_token(WireGram::Core::TokenType::Comma, ",")
             advance
             true
-          when '"'
+          when "\""
             tokenize_string
-          when '-', '0'..'9'
-            tokenize_number
-          when 't', 'f', 'n'
-            tokenize_literal
           else
-            false
+            if char == "-" || /\d/.matches?(char)
+              tokenize_number
+            elsif ["t", "f", "n"].includes?(char)
+              tokenize_literal
+            else
+              false
+            end
           end
         end
 
-        private
-
-        def tokenize_string
-          # Use StringScanner to match full quoted string including escapes
+        private def tokenize_string
           @scanner.pos = @position
           if (matched = @scanner.scan(STRING_PATTERN))
             # Extract content (remove quotes)
             content = matched[1...-1]
             # Only unescape if string contains backslashes (fast path for unescaped strings)
-            unescaped = content.include?('\\') ? unescape_string(content) : content
-            add_token(:string, unescaped, position: @scanner.pos)
+            unescaped = content.includes?("\\") ? unescape_string(content) : content
+            add_token(WireGram::Core::TokenType::String, unescaped, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -127,70 +80,78 @@ module WireGram
 
         def unescape_string(str)
           # Fast path: if no backslashes, return as-is (already checked by caller)
-          return str unless str.include?('\\')
+          return str unless str.includes?("\\")
 
-          # Pre-allocate result buffer with estimated capacity (most strings don't have many escapes)
-          result = String.new(capacity: str.length)
-          i = 0
+          String.build do |builder|
+            i = 0
 
-          while i < str.length
-            if str[i] == '\\' && i + 1 < str.length
-              case str[i + 1]
-              when '"'
-                result << '"'
-                i += 2
-              when '\\'
-                result << '\\'
-                i += 2
-              when '/'
-                result << '/'
-                i += 2
-              when 'b'
-                result << "\b"
-                i += 2
-              when 'f'
-                result << "\f"
-                i += 2
-              when 'n'
-                result << "\n"
-                i += 2
-              when 'r'
-                result << "\r"
-                i += 2
-              when 't'
-                result << "\t"
-                i += 2
-              when 'u'
-                # Unicode escape \uXXXX
-                if i + 5 < str.length
-                  hex = str[(i + 2)..(i + 5)]
-                  begin
-                    result << [hex.to_i(16)].pack('U')
-                  rescue StandardError
-                    result << '?'
+            while i < str.size
+              if str[i] == '\\' && i + 1 < str.size
+                case str[i + 1]
+                when '"'
+                  builder << '"'
+                  i += 2
+                when '\\'
+                  builder << '\\'
+                  i += 2
+                when '/'
+                  builder << '/'
+                  i += 2
+                when 'b'
+                  builder << "\b"
+                  i += 2
+                when 'f'
+                  builder << "\f"
+                  i += 2
+                when 'n'
+                  builder << "\n"
+                  i += 2
+                when 'r'
+                  builder << "\r"
+                  i += 2
+                when 't'
+                  builder << "\t"
+                  i += 2
+                when 'u'
+                  # Unicode escape \uXXXX
+                  if i + 5 < str.size
+                    hex = str[(i + 2)..(i + 5)]
+                    begin
+                      builder << hex.to_i(16).chr
+                    rescue
+                      builder << '?'
+                    end
+                    i += 6
+                  else
+                    builder << str[i]
+                    i += 1
                   end
-                  i += 6
                 else
-                  result << str[i]
+                  builder << str[i]
                   i += 1
                 end
               else
-                result << str[i]
+                builder << str[i]
                 i += 1
               end
-            else
-              result << str[i]
-              i += 1
             end
           end
-          result
         end
 
         def tokenize_number
           @scanner.pos = @position
           if (matched = @scanner.scan(NUMBER_PATTERN))
-            value = matched.include?('.') || matched.match?(/[eE]/) ? matched.to_f : matched.to_i
-            add_token(:number, value, position: @scanner.pos)
+            number_text = matched
+            if number_text.includes?(".") || number_text.matches?(/[eE]/)
+              begin
+                value = number_text.to_f
+              rescue ex : ArgumentError
+                value = number_text.starts_with?("-") ? -Float64::INFINITY : Float64::INFINITY
+              end
+            else
+              value = number_text.to_i64
+            end
+            add_token(WireGram::Core::TokenType::Number, value, position: @scanner.pos)
             @position = @scanner.pos
             true
           else
@@ -201,15 +162,15 @@ module WireGram
         def tokenize_literal
           @scanner.pos = @position
           if @scanner.scan(TRUE_PATTERN)
-            add_token(:boolean, true, position: @scanner.pos)
+            add_token(WireGram::Core::TokenType::Boolean, true, position: @scanner.pos)
             @position = @scanner.pos
             true
           elsif @scanner.scan(FALSE_PATTERN)
-            add_token(:boolean, false, position: @scanner.pos)
+            add_token(WireGram::Core::TokenType::Boolean, false, position: @scanner.pos)
             @position = @scanner.pos
             true
           elsif @scanner.scan(NULL_PATTERN)
-            add_token(:null, nil, position: @scanner.pos)
+            add_token(WireGram::Core::TokenType::Null, nil, position: @scanner.pos)
             @position = @scanner.pos
             true
           else

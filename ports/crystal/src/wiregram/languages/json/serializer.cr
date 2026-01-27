@@ -7,28 +7,29 @@ module WireGram
       class Serializer
         # Serialize JSON UOM to normalized JSON string
         def self.serialize(uom)
-          return '' if uom.nil? || uom.root.nil?
+          return "" if uom.nil? || uom.root.nil?
 
-          # If the data contains control characters (newlines/tabs) or infinite floats,
-          # prefer pretty-printed JSON (matching UOM pretty output used in snapshots).
-          simple = uom.root.to_simple_json
+          root = uom.root.not_nil!
+          simple = root.to_simple_json
           if contains_control_or_infinite?(simple)
-            # Use UOM's pretty JSON generator which also sanitizes infinite floats
-            uom.root.to_pretty_json
+            root.to_pretty_json
           else
-            uom.root.to_json
+            root.to_json_string
           end
         end
 
         def self.contains_control_or_infinite?(obj)
           case obj
           when Hash
-            obj.values.any? { |v| contains_control_or_infinite?(v) }
+            obj.each_value do |v|
+              return true if contains_control_or_infinite?(v)
+            end
+            false
           when Array
             obj.any? { |v| contains_control_or_infinite?(v) }
           when String
-            obj.include?("\n") || obj.include?("\t")
-          when Float
+            obj.includes?("\n") || obj.includes?("\t")
+          when Float64
             obj.infinite?
           else
             false
@@ -36,46 +37,44 @@ module WireGram
         end
 
         # Serialize with pretty formatting
-        def self.serialize_pretty(uom, indent = '    ')
-          return '' if uom.nil? || uom.root.nil?
+        def self.serialize_pretty(uom, indent = "    ")
+          return "" if uom.nil? || uom.root.nil?
 
-          PrettySerializer.new(indent).serialize(uom.root)
+          PrettySerializer.new(indent).serialize(uom.root.not_nil!)
         end
 
         # Serialize to simple Ruby hash/array structure
         def self.serialize_simple(uom)
           return nil if uom.nil? || uom.root.nil?
 
-          uom.root.to_simple_json
+          uom.root.not_nil!.to_simple_json
         end
 
         # PrettySerializer for formatted JSON output
         class PrettySerializer
-          attr_reader :indent
+          getter indent : String
 
-          def initialize(indent = '  ')
+          def initialize(indent = "  ")
             @indent = indent
             @level = 0
           end
 
           def serialize(value)
             case value
-            when UOM::ObjectValue
+            when WireGram::Languages::Json::UOM::ObjectValue
               serialize_object(value)
-            when UOM::ArrayValue
+            when WireGram::Languages::Json::UOM::ArrayValue
               serialize_array(value)
-            when UOM::StringValue, UOM::NumberValue, UOM::BooleanValue, UOM::NullValue
+            when WireGram::Languages::Json::UOM::StringValue, WireGram::Languages::Json::UOM::NumberValue, WireGram::Languages::Json::UOM::BooleanValue, WireGram::Languages::Json::UOM::NullValue
               value.to_json
             else
               value.to_s
             end
           end
 
-          private
-
-          def serialize_object(object)
+          private def serialize_object(object)
             if object.items.empty?
-              '{}'
+              "{}"
             else
               @level += 1
               current_indent = @indent * @level
@@ -93,7 +92,7 @@ module WireGram
 
           def serialize_array(array)
             if array.items.empty?
-              '[]'
+              "[]"
             else
               @level += 1
               current_indent = @indent * @level

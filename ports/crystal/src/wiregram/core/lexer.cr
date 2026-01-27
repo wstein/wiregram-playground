@@ -1,17 +1,23 @@
 # frozen_string_literal: true
 
+require "./token"
+
 module WireGram
   module Core
     # Base Lexer - Foundation for tokenization
     # Provides error recovery and resilient tokenization
     class BaseLexer
-      attr_reader :source, :position, :tokens, :errors
+      getter source : String
+      getter position : Int32
+      getter tokens : Array(Token)
+      getter errors : Array(Hash(Symbol, String | Int32 | TokenType | Symbol | Nil))
+      getter last_token : Token | Nil
 
-      def initialize(source)
-        @source = source
+      def initialize(@source : String)
+        @bytes = @source.to_slice
         @position = 0
-        @tokens = []
-        @errors = []
+        @tokens = [] of Token
+        @errors = [] of Hash(Symbol, String | Int32 | TokenType | Symbol | Nil)
         @streaming = false
         @last_token = nil
       end
@@ -28,15 +34,15 @@ module WireGram
       end
 
       # Tokenize the source code eagerly (compatibility)
-      def tokenize
-        @tokens = []
-        @errors = []
+      def tokenize : Array(Token)
+        @tokens = [] of Token
+        @errors = [] of Hash(Symbol, String | Int32 | TokenType | Symbol | Nil)
         @position = 0
         @streaming = false
 
         loop do
           token = next_token
-          break if token && token[:type] == :eof
+          break if token.type == TokenType::Eof
         end
 
         @tokens
@@ -44,41 +50,39 @@ module WireGram
 
       # Produce the next token from the source on demand.
       # This enables lazy tokenization for parsers that request tokens incrementally.
-      def next_token
+      def next_token : Token
         skip_whitespace
 
         # If at end, return EOF token
-        if @position >= @source.length
-          token = { type: :eof, value: nil, position: @position }
+        if @position >= @bytes.size
+          token = Token.new(TokenType::Eof, nil, @position)
           if @streaming
             @last_token = token
           else
-            @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
+            @tokens << token unless @tokens.last? && @tokens.last.type == TokenType::Eof
           end
           return token
         end
 
-        prev_len = @tokens.length
+        prev_len = @tokens.size
         @last_token = nil if @streaming
 
         # Keep trying until a token has been added (skip_comment may not add tokens)
         loop do
           if try_tokenize_next
             if @streaming
-              return @last_token if @last_token
-              # else loop and try again (e.g., comments were skipped)
-            elsif @tokens.length > prev_len
+              return @last_token.not_nil! if @last_token
+            elsif @tokens.size > prev_len
               return @tokens.last
-              # else loop and try again (e.g., comments were skipped)
             end
           else
             # Error recovery: skip character and report unknown
-            @errors << {
-              type: :unknown_character,
-              char: current_char,
-              position: @position
-            }
-            token = { type: :unknown, value: current_char, position: @position }
+            error = {} of Symbol => String | Int32 | TokenType | Symbol | Nil
+            error[:type] = "unknown_character"
+            error[:char] = current_char
+            error[:position] = @position
+            @errors << error
+            token = Token.new(TokenType::Unknown, current_char, @position)
             advance
             if @streaming
               @last_token = token
@@ -89,31 +93,43 @@ module WireGram
           end
 
           # If we advanced to EOF while skipping, return EOF
-          next unless @position >= @source.length
+          next unless @position >= @bytes.size
 
-          token = { type: :eof, value: nil, position: @position }
+          token = Token.new(TokenType::Eof, nil, @position)
           if @streaming
             @last_token = token
           else
-            @tokens << token unless @tokens.last && @tokens.last[:type] == :eof
+            @tokens << token unless @tokens.last? && @tokens.last.type == TokenType::Eof
           end
           return token
         end
       end
 
-      protected
-
       # To be implemented by subclasses
-      def try_tokenize_next
-        raise NotImplementedError, 'Subclasses must implement try_tokenize_next'
+      private def try_tokenize_next : Bool
+        raise "Subclasses must implement try_tokenize_next"
       end
 
-      def current_char
-        @source[@position]
+      def current_char : String?
+        return nil if @position >= @bytes.size
+        @source.byte_slice(@position, 1)
       end
 
-      def peek_char(offset = 1)
-        @source[@position + offset]
+      def peek_char(offset = 1) : String?
+        pos = @position + offset
+        return nil if pos >= @bytes.size
+        @source.byte_slice(pos, 1)
+      end
+
+      def current_byte : UInt8?
+        return nil if @position >= @bytes.size
+        @bytes[@position]
+      end
+
+      def peek_byte(offset = 1) : UInt8?
+        pos = @position + offset
+        return nil if pos >= @bytes.size
+        @bytes[pos]
       end
 
       def advance
@@ -121,12 +137,19 @@ module WireGram
       end
 
       def skip_whitespace
-        advance while current_char&.match?(/\s/)
+        while (byte = current_byte)
+          case byte
+          when 0x20, 0x09, 0x0a, 0x0d, 0x0b, 0x0c
+            advance
+          else
+            break
+          end
+        end
       end
 
-      def add_token(type, value = nil, extras = {})
-        token = { type: type, value: value, position: @position }
-        token.merge!(extras) if extras && !extras.empty?
+      def add_token(type : TokenType, value : TokenValue = nil, extras : Hash(Symbol, TokenExtraValue)? = nil, position : Int32? = nil) : Token
+        token_pos = position || @position
+        token = Token.new(type, value, token_pos, extras)
         if @streaming
           @last_token = token
         else

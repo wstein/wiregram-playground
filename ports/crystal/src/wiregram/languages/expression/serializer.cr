@@ -6,15 +6,10 @@ module WireGram
       # Serializer for Expression Language
       # Converts UOM back to normalized expression strings
       class Serializer
-        def serialize(uom, options = {})
-          return '' unless uom&.root
+        def serialize(uom, pretty : Bool = false, indent_size : Int32 = 2)
+          return "" unless uom && uom.root
 
-          @options = {
-            pretty: false,
-            indent_size: 2
-          }.merge(options)
-
-          serialize_node(uom.root)
+          serialize_node(uom.root.not_nil!)
         end
 
         def serialize_pretty(uom, indent_size = 2)
@@ -25,9 +20,7 @@ module WireGram
           serialize(uom, pretty: false)
         end
 
-        private
-
-        def serialize_node(node)
+        private def serialize_node(node)
           case node
           when UOM::Program
             serialize_program(node)
@@ -54,7 +47,7 @@ module WireGram
         end
 
         def serialize_program(program)
-          statements = program.statements.map { |stmt| serialize_node(stmt) }
+          statements = program.statements.map { |stmt| serialize_node(stmt).as(String) }
           statements.join("\n")
         end
 
@@ -80,7 +73,7 @@ module WireGram
         end
 
         def serialize_function_call(func_call)
-          args = func_call.arguments.map { |arg| serialize_node(arg) }.join(', ')
+          args = func_call.arguments.map { |arg| serialize_node(arg).as(String) }.join(", ")
           "#{func_call.name}(#{args})"
         end
 

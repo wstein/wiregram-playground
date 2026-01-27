@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative 'uom'
+require "./uom"
 
 module WireGram
   module Languages
@@ -12,19 +12,19 @@ module WireGram
           return nil unless ast
 
           case ast.type
-          when :program
+          when WireGram::Core::NodeType::Program
             transform_program(ast)
-          when :assign
+          when WireGram::Core::NodeType::Assign
             transform_assignment(ast)
-          when :add, :subtract, :multiply, :divide
+          when WireGram::Core::NodeType::Add, WireGram::Core::NodeType::Subtract, WireGram::Core::NodeType::Multiply, WireGram::Core::NodeType::Divide
             transform_binary_operation(ast)
-          when :identifier
+          when WireGram::Core::NodeType::Identifier
             transform_identifier(ast)
-          when :number
+          when WireGram::Core::NodeType::Number
             transform_number(ast)
-          when :string
+          when WireGram::Core::NodeType::String
             transform_string(ast)
-          when :group
+          when WireGram::Core::NodeType::Group
             transform_group(ast)
           else
             raise "Unknown AST node type: #{ast.type}"
@@ -33,31 +33,36 @@ module WireGram
 
         def transform_group(ast)
           inner = transform(ast.children[0])
+          return nil unless inner
           UOM::Group.new(inner)
         end
 
-        private
-
-        def transform_program(ast)
-          statements = ast.children.map { |child| transform(child) }.compact
+        private def transform_program(ast)
+          statements = [] of WireGram::Languages::Expression::UOM::NodeBase
+          ast.children.each do |child|
+            transformed = transform(child)
+            statements << transformed if transformed
+          end
           UOM::Program.new(statements)
         end
 
         def transform_assignment(ast)
           variable = transform(ast.children[0])
           value = transform(ast.children[1])
+          return nil unless variable && value
           UOM::Assignment.new(variable, value)
         end
 
         def transform_binary_operation(ast)
           left = transform(ast.children[0])
           right = transform(ast.children[1])
+          return nil unless left && right
 
           operator = case ast.type
-                     when :add then '+'
-                     when :subtract then '-'
-                     when :multiply then '*'
-                     when :divide then '/'
+                     when WireGram::Core::NodeType::Add then "+"
+                     when WireGram::Core::NodeType::Subtract then "-"
+                     when WireGram::Core::NodeType::Multiply then "*"
+                     when WireGram::Core::NodeType::Divide then "/"
                      else ast.type.to_s
                      end
 
@@ -65,15 +70,15 @@ module WireGram
         end
 
         def transform_identifier(ast)
-          UOM::IdentifierValue.new(ast.value)
+          UOM::IdentifierValue.new(ast.value.as(String))
         end
 
         def transform_number(ast)
-          UOM::NumberValue.new(ast.value)
+          UOM::NumberValue.new(ast.value.as(Int64 | Float64))
         end
 
         def transform_string(ast)
-          UOM::StringValue.new(ast.value)
+          UOM::StringValue.new(ast.value.as(String))
         end
       end
     end
