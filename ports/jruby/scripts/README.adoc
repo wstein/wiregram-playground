@@ -1,3 +1,0 @@
-= JRuby Scripts
-
-Helper scripts for running or packaging the JRuby port.

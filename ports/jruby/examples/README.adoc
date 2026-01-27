@@ -1,3 +1,0 @@
-= JRuby Examples
-
-Executable examples for JRuby usage.
