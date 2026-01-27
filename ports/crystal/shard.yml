@@ -1,0 +1,11 @@
+name: wiregram
+version: 0.1.0
+description: Crystal port of WireGram (PoC)
+authors:
+  - Werner <werner@example.com>
+license: MIT
+crystal: ">= 1.11.0"
+
+targets:
+  wiregram:
+    main: src/wiregram/cli.cr
