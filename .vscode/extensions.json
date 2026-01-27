@@ -1,10 +1,13 @@
 {
   "recommendations": [
-    "castwide.solargraph",
     "crystal-lang.crystal",
+    "EditorConfig.EditorConfig",
     "GitHub.vscode-pull-request-github",
+    "golang.go",
     "mhutchie.git-graph",
     "ms-azuretools.vscode-containers",
-    "redhat.vscode-yaml"
+    "redhat.vscode-yaml",
+    "saoudrizwan.claude-dev",
+    "Shopify.ruby-lsp"
   ]
 }

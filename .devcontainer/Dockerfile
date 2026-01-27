@@ -2,50 +2,62 @@
 FROM fedora:latest
 
 ARG VARIANT=latest
-ENV DEBIAN_FRONTEND=noninteractive
+
+# Reserve docker and docker-codespace groups upfront
+# Must be defined before installing nix to avoid GID conflicts
+RUN getent group docker-codespace >/dev/null || groupadd --gid 800 docker-codespace \
+ && getent group docker >/dev/null || groupadd --gid 995 docker
 
 # Install base tooling and build deps
-RUN dnf -y update \
- && dnf -y install --skip-unavailable \
-    cmake \
+RUN dnf -y install --skip-unavailable \
+     --exclude nix-daemon \
+    #cmake \
     curl \
     docker-cli \
     fd-find \
     fish \
-    gcc \
-    gcc-c++ \
+    fuse-overlayfs \
+    #gcc \
+    #gcc-c++ \
     gh \
     git \
-    go \
+    git-absorb \
+    git-extras \
+    git-filter-repo \
+    git-lfs \
+    #go \
     htop \
     java-25-openjdk-headless \
     jq \
-    libevent-devel \
-    libffi-devel \
-    libgc-devel \
-    libxml2-devel \
-    libxslt-devel \
-    libyaml-devel \
+    #libevent-devel \
+    #libffi-devel \
+    #libgc-devel \
+    #libxml2-devel \
+    #libxslt-devel \
+    #libyaml-devel \
     llvm \
     lsd \
     make \
-    openssl-devel \
+    neovim \
+    nix \
+    #openssl-devel \
     pandoc \
     pkgconfig \
-    python3 \
-    python3-pip \
+    procps-ng \
     rbspy \
-    readline-devel \
+    rsync \
+    #readline-devel \
     ripgrep \
     ruby \
-    rustup \
     scc \
     sudo \
     unzip \
     wget \
     which \
-    zlib-devel \
+    #zlib-devel \
  && dnf -y clean all
+
+RUN ln -s /usr/bin/nvim /usr/local/bin/vim
 
 # Create a vscode user to match devcontainer defaults
 ARG USERNAME=vscode
@@ -55,8 +67,8 @@ RUN groupadd --gid $USER_GID $USERNAME \
  && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
  && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
  && chmod 0440 /etc/sudoers.d/$USERNAME \
- && groupadd --gid 800 docker-codespace \
- && usermod -a -G docker -G docker-codespace $USERNAME
+ && usermod -a -G docker-codespace $USERNAME \
+ && chown -R $USERNAME:$USERNAME /nix
 
 # Add /opt/scripts for devcontainer scripts
 RUN mkdir -p /opt/devcontainer/scripts && chown -R $USERNAME:$USERNAME /opt/devcontainer
@@ -73,6 +85,9 @@ ENV DOCKER_API_VERSION=1.43
 # Set ownership to vscode so the non-root user can modify permissions
 COPY --chown=vscode:vscode scripts /tmp/devcontainer-scripts
 RUN chmod +x /tmp/devcontainer-scripts/*.sh
+
+# Install starship prompt
+RUN curl -sS https://starship.rs/install.sh | sh -s -- --yes
 
 # Default shell is fish (user choice will be set in setup script)
 SHELL ["/bin/bash", "-lc"]
