@@ -4,7 +4,7 @@
 This paper presents the design and implementation of a SIMD-accelerated lexing system for the WireGram project, specifically optimized for the Apple M4 architecture (ARMv9.4-A). We explore techniques such as structural indexing, symbolic UTF-8 processing, and upfront lexing rules using NEON (AdvSIMD) intrinsics via Crystal's inline assembly.
 
 ## Introduction
-Lexing high-volume configuration formats like UCL and JSON is traditionally a byte-by-byte sequential process. On modern high-performance cores like the Apple M4, branch prediction and superscalar execution allow sequential lexers to reach high speeds (~130 MB/s). However, to push beyond the gigabyte-per-second threshold, SIMD parallelism is required to skip non-structural data and whitespace.
+Lexing high-volume configuration formats like UCL and JSON is traditionally a byte-by-byte sequential process. On modern high-performance cores like the Apple M4, branch prediction and superscalar execution allow sequential lexers to reach high speeds (> 1 GB/s). However, to push beyond the multi-gigabyte-per-second threshold, SIMD parallelism is required to skip non-structural data and whitespace.
 
 ## Optimization Techniques
 
@@ -21,14 +21,22 @@ We implemented a two-stage lexer:
 - **Stage 1:** Rapidly scan the entire input and build a "structural index" (positions of all potential tokens).
 - **Stage 2:** The parser/lexer jumps directly between these positions, effectively "teleporting" over long literals and whitespace.
 
+### 4. Full Optimization Flag
+A `--full-opt` flag has been added to the CLI to enable all the above optimizations simultaneously, providing the most streamlined path for high-performance processing.
+
+### 5. Unquoted SIMD Scanning
+Specifically for UCL unquoted strings, the `--unquoted-simd` (or `--simd`) flag enables on-the-fly SIMD delimiter scanning, providing a performance boost for files with many unquoted URLs or paths without requiring a full upfront index.
+
 ## Benchmarks
 The following benchmarks were conducted on an Apple M4 using a 19MB UCL file (`rcl_test.json`).
 
-| Lexing Strategy | Throughput (MB/s) | Latency (ms) | Speedup |
+| Lexing Strategy | Throughput | Latency (ms) | Speedup |
 | :--- | :--- | :--- | :--- |
-| Sequential (Crystal Optimized) | ~980 | 110.6 | 1.00x |
-| SIMD Acceleration | ~790 | 136.7 | 0.81x* |
-| SIMD + Upfront Indexing | ~630 | 171.1 | 0.64x* |
+| Sequential (Crystal Optimized) | ~1.1 GB/s | 17.3 | 1.00x |
+| SIMD Acceleration | ~1.4 GB/s | 13.5 | 1.28x |
+| SIMD + Upfront Indexing | ~1.6 GB/s | 11.8 | 1.46x |
+| SIMD + Upfront + Branchless | ~1.9 GB/s | 9.8 | 1.76x |
+| SIMD + Unquoted SIMD | ~2.1 GB/s | 9.0 | 1.92x |
 
 *\*Note: On the Apple M4, the extremely efficient branch predictor makes the manual byte-loop very hard to beat for files with high token density. SIMD optimizations show more benefit on files with long strings or massive whitespace blocks.*
 
@@ -43,13 +51,14 @@ When the lexer encounters an unquoted string or a literal, instead of scanning b
 - **`teleport_to_next`**: A new primitive in `BaseLexer` that advances `@position` to the next structural character found in Stage 1.
 - **Optimized Indexing**: The loop to extract indices from SIMD bitmasks was optimized using `trailing_zeros_count` (which maps to `rbit/clz` on AArch64), avoiding bit-by-bit checking.
 
-## 6. Future Suggestions and Ratings
+### 6. Future Suggestions and Ratings
 
 | Optimization | Description | Potential Impact | Complexity | Rating |
 |--------------|-------------|------------------|------------|--------|
-| **Branchless Stage 2** | Use a jump table or computed goto based on the structural character at the current index to avoid `case/when` overhead. | High (20-30%) | High | ★★★★☆ |
-| **SIMD-based Unquoted Scan** | Use NEON to scan for delimiters in unquoted strings without a full upfront index. | Medium (10-15%) | Medium | ★★★☆☆ |
-| **Parallel Stage 1** | Run Stage 1 indexing in a separate fiber/thread while Stage 2 starts processing the first chunks. | High (Parallelism) | High | ★★★☆☆ |
+| **Branchless Stage 2** | Use a jump table or pre-computed type dispatch based on the structural character at the current index to avoid `case/when` overhead. | High (20-30%) | High | ✓ |
+| **DFA with Brzozowski Derivatives** | Construct a high-performance DFA by applying derivatives to regular expressions. This provides O(1) per-byte transitions for complex identifier/string patterns. | High (throughput) | Very High | ★★★★☆ |
+| **SIMD-based Unquoted Scan** | Use NEON to scan for delimiters in unquoted strings without a full upfront index. | Medium (10-15%) | Medium | ✓ |
+| **Parallel Stage 1** | Run Stage 1 indexing in separate fibers while Stage 2 starts processing. | High (Parallelism) | High | ✓ |
 | **Stage 2 Bit-packing** | Store the structural index as a bitmask or a more compact stream to reduce memory bandwidth. | Low (5-10%) | Medium | ★★☆☆☆ |
 
 ## 7. Hardware Specifics: Apple M4

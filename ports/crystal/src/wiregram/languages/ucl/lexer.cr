@@ -27,11 +27,12 @@ module WireGram
           0x29_u8 => WireGram::Core::TokenType::RParen     # ')'
         }
 
-        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false)
+        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, use_branchless = false)
           super(source)
           @use_simd = use_simd
           @use_symbolic_utf8 = use_symbolic_utf8
           @use_upfront_rules = use_upfront_rules
+          @use_branchless = use_branchless
           @scanner = WireGram::Core::Scanner.new(source)
           build_structural_index! if use_upfront_rules
         end
@@ -445,19 +446,30 @@ module WireGram
           pos
         end
 
+        # SIMD-accelerated delimiter scan for unquoted strings.
+        # Uses NEON to find the first character that acts as a delimiter.
+        private def find_delimiter_simd(pos) : Int32
+          if @use_simd
+            ptr = @bytes.to_unsafe
+            size = @bytes.size
+            while pos + 15 < size
+              mask, _ = WireGram::Core::SimdAccelerator.find_structural_bits(ptr + pos)
+              if mask > 0
+                return pos + mask.trailing_zeros_count
+              end
+              pos += 16
+            end
+          end
+          # Fallback
+          find_delimiter(pos)
+        end
+
         def tokenize_unquoted_string
           start = @position
           src = @source
 
           if @use_upfront_rules
             teleport_to_next
-            # We don't handle interpolation as easily with teleportation if it's not a structural character,
-            # but '${' starts with '$' which is NOT structural, but '{' IS.
-            # Actually, UCL unquoted strings are tricky.
-            # Let's see if we can just teleport to the NEXT structural char.
-            # find_delimiter already listed: \s , ; : } ) "
-            # structural_index includes: \s { } [ ] : , " \
-            # They are very similar.
             add_token(WireGram::Core::TokenType::String, src.byte_slice(start, @position - start), position: @position)
             return true
           end
@@ -465,7 +477,7 @@ module WireGram
           # If URL at current position, consume entire URL until next delimiter (allow ':' in URL)
           if is_url_start?
             # Consume until next delimiter
-            end_pos = find_delimiter(start)
+            end_pos = find_delimiter_simd(start)
             @position = end_pos
             add_token(WireGram::Core::TokenType::String, src.byte_slice(start, @position - start), position: @position)
             return true
@@ -474,7 +486,7 @@ module WireGram
           # Fast path: check for interpolation without regex
           # We search for '${'
           interp_pos = src.index("${", start)
-          delimiter_pos = find_delimiter(start)
+          delimiter_pos = find_delimiter_simd(start)
 
           if interp_pos && interp_pos < delimiter_pos
             # interpolation occurs within the upcoming run
