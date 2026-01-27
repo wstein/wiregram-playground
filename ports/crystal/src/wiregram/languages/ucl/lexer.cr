@@ -325,6 +325,13 @@ module WireGram
           builder.to_s
         end
 
+        private def has_uppercase?(str : String) : Bool
+          str.each_byte do |byte|
+            return true if byte >= 0x41 && byte <= 0x5a
+          end
+          false
+        end
+
         def tokenize_identifier_or_keyword
           @scanner.pos = @position
           if (matched = @scanner.scan(IDENTIFIER_PATTERN))
@@ -338,7 +345,7 @@ module WireGram
                 add_token(WireGram::Core::TokenType::Boolean, v, position: @scanner.pos)
               end
             else
-              lc = matched.downcase
+              lc = has_uppercase?(matched) ? matched.downcase : matched
               if KEYWORDS.has_key?(lc)
                 v = KEYWORDS[lc]
                 if v.nil?
@@ -368,7 +375,7 @@ module WireGram
             value = @source.byte_slice(start, @position - start)
             return false if value.empty?
 
-            lookup = value.downcase
+            lookup = has_uppercase?(value) ? value.downcase : value
             if KEYWORDS.has_key?(lookup)
               kw = KEYWORDS[lookup]
               if kw.nil?
