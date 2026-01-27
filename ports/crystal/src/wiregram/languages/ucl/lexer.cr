@@ -390,6 +390,18 @@ module WireGram
           true
         end
 
+        private def find_delimiter(pos) : Int32
+          while pos < @bytes.size
+            byte = @bytes[pos]
+            # \s , ; : } ) "
+            if byte <= 0x20 || byte == 0x2c || byte == 0x3b || byte == 0x3a || byte == 0x7d || byte == 0x29 || byte == 0x22
+              return pos
+            end
+            pos += 1
+          end
+          pos
+        end
+
         def tokenize_unquoted_string
           @scanner.pos = @position
           src = @source
@@ -398,13 +410,8 @@ module WireGram
           # If URL at current position, consume entire URL until next delimiter (allow ':' in URL)
           if @scanner.check(URL_PATTERN)
             @scanner.scan(URL_PATTERN)
-            # Use scanner.scan_until to find next delimiter and stop before it
-            end_pos = if @scanner.scan_until(/[\s,;})"]/)
-                        # scanner.pos points after the delimiter; set end_pos to position before it
-                        @scanner.pos - 1
-                      else
-                        src.bytesize
-                      end
+            # Use manual scan to find next delimiter and stop before it
+            end_pos = find_delimiter(@scanner.pos)
             @position = end_pos
             add_token(WireGram::Core::TokenType::String, src.byte_slice(start, @position - start), position: @position)
             return true
@@ -420,11 +427,7 @@ module WireGram
               end_pos = src.bytesize
             else
               @scanner.pos = close + 1
-              end_pos = if @scanner.scan_until(/[\s,;:})"]/)
-                          @scanner.pos - 1
-                        else
-                          src.bytesize
-                        end
+              end_pos = find_delimiter(@scanner.pos)
             end
             @position = end_pos
             add_token(WireGram::Core::TokenType::String, src.byte_slice(start, @position - start), position: @position)
@@ -433,14 +436,11 @@ module WireGram
 
           # Fast path: consume until next delimiter (no interpolation present)
           @scanner.pos = start
-          end_pos = if @scanner.scan_until(/[\s,;:})"]/)
-                      @scanner.pos - 1
-                    else
-                      src.bytesize
-                    end
+          end_pos = find_delimiter(start)
           if end_pos > start
             @position = end_pos
             add_token(WireGram::Core::TokenType::String, src.byte_slice(start, @position - start), position: @position)
+            @scanner.pos = @position
             return true
           end
 
