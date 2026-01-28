@@ -49,7 +49,6 @@ module Simdjson
           asm(
             %(
             ld1 {v0.8b}, [$5]
-            movi v31.8b, 1
             mov w9, 0x0201
             mov v30.h[0], w9
             mov w9, 0x0804
@@ -97,49 +96,39 @@ module Simdjson
             movi v1.8b, 31
             cmhs v7.8b, v1.8b, v0.8b
 
-            ushr v2.8b, v2.8b, 7
-            and v2.8b, v2.8b, v31.8b
-            mul v2.8b, v2.8b, v30.8b
-            addv b10, v2.8b
-            umov w10, v10.b[0]
+            and v2.8b, v2.8b, v30.8b
+            uaddlv h10, v2.8b
+            umov w10, v10.h[0]
             uxtb x10, w10
             mov $0, x10
 
-            ushr v3.8b, v3.8b, 7
-            and v3.8b, v3.8b, v31.8b
-            mul v3.8b, v3.8b, v30.8b
-            addv b10, v3.8b
-            umov w10, v10.b[0]
+            and v3.8b, v3.8b, v30.8b
+            uaddlv h10, v3.8b
+            umov w10, v10.h[0]
             uxtb x10, w10
             mov $1, x10
 
-            ushr v4.8b, v4.8b, 7
-            and v4.8b, v4.8b, v31.8b
-            mul v4.8b, v4.8b, v30.8b
-            addv b10, v4.8b
-            umov w10, v10.b[0]
+            and v4.8b, v4.8b, v30.8b
+            uaddlv h10, v4.8b
+            umov w10, v10.h[0]
             uxtb x10, w10
             mov $2, x10
 
-            ushr v6.8b, v6.8b, 7
-            and v6.8b, v6.8b, v31.8b
-            mul v6.8b, v6.8b, v30.8b
-            addv b10, v6.8b
-            umov w10, v10.b[0]
+            and v6.8b, v6.8b, v30.8b
+            uaddlv h10, v6.8b
+            umov w10, v10.h[0]
             uxtb x10, w10
             mov $3, x10
 
-            ushr v7.8b, v7.8b, 7
-            and v7.8b, v7.8b, v31.8b
-            mul v7.8b, v7.8b, v30.8b
-            addv b10, v7.8b
-            umov w10, v10.b[0]
+            and v7.8b, v7.8b, v30.8b
+            uaddlv h10, v7.8b
+            umov w10, v10.h[0]
             uxtb x10, w10
             mov $4, x10
             )
             : "=r"(backslash), "=r"(quote), "=r"(whitespace), "=r"(op), "=r"(control)
             : "r"(ptr)
-            : "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v10", "v30", "v31", "w9", "w10"
+            : "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v10", "v30", "w9", "w10"
             : "volatile"
           )
           Masks8.new(backslash, quote, whitespace, op, control)
