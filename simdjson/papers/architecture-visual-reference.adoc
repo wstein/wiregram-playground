@@ -1,0 +1,442 @@
+= SIMD Architecture - Visual Reference
+:doctype: article
+:toc: left
+:toclevels: 3
+
+== Architecture Comparison Diagrams
+
+=== Alternative 1: Monolithic Backend Approach
+
+[source,text]
+----
+┌─────────────────────────────────────────────┐
+│         Application Layer                   │
+│         (Stage1.index)                      │
+└─────────────────┬───────────────────────────┘
+                  │
+                  ▼
+         ┌────────────────────┐
+         │  Compile-Time      │
+         │  Platform Check    │
+         └────────┬───────────┘
+                  │
+        ┌─────────┼─────────┐
+        │         │         │
+        ▼         ▼         ▼
+   ┌────────┐ ┌─────────┐ ┌───────┐
+   │ AVX512 │ │  NEON   │ │Scalar │
+   │Backend │ │Backend  │ │Backend│
+   │(x86_64)│ │(aarch64)│ │(other)│
+   └────────┘ └─────────┘ └───────┘
+        │         │         │
+        ▼         ▼         ▼
+   ┌────────┐ ┌────────┐ ┌──────┐
+   │64 bytes│ │ 8 bytes│ │1 byte│
+   │  only  │ │  only  │ │ only │
+   └────────┘ └────────┘ └──────┘
+
+Pros: Simple, zero overhead
+Cons: Inflexible, no degradation
+----
+
+=== Alternative 2: Layered Abstraction with Runtime Selection
+
+[source,text]
+----
+┌─────────────────────────────────────────────────────┐
+│              Application Layer                      │
+│              (Stage1.index)                         │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────┐
+│          Layer 1: SIMD Interface                     │
+│  ┌──────────────────┐  ┌─────────────────────┐      │
+│  │SimdBackendSelector│  │SimdMask Interface   │      │
+│  │(runtime detection)│  │(abstract)           │      │
+│  └────────┬─────────┘  └─────────────────────┘      │
+└───────────┼──────────────────────────────────────────┘
+            │
+            ▼ (runtime selection, ~10ns overhead)
+┌──────────────────────────────────────────────────────┐
+│          Layer 2: Hardware Backends                  │
+│                                                       │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  │
+│  │AVX512│  │ AVX2 │  │ SSE2 │  │ NEON │  │Scalar│  │
+│  │Backend│  │Backend│  │Backend│  │Backend│  │Backend│  │
+│  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘  │
+└─────┼─────────┼─────────┼─────────┼─────────┼───────┘
+      │         │         │         │         │
+      ▼         ▼         ▼         ▼         ▼
+┌──────────────────────────────────────────────────────┐
+│          Layer 3: Block Size Optimization            │
+│                                                       │
+│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  │
+│  │64-byte│  │32-byte│  │16-byte│  │ 8-byte│  │1-byte│  │
+│  │masks  │  │masks  │  │masks  │  │masks  │  │masks │  │
+│  └──────┘  └──────┘  └──────┘  └──────┘  └──────┘  │
+└──────────────────────────────────────────────────────┘
+
+Pros: Maximum flexibility, graceful degradation
+Cons: More complex, slight runtime overhead
+----
+
+=== Alternative 3: Compile-Time Specialization
+
+[source,text]
+----
+┌─────────────────────────────────────────────┐
+│         Build System                        │
+│  (Generates 5 separate binaries)            │
+└─────────┬───────────────────────────────────┘
+          │
+    ┌─────┼─────┬────────┬────────┐
+    │     │     │        │        │
+    ▼     ▼     ▼        ▼        ▼
+┌────────────────────────────────────────────┐
+│ Binary 1: simdjson-avx512 (Ice Lake+)      │
+│   Pure AVX512, no runtime checks           │
+│   64-byte blocks only                      │
+└────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────┐
+│ Binary 2: simdjson-avx2 (Haswell+)         │
+│   Pure AVX2, no runtime checks             │
+│   32-byte blocks only                      │
+└────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────┐
+│ Binary 3: simdjson-sse2 (x86_64 baseline)  │
+│   Pure SSE2, no runtime checks             │
+│   16-byte blocks only                      │
+└────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────┐
+│ Binary 4: simdjson-neon (ARM64)            │
+│   Pure NEON, no runtime checks             │
+│   8-byte blocks only                       │
+└────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────┐
+│ Binary 5: simdjson-scalar (fallback)       │
+│   Pure Crystal, no SIMD                    │
+│   1-byte processing                        │
+└────────────────────────────────────────────┘
+
+Pros: Zero overhead, maximum performance
+Cons: Complex deployment, package management nightmare
+----
+
+=== Alternative 4: Hybrid Approach (RECOMMENDED)
+
+[source,text]
+----
+┌─────────────────────────────────────────────────────┐
+│              Application Layer                      │
+│              (Stage1.index)                         │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────┐
+│          Layer 1: Runtime Backend Selection          │
+│  ┌──────────────────┐                                │
+│  │select_best_backend()│  (done once at startup)     │
+│  │  CPUID / AT_HWCAP  │  (~10ns overhead, cached)    │
+│  └────────┬─────────┘                                │
+└───────────┼──────────────────────────────────────────┘
+            │
+            ▼ (runtime selection)
+┌──────────────────────────────────────────────────────┐
+│          Layer 2: Compile-Time Optimized Backends    │
+│                                                       │
+│  ┌─────────────────────────────────────────────┐    │
+│  │ class AVX512Backend                         │    │
+│  │   BLOCK_SIZE = 64  ← compile-time constant  │    │
+│  │                                              │    │
+│  │   def scan(ptr, len)                         │    │
+│  │     while offset + BLOCK_SIZE <= len         │    │
+│  │       scan_block_64(ptr + offset)            │    │
+│  │       offset += BLOCK_SIZE  ← unrolled       │    │
+│  │                                              │    │
+│  │   # Inline assembly with constant BLOCK_SIZE │    │
+│  └─────────────────────────────────────────────┘    │
+│                                                       │
+│  Similar for: AVX2Backend, SSE2Backend,              │
+│               NEONBackend, ScalarBackend             │
+└──────────────────────────────────────────────────────┘
+            │
+            ▼
+┌──────────────────────────────────────────────────────┐
+│       Layer 3: Block Size (Compile-Time Const)       │
+│                                                       │
+│  AVX512: 64 bytes │ AVX2: 32 bytes │ SSE2: 16 bytes  │
+│  NEON: 8 bytes    │ Scalar: 1 byte                   │
+└──────────────────────────────────────────────────────┘
+
+Pros: Best of both worlds, single binary, optimal performance
+Cons: Moderate complexity
+----
+
+== Performance Flow Diagram
+
+=== Alternative 4 (Hybrid) - Typical Execution
+
+[source,text]
+----
+┌─────────────────────────────────────────────────────┐
+│  Process Startup                                    │
+└──────────┬──────────────────────────────────────────┘
+           │
+           ▼
+    ┌────────────────┐
+    │ CPU Detection  │  ← One-time cost (~500 cycles)
+    │  CPUID/HWCAP   │
+    └────────┬───────┘
+             │
+             ▼
+    ┌────────────────┐
+    │Select Backend  │  ← Cached in @@backend
+    │  (AVX512)      │
+    └────────┬───────┘
+             │
+             │ (startup overhead ends here)
+             │
+┌────────────┴────────────────────────────────────────┐
+│  JSON Parsing Loop (hot path)                       │
+└──────────┬──────────────────────────────────────────┘
+           │
+           ▼
+    ┌────────────────┐
+    │ @@backend.scan │  ← No overhead (static dispatch)
+    └────────┬───────┘
+             │
+             ▼
+    ┌─────────────────────────────────────┐
+    │  AVX512Backend.scan (inlined)       │
+    │                                     │
+    │  offset = 0                         │
+    │  while offset + 64 <= len           │  ← Compiler optimizes
+    │    # AVX512 assembly (64 bytes)     │  ← Zero overhead
+    │    scan_block_64(ptr + offset)      │  ← Inlined
+    │    offset += 64                     │  ← Constant propagation
+    │  end                                │
+    │                                     │
+    │  scan_remainder(...)  (if needed)   │  ← Rare, edge case
+    └─────────────────────────────────────┘
+
+Total overhead: ~0.003% on 1MB file
+Performance: 90-95% of theoretical maximum
+----
+
+== Data Flow Diagram
+
+=== How a 1MB JSON File is Processed (Alternative 4)
+
+[source,text]
+----
+┌──────────────────────────────────────────────┐
+│  Input: 1MB JSON file                        │
+│  1,048,576 bytes                             │
+└──────────┬───────────────────────────────────┘
+           │
+           ▼
+    ┌─────────────────┐
+    │ Backend: AVX512 │
+    │ Block: 64 bytes │
+    └─────────┬───────┘
+              │
+              ├──────────────────┐
+              │                  │
+    ┌─────────▼─────────┐ ┌─────▼────────┐
+    │ Main Loop         │ │ Remainder    │
+    │ 16,384 iterations │ │ 0-63 bytes   │
+    │ × 64 bytes        │ │ (scalar)     │
+    │ = 1,048,576 bytes │ │              │
+    └─────────┬─────────┘ └──────────────┘
+              │
+              ├── Iteration 1: bytes 0-63
+              ├── Iteration 2: bytes 64-127
+              ├── Iteration 3: bytes 128-191
+              │   ...
+              └── Iteration 16,384: bytes 1,048,512-1,048,575
+              │
+              ▼
+    ┌─────────────────────────────┐
+    │ Per-iteration processing:   │
+    │                             │
+    │ 1. Load 64 bytes (AVX512)   │ ← ~3 cycles (L1 cache)
+    │ 2. Detect quotes (zmm0)     │ ← 1 cycle (pcmpeqb)
+    │ 3. Detect backslash (zmm1)  │ ← 1 cycle
+    │ 4. Detect whitespace (zmm2) │ ← 2 cycles
+    │ 5. Detect operators (zmm3)  │ ← 3 cycles
+    │ 6. Extract masks (k0-k7)    │ ← 2 cycles
+    │ 7. Store results            │ ← 1 cycle
+    │                             │
+    │ Total: ~13 cycles/64 bytes  │
+    │      = 0.2 cycles/byte      │
+    │      ≈ 5.0 bytes/cycle      │
+    └─────────────────────────────┘
+              │
+              ▼
+    ┌──────────────────────────────┐
+    │ Output: Structural Indices   │
+    │ Array(UInt32)                │
+    │ ~100-500 elements (typical)  │
+    └──────────────────────────────┘
+
+Throughput: ~7.5 GB/s @ 3 GHz
+           (Estimated on Intel Xeon 8380)
+----
+
+== Comparison Chart
+
+=== Performance vs Complexity
+
+[source,text]
+----
+Performance
+    ↑
+ 10 │                                          Alt 3 ●
+    │
+  9 │                  Alt 4 ●      Alt 2 ●
+    │
+  8 │      Alt 1 ●
+    │
+  7 │
+    │
+  6 │
+    │
+  5 │
+    │
+  4 │
+    │
+  3 │
+    │
+  2 │
+    │
+  1 │
+  0 └──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────→
+           1      2      3      4      5      6      7      8
+                          Complexity
+
+Legend:
+● Alt 1: Simple but inflexible (8/10 perf, 1/10 complexity)
+● Alt 2: Flexible but complex (9/10 perf, 4/10 complexity)
+● Alt 3: Fast but impractical (10/10 perf, 6/10 complexity)
+● Alt 4: Balanced approach (9/10 perf, 3/10 complexity) ✅ WINNER
+----
+
+=== Flexibility vs Performance
+
+[source,text]
+----
+Flexibility
+    ↑
+ 10 │            Alt 2 ●
+    │
+  9 │                          Alt 4 ●
+    │
+  8 │   Alt 1 ●
+    │
+  7 │
+    │
+  6 │
+    │
+  5 │
+    │
+  4 │
+    │
+  3 │                                        Alt 3 ●
+    │
+  2 │
+    │
+  1 │
+  0 └──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────→
+           8             9                    10
+                          Performance
+
+Legend:
+● Alt 1: Good perf, poor flexibility
+● Alt 2: Great perf, maximum flexibility ✅
+● Alt 3: Best perf, worst flexibility
+● Alt 4: Great perf, great flexibility ✅ WINNER
+----
+
+== Decision Tree
+
+Use this flowchart to choose the right alternative:
+
+[source,text]
+----
+                    Start
+                      │
+                      ▼
+        ┌──────────────────────────┐
+        │ Is hardware fixed and    │
+        │ known at compile time?   │
+        └────┬───────────────┬─────┘
+             │ Yes           │ No
+             ▼               ▼
+    ┌────────────────┐  ┌───────────────┐
+    │ Is binary size │  │ Single binary │
+    │ critical?      │  │ required?     │
+    └───┬───────┬────┘  └───┬───────┬───┘
+        │Yes    │No         │Yes    │No
+        ▼       ▼           ▼       ▼
+    ┌─────┐ ┌─────┐    ┌─────┐ ┌─────┐
+    │Alt 3│ │Alt 1│    │Alt 4│ │Alt 2│
+    │     │ │     │    │  ✅ │ │     │
+    └─────┘ └─────┘    └─────┘ └─────┘
+
+For 99% of use cases: Choose Alternative 4 ✅
+----
+
+== Implementation Roadmap
+
+=== Alternative 4 (Recommended) - 8 Week Plan
+
+[source,text]
+----
+Week 1-2: Foundation
+├─ CPU feature detection (CPUID, AT_HWCAP)
+├─ Backend interface definition
+├─ Backend selector implementation
+└─ Test framework
+
+Week 3-4: Core Backends
+├─ SSE2 backend (16-byte)
+├─ AVX2 backend (32-byte)
+├─ Refactored NEON backend
+└─ Integration tests
+
+Week 5-6: Advanced Backends
+├─ AVX512 backend (64-byte)
+├─ Performance optimization
+├─ Loop unrolling
+└─ Prefetch hints
+
+Week 7-8: Testing & Documentation
+├─ Comprehensive tests
+├─ Performance benchmarks
+├─ Documentation
+└─ Release preparation
+----
+
+== Conclusion
+
+**Recommended Architecture**: Alternative 4 (Hybrid Approach) ✅
+
+**Key Benefits**:
+- Single binary with optimal performance
+- Runtime backend selection (flexibility)
+- Compile-time block size optimization (performance)
+- Best balance of all factors
+
+**Implementation**: 8 weeks to completion
+
+**Expected Performance**: 4-8x improvement on x86, no regression on ARM
+
+---
+
+_Visual Reference v1.0_
+_Last Updated: January 28, 2026_

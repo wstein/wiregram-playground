@@ -1,0 +1,187 @@
+ = ADR: SIMD Hardware Abstraction Layer Architecture
+
+:doctype: article
+:toc: left
+:toclevels: 3
+:source-highlighter: pygments
+:pygments-style: friendly
+:sectnums:
+
+== Status
+
+|===
+|Proposed |Accepted |Superseded |Deprecated
+
+|X
+|
+|
+|
+|===
+
+== Context
+
+The simdjson Crystal implementation currently supports only ARM64 NEON SIMD instructions with an 8-byte block size. To achieve maximum performance across different hardware platforms and take advantage of modern SIMD instruction sets, we need to support:
+
+* **AVX512** (64-byte blocks) for modern x86_64 systems
+* **AVX** (32-byte blocks) for x86_64 systems without AVX512
+* **SSE2** (16-byte blocks) for older x86 systems and broader compatibility
+* **NEON** (8-byte blocks) for ARM64 systems (current implementation)
+* **Crystal fallback** for systems without SIMD support
+
+The current architecture has several limitations:
+- Fixed 8-byte block size limits performance on wider SIMD instruction sets
+- No runtime feature detection for available instruction sets
+- Platform-specific code is tightly coupled to the Stage1 implementation
+- Difficult to extend with new instruction sets or optimization strategies
+
+== Decision
+
+We will implement a **three-layer SIMD Hardware Abstraction Layer** with the following architecture:
+
+=== Layer 1: SIMD Interface Layer
+Provides a unified interface for all SIMD operations with runtime backend selection based on available instruction sets and data characteristics.
+
+=== Layer 2: Hardware Abstraction Layer
+Contains CPU-specific implementations for each instruction set (AVX512, AVX, SSE2, NEON, Crystal).
+
+=== Layer 3: SIMD Length Optimization Layer
+Optimizes for different block sizes (64, 32, 16, 8, 1 bytes) based on the selected backend and data size.
+
+== Rationale
+
+=== Why This Architecture?
+
+1. **Maximum Performance**: Each platform can use its optimal instruction set and block size
+2. **Broad Compatibility**: Graceful degradation from advanced to basic instruction sets
+3. **Maintainability**: Clean separation of hardware-specific and algorithmic concerns
+4. **Extensibility**: Easy to add new instruction sets or optimization strategies
+5. **Runtime Adaptability**: Can choose optimal backend and block size based on data characteristics
+
+=== Why Not Alternative Approaches?
+
+==== Alternative 1: Monolithic Backend Approach
+Rejected because it lacks flexibility for mixed workloads and doesn't provide graceful degradation.
+
+==== Alternative 2: Compile-Time Specialization
+Rejected because it requires recompilation for different targets and increases binary size significantly.
+
+==== Alternative 3: Hybrid Approach
+Considered but rejected in favor of the pure runtime selection approach due to implementation complexity.
+
+=== Why Include SSE2?
+
+SSE2 provides:
+- **2x throughput improvement** over current NEON implementation
+- **Broader compatibility** with older x86 systems
+- **Good fallback** for systems without AVX support
+- **Widespread availability** across x86 platforms
+
+== Implications
+
+=== Positive Implications
+
+1. **Performance**: 4-8x improvement on AVX512 systems, 2x on SSE2 systems
+2. **Compatibility**: Support for all major platforms (x86_64, ARM64)
+3. **Future-Proof**: Easy to extend with new instruction sets
+4. **Maintainability**: Clean, modular architecture
+
+=== Negative Implications
+
+1. **Complexity**: Multi-layer architecture increases code complexity
+2. **Runtime Overhead**: Backend selection adds some runtime overhead
+3. **Memory Usage**: Multiple implementations increase memory footprint
+4. **Testing Burden**: Need to test across multiple platforms and instruction sets
+
+=== Migration Strategy
+
+1. **Phase 1**: Implement Layer 1 interface and basic backend selection
+2. **Phase 2**: Implement core backends (AVX, SSE2, refactored NEON, Crystal)
+3. **Phase 3**: Add optimizations and performance tuning
+4. **Phase 4**: Comprehensive testing and documentation
+
+=== Backward Compatibility
+
+The new architecture maintains full backward compatibility:
+- Existing `Stage1.index` API remains unchanged
+- Current NEON implementation continues to work
+- Scalar fallback ensures compatibility with all systems
+- Same output format (structural indices)
+
+== Alternatives Considered
+
+=== Alternative 1: Monolithic Backend Approach ⭐⭐⭐⭐
+
+**Description**: Single backend per CPU architecture with hardcoded block sizes
+
+**Pros**:
+- Simple implementation
+- Direct mapping CPU → Block size
+- Easy to understand
+
+**Cons**:
+- Inflexible for mixed workloads
+- No graceful degradation
+- Limited optimization opportunities
+
+**Why Rejected**: Lacks the flexibility and performance optimization opportunities of the layered approach.
+
+=== Alternative 2: Compile-Time Specialization ⭐⭐⭐
+
+**Description**: Compile-time feature detection with specialized code paths
+
+**Pros**:
+- Zero runtime overhead
+- Maximum performance
+- Clean code paths
+
+**Cons**:
+- Requires recompilation for different targets
+- Larger binary size
+- Complex build system
+
+**Why Rejected**: The requirement for recompilation and increased binary size makes this unsuitable for a library that needs to run on diverse hardware.
+
+=== Alternative 3: Hybrid Approach ⭐⭐⭐⭐⭐
+
+**Description**: Runtime backend selection with compile-time block size optimization
+
+**Pros**:
+- Best of both worlds
+- Runtime flexibility for backends
+- Compile-time optimization for block sizes
+- Good performance characteristics
+
+**Cons**:
+- Complex implementation
+- Requires sophisticated build system
+
+**Why Rejected**: While this approach has excellent performance characteristics, the implementation complexity and build system requirements make it less suitable for the current project scope.
+
+== Success Metrics
+
+1. **Performance**: Measure 4-8x improvement on AVX512 systems compared to current NEON implementation
+2. **Compatibility**: Ensure all existing tests pass on all supported platforms
+3. **Maintainability**: Code review shows clean separation of concerns and easy extensibility
+4. **Reliability**: No performance regressions on existing NEON systems
+5. **Documentation**: Complete documentation for all layers and backends
+
+== Review Criteria
+
+This ADR will be considered successful when:
+
+1. All existing tests continue to pass
+2. New SIMD-specific tests demonstrate performance improvements
+3. Code review shows clean, maintainable implementation
+4. Documentation is complete and accurate
+5. Performance benchmarks show expected improvements
+
+== Related Decisions
+
+* ADR-001: Initial SIMD Implementation (NEON-only)
+* RFC-001: SIMD Hardware Abstraction Layer Design
+
+== References
+
+* RFC: SIMD Hardware Abstraction Layer RFC (`papers/simd-architecture-rfc.adoc`)
+* Performance Analysis: `papers/performance.adoc`
+* Current Implementation: `src/simdjson/stage1.cr`, `src/simdjson/neon.cr`
