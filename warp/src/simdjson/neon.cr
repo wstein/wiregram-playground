@@ -68,9 +68,6 @@ module Simdjson
             movi v1.8b, 9
             cmeq v5.8b, v0.8b, v1.8b
             orr v4.8b, v4.8b, v5.8b
-            movi v1.8b, 10
-            cmeq v5.8b, v0.8b, v1.8b
-            orr v4.8b, v4.8b, v5.8b
             movi v1.8b, 13
             cmeq v5.8b, v0.8b, v1.8b
             orr v4.8b, v4.8b, v5.8b
@@ -90,6 +87,10 @@ module Simdjson
             cmeq v5.8b, v0.8b, v1.8b
             orr v6.8b, v6.8b, v5.8b
             movi v1.8b, 44
+            cmeq v5.8b, v0.8b, v1.8b
+            orr v6.8b, v6.8b, v5.8b
+
+            movi v1.8b, 10
             cmeq v5.8b, v0.8b, v1.8b
             orr v6.8b, v6.8b, v5.8b
 
@@ -143,8 +144,10 @@ module Simdjson
             bit = 1_u8 << i
             control |= bit if b <= 0x1f
             case b
-            when 0x20, 0x09, 0x0a, 0x0d
+            when 0x20, 0x09, 0x0d
               whitespace |= bit
+            when 0x0a
+              op |= bit
             when '{'.ord, '}'.ord, '['.ord, ']'.ord, ':'.ord, ','.ord
               op |= bit
             end

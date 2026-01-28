@@ -438,8 +438,10 @@ module Simdjson
         end
 
         case c
-        when 0x20_u8, 0x09_u8, 0x0a_u8, 0x0d_u8
+        when 0x20_u8, 0x09_u8, 0x0d_u8
           whitespace |= bit
+        when 0x0a_u8
+          op |= bit
         when '['.ord, ']'.ord, '{'.ord, '}'.ord, ':'.ord, ','.ord
           op |= bit
         end
@@ -453,6 +455,7 @@ module Simdjson
         i += 1
       end
 
+      # TODO optimize! Partial blocks should be not be possible, as padded buffers are used.
       if block_len < 64
         whitespace |= ~0_u64 << block_len
       end
@@ -473,8 +476,10 @@ module Simdjson
         bit = 1_u16 << i
         control |= bit if b <= 0x1f
         case b
-        when 0x20, 0x09, 0x0a, 0x0d
+        when 0x20, 0x09, 0x0d
           whitespace |= bit
+        when 0x0a
+          op |= bit
         when '{'.ord, '}'.ord, '['.ord, ']'.ord, ':'.ord, ','.ord
           op |= bit
         end

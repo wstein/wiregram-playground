@@ -79,6 +79,8 @@ module Simdjson
           yield Token.new(TokenType::Colon, idx, 1)
         when ','.ord
           yield Token.new(TokenType::Comma, idx, 1)
+        when '\n'.ord
+          yield Token.new(TokenType::Newline, idx, 1)
         when '"'.ord
           start = idx + 1
           end_idx = scan_string_end(ptr, len, start)
