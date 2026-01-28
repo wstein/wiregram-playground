@@ -512,32 +512,44 @@ module Simdjson
     # and the original file length as Int32. On error the function returns
     # Pointer(UInt8).null and length 0.
     def self.read_file_padded(path : String) : Tuple(Pointer(UInt8), Int32)
-      begin
-        size = File.stat(path).size.to_i
-      rescue ex : Exception
+      o_rdonly = 0
+      seek_set = 0
+      seek_end = 2
+
+      fd = LibC.open(path.to_unsafe, o_rdonly, 0)
+      if fd < 0
         return {Pointer(UInt8).null, 0}
       end
+
+      size = LibC.lseek(fd, 0, seek_end)
+      if size < 0
+        LibC.close(fd)
+        return {Pointer(UInt8).null, 0}
+      end
+      LibC.lseek(fd, 0, seek_set)
 
       total = size.to_u64 + 16_u64
       allocated = LibC_Read.malloc(total)
       if allocated.null?
+        LibC.close(fd)
         return {Pointer(UInt8).null, 0}
       end
 
-      # Read file into a temporary String then copy into the allocated buffer.
-      # This keeps the implementation portable and simple; if a zero-copy
-      # read is required we can switch to low-level read(2) later.
-      content = File.read(path)
-      content_size = content.bytesize
-      if content_size != size
-        # unexpected but handle gracefully
-        size = [size, content_size].min
+      read_total = 0_i64
+      while read_total < size
+        r = LibC.read(fd, allocated + read_total, (size - read_total).to_u64)
+        if r <= 0
+          LibC_Read.free(allocated)
+          LibC.close(fd)
+          return {Pointer(UInt8).null, 0}
+        end
+        read_total += r
       end
 
-      LibC_Read.memcpy(allocated, content.to_unsafe, size.to_u64)
       LibC_Read.memset(allocated + size, 0, 16_u64)
+      LibC.close(fd)
 
-      {allocated.as(Pointer(UInt8)), size}
+      {allocated.as(Pointer(UInt8)), size.to_i}
     end
 
     # free_padded_buffer(ptr)
@@ -555,20 +567,41 @@ module Simdjson
     # the recommended high-level API in Crystal code since it avoids manual
     # malloc/free and is safe to pass to NEON-backed functions.
     def self.read_file_padded_bytes(path : String) : Bytes
+      # Try to read directly into a Crystal-managed Array(UInt8) to avoid
+      # an extra copy. This is done using low-level libc syscalls to get the
+      # file size and perform direct reads into the array's memory.
       begin
-        content = File.read(path)
-      rescue ex : Exception
-        return Bytes.new
+        o_rdonly = 0
+        seek_end = 2
+        seek_set = 0
+
+        fd = LibC.open(path.to_unsafe, o_rdonly, 0)
+        return Bytes.new(0) if fd < 0
+
+        size = LibC.lseek(fd, 0, seek_end)
+        if size < 0
+          LibC.close(fd)
+          return Bytes.new(0)
+        end
+        LibC.lseek(fd, 0, seek_set)
+
+        buf = Bytes.new(size.to_i + 16)
+        read_total = 0_i64
+        while read_total < size
+          r = LibC.read(fd, buf.to_unsafe + read_total, (size - read_total).to_u64)
+          if r <= 0
+            LibC.close(fd)
+            return Bytes.new(0)
+          end
+          read_total += r
+        end
+
+        LibC.close(fd)
+        # trailing bytes are zero-initialized by Bytes.new
+        buf
+      rescue ex
+        Bytes.new(0)
       end
-      size = content.bytesize
-      arr = Array(UInt8).new(size + 16)
-      i = 0
-      while i < size
-        arr[i] = content.to_unsafe[i]
-        i += 1
-      end
-      # trailing bytes are zero-initialized by Array.new
-      arr.to_slice
     end
     {% end %}
 
