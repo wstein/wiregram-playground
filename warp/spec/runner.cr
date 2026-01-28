@@ -1,0 +1,5 @@
+require "./spec_helper"
+require "./integration/parser_spec"
+require "./unit/parser_internal_spec"
+require "./unit/stage1_spec"
+require "./unit/stage2_spec"

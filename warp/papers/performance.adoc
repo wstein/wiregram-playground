@@ -1,0 +1,54 @@
+= Performance Considerations for simdjson (Crystal)
+Werner Stein
+
+== Abstract
+This paper summarizes the performance techniques currently present in the simdjson (Crystal) codebase, evaluates their alignment with the Crystal 1.19 performance guide, and proposes further optimizations with an emphasis on SIMD and low-level tuning. The goal is to balance throughput, correctness, and maintainability on Apple Silicon while keeping the code portable to non-AArch64 targets.
+
+== Background
+The project delivers a zero-copy JSON token iterator and a tape-building stage2 parser. Stage1 is SIMD-accelerated on AArch64 via NEON inline assembly and falls back to scalar on other architectures. Stage2 remains scalar but leverages precomputed structural indexes from stage1. The implementation follows Crystal idioms (slices, enums, struct-based results) while adopting low-level techniques inspired by simdjson.
+
+== Current Performance Techniques
+- NEON stage1 scanning: `src/simdjson/neon.cr` uses 128-bit NEON to classify structural characters in 16-byte chunks, minimizing branches and memory traffic.
+- ASCII-fast UTF-8 validation: Stage1 validates ASCII blocks via NEON and carries scalar state for multibyte sequences, avoiding rescans.
+- Zero-copy slices: Tokens and tape entries reference the original `Bytes` without copying or unescaping.
+- Structural-index–driven stage2: Parsing reuses stage1 indexes to avoid rescanning the byte buffer.
+- Preallocation: Tape and context stack are sized from the structural count to reduce allocations and bounds checks.
+- Parallel benchmarks: `bin/bench` runs per-file benchmarks concurrently to saturate cores during measurement.
+
+== Alignment with Crystal 1.19 Performance Guide
+- Data locality: Uses contiguous `Bytes` and arrays; avoids per-token allocations.
+- Avoiding copies: Zero-copy slices and tape entries follow the guide’s advice to minimize heap traffic.
+- Inlineable hot paths: Small structs/enums and short helper methods are suitable for inlining, though explicit `@[AlwaysInline]` is not yet applied.
+- Concurrency: Fiber-based parallelism in the benchmark harness matches Crystal’s lightweight concurrency model.
+- Unsafe optimizations: Limited use of `unsafe` today; further gains are possible by removing redundant bounds checks as allowed by structural guarantees.
+
+== Opportunities for Further Optimization
+=== SIMD and Parsing
+- Full NEON UTF-8 validation (multibyte): Extend SIMD beyond the ASCII fast-path by classifying lead bytes, counting expected continuations, and carrying state across blocks to eliminate scalar fallback on mixed text.
+- SIMD string end scan: Use NEON to locate quotes/backslashes within bounded regions defined by structural indexes, reducing scalar scans for string termination.
+- SIMD whitespace/colon/comma scan in stage2: Reuse structural indexes to bypass scalar whitespace trimming and detect delimiters with small NEON masks.
+
+=== Scalar Tightening
+- Inline hot helpers: Apply `@[AlwaysInline]` to tiny functions (`scalar_type`, iterator accessors) and inline tape-building helpers to reduce call overhead.
+- Bounds-check minimization: Replace repeated safe indexing with `unsafe_fetch` inside guarded hot loops where structural indexes guarantee safety.
+- Stack/tape reuse: Reuse preallocated tape and context arrays per parser instance to lower GC pressure across parses.
+- Simplified fast paths: Split common object/array cases (value + comma/end) into branch-light paths once correctness is restored.
+
+=== Build and Tooling
+- Benchmark flags: Use `--release -O3 --no-debug` and a fast `CRYSTAL_CACHE_DIR` to keep measurement noise low.
+- Verification toggles: Keep debug-only cross-checks (e.g., `SIMDJSON_VERIFY_NEON`) off in production builds to avoid overhead.
+
+== Proposed Work Plan
+[cols="2,4,3,3",options="header"]
+|===
+| Area | Action | Expected Benefit | Risk/Notes
+| UTF-8 | Implement full NEON multibyte validator with carried state | Major: reduces scalar fallback on text-heavy JSON | Requires careful state handling and tests
+| Strings | NEON quote/backslash scan bounded by structurals | Moderate: faster string termination | Must preserve escape correctness
+| Stage2 | SIMD colon/comma/whitespace scan | Moderate: fewer scalar scans | Keep logic aligned with stage1 indexes
+| Inlining/unsafe | `@[AlwaysInline]`, guarded `unsafe_fetch` in hot loops | Moderate: lower overhead, fewer bounds checks | Validate with benchmarks; watch code size
+| Buffers | Reuse tape/stack between parses | Small: reduced GC churn | Parser becomes stateful; add reset
+| Fast paths | Restore and simplify object/array common-case branches | Moderate: fewer branches | Only after current TapeError is resolved
+|=== 
+
+== Conclusion
+The codebase already follows several best practices from the Crystal performance guide: SIMD acceleration, zero-copy slices, structural-index reuse, and preallocation. The largest remaining wins likely come from a complete SIMD UTF-8 path, SIMD-assisted string/delimiter scanning, and selective inlining/bounds-check removal. Correctness in stage2 must be reestablished before adopting aggressive fast paths. With these steps, the parser can approach the throughput of native simdjson while preserving Crystal ergonomics.
