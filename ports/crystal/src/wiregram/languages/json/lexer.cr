@@ -8,6 +8,8 @@ module WireGram
     module Json
       # High-performance JSON lexer using a lightweight scanner
       class Lexer < WireGram::Core::BaseLexer
+        @number_engine : WireGram::Core::Brzozowski::Engine?
+
         # Pre-compiled regex patterns for performance
         STRING_PATTERN = /"(?:\\.|[^"\\])*"/
         WHITESPACE_PATTERN = /\s+/
@@ -15,14 +17,28 @@ module WireGram
         FALSE_PATTERN = /false/
         NULL_PATTERN = /null/
 
-        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, use_branchless = false)
+        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, use_branchless = false, use_brzozowski = false, use_gpu = false, verbose = false)
           super(source)
           @use_simd = use_simd
           @use_symbolic_utf8 = use_symbolic_utf8
           @use_upfront_rules = use_upfront_rules
           @use_branchless = use_branchless
+          @use_brzozowski = use_brzozowski
+          @use_gpu = use_gpu
+          @verbose = verbose
           @scanner = WireGram::Core::Scanner.new(source)
+          STDERR.puts "[JSON::Lexer] Initializing (SIMD=#{@use_simd}, Upfront=#{@use_upfront_rules}, Branchless=#{@use_branchless}, Brzozowski=#{@use_brzozowski}, GPU=#{@use_gpu})" if @verbose
           build_structural_index! if use_upfront_rules
+          if use_brzozowski
+            # Initialize Brzozowski engines for patterns
+            digit = WireGram::Core::Brzozowski::BCharRange.new(0x30, 0x39)
+            @number_engine = WireGram::Core::Brzozowski::Engine.new(
+              WireGram::Core::Brzozowski::BConcatenation.new(
+                WireGram::Core::Brzozowski::BKleeneStar.new(digit),
+                digit
+              )
+            )
+          end
         end
 
         private def try_tokenize_next
