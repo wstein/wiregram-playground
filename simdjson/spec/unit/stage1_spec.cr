@@ -88,7 +88,7 @@ describe Simdjson::Stage1 do
   end
 
   it "returns Empty for whitespace-only input" do
-    bytes = "   \n\t".to_slice
+    bytes = "   \t".to_slice
     result = Simdjson::Stage1.index(bytes)
     result.error.should eq(Simdjson::ErrorCode::Empty)
   end

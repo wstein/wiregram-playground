@@ -279,7 +279,7 @@ module Simdjson
       # Summary
       #
       # Works for `String`, `Key`, `Number`, and literal atom entries.
-      def slice(entry : Entry) : Bytes?
+      def slice(entry : Entry) : Slice(UInt8)?
         case entry.type
         when TapeType::String, TapeType::Key, TapeType::Number, TapeType::True, TapeType::False, TapeType::Null
           @doc.bytes[entry.a, entry.b]
