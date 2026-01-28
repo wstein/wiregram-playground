@@ -27,13 +27,17 @@ module WireGram
           0x29_u8 => WireGram::Core::TokenType::RParen     # ')'
         }
 
-        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, use_branchless = false)
+        def initialize(source, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, use_branchless = false, use_brzozowski = false, use_gpu = false, verbose = false)
           super(source)
           @use_simd = use_simd
           @use_symbolic_utf8 = use_symbolic_utf8
           @use_upfront_rules = use_upfront_rules
           @use_branchless = use_branchless
+          @use_brzozowski = use_brzozowski
+          @use_gpu = use_gpu
+          @verbose = verbose
           @scanner = WireGram::Core::Scanner.new(source)
+          STDERR.puts "[UCL::Lexer] Initializing (SIMD=#{@use_simd}, Upfront=#{@use_upfront_rules}, Branchless=#{@use_branchless}, Brzozowski=#{@use_brzozowski}, GPU=#{@use_gpu})" if @verbose
           build_structural_index! if use_upfront_rules
         end
 

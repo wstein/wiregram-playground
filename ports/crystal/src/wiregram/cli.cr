@@ -52,6 +52,9 @@ module WireGram
       @symbolic_utf8 = false
       @upfront_rules = false
       @branchless = false
+      @brzozowski = false
+      @gpu = false
+      @verbose = false
 
       def initialize(argv : Array(String))
         @argv = argv.dup
@@ -80,7 +83,11 @@ module WireGram
             # Parse language-specific flags BEFORE handling the language
             @argv = parse_common_flags(@argv)
 
-            handle_language(language, action, @argv)
+            if action == "benchmark"
+              handle_benchmark(language, @argv)
+            else
+              handle_language(language, action, @argv)
+            end
           else
             STDERR.puts "Unknown command: #{command}"
             print_help
@@ -96,6 +103,8 @@ module WireGram
           opts.on("--symbolic-utf8", "Enable symbolic UTF-8 processing") { @symbolic_utf8 = true }
           opts.on("--upfront-rules", "Enable upfront lexing rules (Stage 1)") { @upfront_rules = true }
           opts.on("--branchless", "Enable branchless Stage 2 dispatch") { @branchless = true }
+          opts.on("--brzozowski", "Enable Brzozowski Derivatives engine") { @brzozowski = true }
+          opts.on("--gpu", "Enable M4 GPU acceleration (Metal)") { @gpu = true }
           opts.on("--unquoted-simd", "Enable SIMD for unquoted string scanning (UCL only)") { @simd = true }
           opts.on("--full-opt", "Enable all optimizations (simd, symbolic-utf8, upfront-rules, branchless)") do
             @simd = true
@@ -103,6 +112,7 @@ module WireGram
             @upfront_rules = true
             @branchless = true
           end
+          opts.on("--verbose", "Show internal logs") { @verbose = true }
           opts.unknown_args do |args|
             remaining = args
           end
@@ -120,6 +130,7 @@ module WireGram
             wiregram <language> inspect [opts]       # run full pipeline and show JSON output
             wiregram <language> parse [opts]         # parse input (stdin or file)
             wiregram <language> tokenize [opts]      # show tokens
+            wiregram <language> benchmark <type> <file> # benchmark performance
             wiregram server [--port 4567]            # start a JSON HTTP server for programmatic use
             wiregram snapshot --generate --language json
 
@@ -131,6 +142,8 @@ module WireGram
             --symbolic-utf8       Enable symbolic UTF-8 processing
             --upfront-rules       Enable upfront lexing rules (Stage 1)
             --branchless          Enable branchless Stage 2 dispatch
+            --brzozowski          Enable Brzozowski Derivatives engine
+            --gpu                 Enable M4 GPU acceleration (Metal)
             --unquoted-simd       Enable SIMD for unquoted string scanning (UCL only)
             --full-opt            Enable all optimizations at once
 
@@ -230,6 +243,51 @@ module WireGram
         end
       end
 
+      def handle_benchmark(language : String, argv : Array(String))
+        bench_type = argv.shift?
+        file_path = argv.shift?
+
+        unless bench_type && file_path && File.file?(file_path)
+          STDERR.puts "Usage: wiregram <language> benchmark <tokenize|parse|process> <file>"
+          exit 1
+        end
+
+        # Preload to RAM
+        input = File.read(file_path)
+        size_mb = input.bytesize.to_f / (1024 * 1024)
+
+        STDERR.puts "Benchmarking #{language} #{bench_type} on #{file_path} (#{size_mb.round(2)} MB)..."
+
+        start_time = Time.instant
+
+        case bench_type
+        when "tokenize"
+          tokenize_stream(language, input) do |_token|
+            # discard
+          end
+        when "parse"
+          parse_stream(language, input) do |_node|
+            # discard
+          end
+        when "process"
+          process_language(language, input, false)
+        else
+          STDERR.puts "Unknown benchmark type: #{bench_type}"
+          exit 1
+        end
+
+        end_time = Time.instant
+        duration = end_time - start_time
+        ms = duration.to_f * 1000
+        throughput = size_mb / duration.to_f
+
+        puts "--- Benchmark Results ---"
+        puts "File: #{file_path} (#{size_mb.round(2)} MB)"
+        puts "Type: #{bench_type}"
+        puts "Duration: #{ms.round(2)} ms"
+        puts "Throughput: #{throughput.round(2)} MB/s"
+      end
+
       def handle_language(language : String, action : String, argv : Array(String))
         unless Languages.available.includes?(language)
           STDERR.puts "Unknown language: #{language}"
@@ -268,9 +326,10 @@ module WireGram
 
       def print_language_help(language : String)
         puts "#{language} commands:"
-        puts "  inspect [--pretty]      Run full pipeline and show detailed result"
-        puts "  tokenize                Show tokens (if supported)"
-        puts "  parse                   Show AST (if supported)"
+        puts "  inspect [--pretty]              Run full pipeline and show detailed result"
+        puts "  tokenize                        Show tokens (if supported)"
+        puts "  parse                           Show AST (if supported)"
+        puts "  benchmark <type> <file>         Benchmark performance (type: tokenize|parse|process)"
         puts "Notes: Outputs are in plaintext by default. Use --format json to get JSON."
         puts "Detected capabilities:"
         %i[process process_pretty tokenize parse].each do |m|
@@ -415,13 +474,13 @@ module WireGram
         when "expression"
           # pretty ? WireGram::Languages::Expression.process_pretty(input) : WireGram::Languages::Expression.process(input)
           # For expression, we'll keep it simple for now as it's less performance critical
-          WireGram::Languages::Expression.process(input)
+          WireGram::Languages::Expression.process(input, verbose: @verbose)
         when "json"
-          pretty ? WireGram::Languages::Json.process_pretty(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless) :
-                   WireGram::Languages::Json.process(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless)
+          pretty ? WireGram::Languages::Json.process_pretty(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose) :
+                   WireGram::Languages::Json.process(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose)
         when "ucl"
           # UCL's process handles internal defaults and can be extended if needed
-          WireGram::Languages::Ucl.process(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless)
+          WireGram::Languages::Ucl.process(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose)
         else
           raise "Unknown language: #{language}"
         end
@@ -430,11 +489,11 @@ module WireGram
       private def tokenize_stream(language : String, input : String, &block : WireGram::Core::Token ->)
         case language
         when "expression"
-          WireGram::Languages::Expression.tokenize_stream(input) { |token| yield token }
+          WireGram::Languages::Expression.tokenize_stream(input, verbose: @verbose) { |token| yield token }
         when "json"
-          WireGram::Languages::Json.tokenize_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless) { |token| yield token }
+          WireGram::Languages::Json.tokenize_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose) { |token| yield token }
         when "ucl"
-          WireGram::Languages::Ucl.tokenize_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless) { |token| yield token }
+          WireGram::Languages::Ucl.tokenize_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose) { |token| yield token }
         else
           raise "Unknown language: #{language}"
         end
@@ -443,11 +502,11 @@ module WireGram
       private def parse_stream(language : String, input : String, &block : WireGram::Core::Node? ->)
         case language
         when "expression"
-          WireGram::Languages::Expression.parse_stream(input) { |node| yield node }
+          WireGram::Languages::Expression.parse_stream(input, verbose: @verbose) { |node| yield node }
         when "json"
-          WireGram::Languages::Json.parse_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless) { |node| yield node }
+          WireGram::Languages::Json.parse_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose) { |node| yield node }
         when "ucl"
-          WireGram::Languages::Ucl.parse_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless) { |node| yield node }
+          WireGram::Languages::Ucl.parse_stream(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose) { |node| yield node }
         else
           raise "Unknown language: #{language}"
         end

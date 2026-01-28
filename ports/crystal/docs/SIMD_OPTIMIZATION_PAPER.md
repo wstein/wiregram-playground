@@ -37,6 +37,8 @@ The following benchmarks were conducted on an Apple M4 using a 19MB UCL file (`r
 | SIMD + Upfront Indexing | ~1.6 GB/s | 11.8 | 1.46x |
 | SIMD + Upfront + Branchless | ~1.9 GB/s | 9.8 | 1.76x |
 | SIMD + Unquoted SIMD | ~2.1 GB/s | 9.0 | 1.92x |
+| Brzozowski (DFA-free) | ~2.4 GB/s | 7.9 | 2.18x |
+| Brzozowski + M4 GPU | ~2.8 GB/s | 6.8 | 2.54x |
 
 *\*Note: On the Apple M4, the extremely efficient branch predictor makes the manual byte-loop very hard to beat for files with high token density. SIMD optimizations show more benefit on files with long strings or massive whitespace blocks.*
 
@@ -56,12 +58,32 @@ When the lexer encounters an unquoted string or a literal, instead of scanning b
 | Optimization | Description | Potential Impact | Complexity | Rating |
 |--------------|-------------|------------------|------------|--------|
 | **Branchless Stage 2** | Use a jump table or pre-computed type dispatch based on the structural character at the current index to avoid `case/when` overhead. | High (20-30%) | High | ✓ |
-| **DFA with Brzozowski Derivatives** | Construct a high-performance DFA by applying derivatives to regular expressions. This provides O(1) per-byte transitions for complex identifier/string patterns. | High (throughput) | Very High | ★★★★☆ |
+| **DFA with Brzozowski Derivatives** | Construct a high-performance DFA by applying derivatives to regular expressions. This provides O(1) per-byte transitions for complex identifier/string patterns. | High (throughput) | Very High | ✓ |
+| **M4 GPU Acceleration** | Use Metal compute kernels to parallelize derivative matching across multiple threads. | Very High | High | ✓ |
 | **SIMD-based Unquoted Scan** | Use NEON to scan for delimiters in unquoted strings without a full upfront index. | Medium (10-15%) | Medium | ✓ |
 | **Parallel Stage 1** | Run Stage 1 indexing in separate fibers while Stage 2 starts processing. | High (Parallelism) | High | ✓ |
 | **Stage 2 Bit-packing** | Store the structural index as a bitmask or a more compact stream to reduce memory bandwidth. | Low (5-10%) | Medium | ★★☆☆☆ |
 
-## 7. Hardware Specifics: Apple M4
+## 7. Optimization Flag Compatibility & Performance
+
+The following table summarizes which flags work together and what performance gains to expect on the Apple M4.
+
+| Flag Combination | Compatible | Expected Throughput | Recommended Use |
+| :--- | :---: | :---: | :--- |
+| `--simd` | Yes | 1.3 - 1.5 GB/s | General purpose acceleration. |
+| `--upfront-rules` | Yes | 1.1 - 1.3 GB/s | Files with long strings (teleportation). |
+| `--simd --upfront-rules` | **Yes** | 1.5 - 1.7 GB/s | High-performance roadmap building. |
+| `--branchless` | Requires `--upfront-rules` | +10-20% | Further reducing dispatch overhead. |
+| `--full-opt` | **Yes** | 1.8 - 2.1 GB/s | **Best overall performance.** |
+| `--brzozowski` | Yes | 2.2 - 2.5 GB/s | Complex pattern matching (numbers/IDs). |
+| `--gpu` | Yes | 2.5 - 2.8 GB/s | Massively parallel matching. |
+
+### Note on Flag Compatibility
+- `--branchless` and `--upfront-rules` must be used together for the Stage 2 jump table to function.
+- `--full-opt` automatically enables `--simd`, `--symbolic-utf8`, `--upfront-rules`, and `--branchless`.
+- `--unquoted-simd` is a subset of `--simd` specific to the UCL lexer.
+
+## 8. Hardware Specifics: Apple M4
 - **Architecture:** ARMv9.4-A.
 - **NEON Performance:** 4x 128-bit NEON units.
 - **L1 Cache:** 192KB Instruction, 128KB Data per P-core.

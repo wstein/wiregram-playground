@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 require "./token"
-
 require "./simd_accelerator"
+require "./brzozowski"
+require "./metal_accelerator"
 
 module WireGram
   module Core
@@ -18,6 +19,9 @@ module WireGram
     property? use_symbolic_utf8 : Bool = false
     property? use_upfront_rules : Bool = false
     property? use_branchless : Bool = false
+    property? use_brzozowski : Bool = false
+    property? use_gpu : Bool = false
+    property? verbose : Bool = false
 
     @structural_indices : Array(Int32)? = nil
     @structural_types : Array(UInt8)? = nil
@@ -35,6 +39,7 @@ module WireGram
     # Stage 1: Build structural index upfront if requested
     def build_structural_index!
       return unless @use_upfront_rules
+      STDERR.puts "[Lexer] Building structural index (Stage 1)..." if @verbose
       # Pre-allocate to reduce reallocations for large files
       indices = Array(Int32).new(@bytes.size // 10)
       types = Array(UInt8).new(@bytes.size // 10) if @use_branchless
@@ -44,11 +49,13 @@ module WireGram
 
       # Parallel indexing if requested (Experimental)
       if @use_upfront_rules && ENV["WIREGRAM_PARALLEL_INDEXING"]? == "1"
+        STDERR.puts "[Lexer] Using parallel indexing (4 fibers)..." if @verbose
         return parallel_build_structural_index!
       end
 
       # Use SIMD for Stage 1 if enabled
       if @use_simd
+        STDERR.puts "[Lexer] Using SIMD for Stage 1..." if @verbose
         while i + 15 < size
           mask, _ = SimdAccelerator.find_structural_bits(ptr + i)
           while mask > 0
