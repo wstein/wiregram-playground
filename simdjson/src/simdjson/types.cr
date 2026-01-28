@@ -63,6 +63,7 @@ module Simdjson
     EndArray
     Colon
     Comma
+    Newline
     String
     Number
     True
