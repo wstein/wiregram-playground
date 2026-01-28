@@ -81,6 +81,13 @@ module Simdjson
           yield Token.new(TokenType::Comma, idx, 1)
         when '\n'.ord
           yield Token.new(TokenType::Newline, idx, 1)
+        when '\r'.ord
+          # Check if this is part of CRLF sequence
+          if idx + 1 < len && ptr[idx + 1] == '\n'.ord
+            yield Token.new(TokenType::Newline, idx, 2) # CRLF as single token
+          else
+            yield Token.new(TokenType::Newline, idx, 1) # Standalone CR
+          end
         when '"'.ord
           start = idx + 1
           end_idx = scan_string_end(ptr, len, start)

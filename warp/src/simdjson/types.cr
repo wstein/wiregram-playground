@@ -88,7 +88,7 @@ module Simdjson
     end
 
     # Slice the original `Bytes` for this token.
-    def slice(bytes : Bytes) : Bytes
+    def slice(bytes : Bytes) : Slice(UInt8)
       bytes[@start, @length]
     end
   end
