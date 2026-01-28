@@ -393,11 +393,23 @@ module Simdjson
 
       i = 0
       {% if flag?(:aarch64) %}
-        while i + 15 < block_len
-          m = Neon.scan16(ptr + i)
+        while i + 7 < block_len
+          m = Neon.scan8(ptr + i)
           if VERIFY_NEON
-            scalar = scalar_masks(ptr + i, 16)
-            m = scalar unless masks_equal?(m, scalar)
+            scalar = scalar_masks(ptr + i, 8)
+            if (scalar.backslash & 0xff_u16).to_u8 != m.backslash ||
+               (scalar.quote & 0xff_u16).to_u8 != m.quote ||
+               (scalar.whitespace & 0xff_u16).to_u8 != m.whitespace ||
+               (scalar.op & 0xff_u16).to_u8 != m.op ||
+               (scalar.control & 0xff_u16).to_u8 != m.control
+              m = Neon::Masks8.new(
+                (scalar.backslash & 0xff_u16).to_u8,
+                (scalar.quote & 0xff_u16).to_u8,
+                (scalar.whitespace & 0xff_u16).to_u8,
+                (scalar.op & 0xff_u16).to_u8,
+                (scalar.control & 0xff_u16).to_u8
+              )
+            end
           end
           shift = i
           backslash |= m.backslash.to_u64 << shift
@@ -405,7 +417,7 @@ module Simdjson
           whitespace |= m.whitespace.to_u64 << shift
           op |= m.op.to_u64 << shift
           control |= m.control.to_u64 << shift
-          i += 16
+          i += 8
         end
       {% end %}
       while i < block_len
@@ -465,13 +477,6 @@ module Simdjson
       Neon::Masks16.new(backslash, quote, whitespace, op, control)
     end
 
-    private def self.masks_equal?(a : Neon::Masks16, b : Neon::Masks16) : Bool
-      a.backslash == b.backslash &&
-        a.quote == b.quote &&
-        a.whitespace == b.whitespace &&
-        a.op == b.op &&
-        a.control == b.control
-    end
 
     def self.prefix_xor(bitmask : UInt64) : UInt64
       bitmask ^= bitmask << 1

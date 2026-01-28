@@ -113,16 +113,13 @@ describe Simdjson::Stage1 do
 
   {% if flag?(:aarch64) %}
   it "builds NEON masks for known bytes" do
-    bytes = Bytes[
-      '{'.ord, '}'.ord, '['.ord, ']'.ord, ':'.ord, ','.ord, '"'.ord, '\\'.ord,
-      ' '.ord, '\t'.ord, '\n'.ord, '\r'.ord, 'a'.ord, 'b'.ord, 'c'.ord, 0x1f
-    ]
-    masks = Simdjson::Stage1::Neon.scan16(bytes.to_unsafe)
-    masks.op.should_not eq(0_u16)
-    masks.quote.should_not eq(0_u16)
-    masks.backslash.should_not eq(0_u16)
-    masks.whitespace.should_not eq(0_u16)
-    masks.control.should_not eq(0_u16)
+    bytes = Bytes['{'.ord, '}'.ord, '['.ord, ']'.ord, ':'.ord, ','.ord, '"'.ord, '\\'.ord]
+    masks = Simdjson::Stage1::Neon.scan8(bytes.to_unsafe)
+    masks.op.should_not eq(0_u8)
+    masks.quote.should_not eq(0_u8)
+    masks.backslash.should_not eq(0_u8)
+    masks.whitespace.should eq(0_u8)
+    masks.control.should eq(0_u8)
   end
   {% end %}
 end
