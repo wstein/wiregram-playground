@@ -180,6 +180,9 @@ module Simdjson
           first_min = ((val >> 8) & 0xFF).to_u8
           first_max = ((val >> 16) & 0xFF).to_u8
           pending = ((val >> 24) & 0x01) == 1
+          if remaining == 0 && !pending && ascii_block?(ptr)
+            return true
+          end
           i = 0
           while i < 16
             b = (ptr + i).value
@@ -231,6 +234,10 @@ module Simdjson
             end
             i += 1
           end
+          if remaining == 0 && !pending
+            first_min = 0_u8
+            first_max = 0_u8
+          end
           out = remaining.to_u32 | (first_min.to_u32 << 8) | (first_max.to_u32 << 16) | (pending ? 1_u32 << 24 : 0_u32)
           state.value = out
           true
@@ -250,12 +257,11 @@ module Simdjson
         {% if flag?(:aarch64) %}
           state = pack_state
           while offset + 15 < len
-            if Utf8::Neon.ascii_block?(ptr + offset)
-              break if @remaining > 0
-              offset += 16
-              next
+            unless Utf8::Neon.validate_block(ptr + offset, pointerof(state))
+              unpack_state(state)
+              return false
             end
-            break
+            offset += 16
           end
           unpack_state(state)
         {% end %}
@@ -313,6 +319,9 @@ module Simdjson
 
       private def pack_state : UInt32
         pending = @first_pending ? 1_u32 : 0_u32
+        if @remaining == 0 && pending == 0
+          return 0_u32
+        end
         @remaining.to_u32 | (@first_min.to_u32 << 8) | (@first_max.to_u32 << 16) | (pending << 24)
       end
 
@@ -336,13 +345,13 @@ module Simdjson
     end
 
     def self.index(bytes : Bytes) : Result
+      ptr = bytes.to_unsafe
       len = bytes.size
       indices = Array(UInt32).new
       scanner = Scanner.new
       unescaped_error = 0_u64
       utf8 = Utf8Validator.new
 
-      ptr = bytes.to_unsafe
       offset = 0
       while offset < len
         block_len = len - offset
@@ -477,6 +486,91 @@ module Simdjson
       Neon::Masks16.new(backslash, quote, whitespace, op, control)
     end
 
+    # Why padding may be required for NEON
+    #
+    # Some NEON helpers load 16 bytes at a time (e.g. ld1 {v0.16b}, [ptr]).
+    # Stage1 avoids overreads by only invoking those helpers on full blocks.
+    # If you plan to call the NEON helpers on arbitrary buffers without
+    # bounds checks, pad the input with 16 zero bytes to keep the loads safe.
+    #
+    # We provide utility helpers below that allocate a padded buffer, read a
+    # file into it, and zero the trailing bytes. Callers are responsible for
+    # freeing the returned buffer with `free_padded_buffer`.
+
+    {% if flag?(:aarch64) %}
+    lib LibC_Read
+      fun malloc(size : UInt64) : Pointer(Void)
+      fun free(ptr : Pointer(Void)) : Nil
+      fun memcpy(dest : Pointer(Void), src : Pointer(Void), n : UInt64) : Pointer(Void)
+      fun memset(dest : Pointer(Void), c : Int32, n : UInt64) : Pointer(Void)
+    end
+
+    # read_file_padded(path) -> (ptr, len)
+    #
+    # Allocates a buffer of file_size + 16, reads the file content into it and
+    # zeroes the trailing 16 bytes. Returns a pointer to the buffer (Pointer(UInt8))
+    # and the original file length as Int32. On error the function returns
+    # Pointer(UInt8).null and length 0.
+    def self.read_file_padded(path : String) : Tuple(Pointer(UInt8), Int32)
+      begin
+        size = File.stat(path).size.to_i
+      rescue ex : Exception
+        return {Pointer(UInt8).null, 0}
+      end
+
+      total = size.to_u64 + 16_u64
+      allocated = LibC_Read.malloc(total)
+      if allocated.null?
+        return {Pointer(UInt8).null, 0}
+      end
+
+      # Read file into a temporary String then copy into the allocated buffer.
+      # This keeps the implementation portable and simple; if a zero-copy
+      # read is required we can switch to low-level read(2) later.
+      content = File.read(path)
+      content_size = content.bytesize
+      if content_size != size
+        # unexpected but handle gracefully
+        size = [size, content_size].min
+      end
+
+      LibC_Read.memcpy(allocated, content.to_unsafe, size.to_u64)
+      LibC_Read.memset(allocated + size, 0, 16_u64)
+
+      {allocated.as(Pointer(UInt8)), size}
+    end
+
+    # free_padded_buffer(ptr)
+    #
+    # Free a buffer previously returned by `read_file_padded`.
+    def self.free_padded_buffer(ptr : Pointer(UInt8))
+      return if ptr.null?
+      LibC_Read.free(ptr.as(Pointer(Void)))
+    end
+
+    # read_file_padded_bytes(path) -> Bytes
+    #
+    # Convenience wrapper that returns a GC-managed `Bytes` slice backed by an
+    # `Array(UInt8)` containing the file contents plus 16 zero bytes. This is
+    # the recommended high-level API in Crystal code since it avoids manual
+    # malloc/free and is safe to pass to NEON-backed functions.
+    def self.read_file_padded_bytes(path : String) : Bytes
+      begin
+        content = File.read(path)
+      rescue ex : Exception
+        return Bytes.new
+      end
+      size = content.bytesize
+      arr = Array(UInt8).new(size + 16)
+      i = 0
+      while i < size
+        arr[i] = content.to_unsafe[i]
+        i += 1
+      end
+      # trailing bytes are zero-initialized by Array.new
+      arr.to_slice
+    end
+    {% end %}
 
     def self.prefix_xor(bitmask : UInt64) : UInt64
       bitmask ^= bitmask << 1

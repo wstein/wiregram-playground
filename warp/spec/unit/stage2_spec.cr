@@ -75,7 +75,7 @@ describe Simdjson::Stage2 do
     bytes = Bytes[0x22, 0x5c, 0x5c, 0x5c, 0x22, 0x22] # "\"\\\""
     start = 1
     end_idx = Simdjson::Stage2.scan_string_end(bytes, start, -1)
-    end_idx.should eq(bytes.size - 2)
+    end_idx.should eq(bytes.size - 1)
   end
 
   it "iterates structurals in order" do
