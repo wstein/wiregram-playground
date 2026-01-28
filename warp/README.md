@@ -20,8 +20,18 @@ Run the benchmark (`--release` for higher throughput):
 ./bin/bench [options] <json file> [json file...]
 ```
 Options:
-- `--release`: re-run with `crystal --release`.
-- `--profile`: report stage1/stage2 timings (runs both stages).
+- `--release`: re-run with `crystal --release` (this is the default behavior).
+- `--profile`: report stage1/stage2 timings (runs both stages). When passed, `bin/bench` will attempt to enable compile-time LLVM instrumentation and set `LLVM_PROFILE_FILE=bench-%p.profraw` so an `.profraw` file is generated; processing requires `llvm-profdata`/`llvm-cov` (toolchain support may be needed).
+
+  Example workflow (when instrumentation succeeds):
+
+  ```bash
+  ./bin/bench --profile data.json
+  # produces bench-<pid>.profraw
+  llvm-profdata merge -o bench.profdata bench-*.profraw
+  llvm-cov show ./bin/bench -instr-profile=bench.profdata
+  ```
+
 Multiple files are parsed in parallel automatically.
 
 Note: the CLI no longer displays an interactive progress bar during parallel runs to avoid contention; use `--verbose` to print worker and system allocation details.
