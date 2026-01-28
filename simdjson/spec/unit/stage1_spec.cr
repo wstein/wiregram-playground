@@ -49,6 +49,25 @@ describe Simdjson::Stage1 do
     Simdjson::Stage1::Utf8::Neon.ascii_block?(bytes.to_unsafe).should be_true
     Simdjson::Stage1::Utf8::Neon.validate_block(bytes.to_unsafe, pointerof(state)).should be_true
   end
+
+  it "validates multibyte UTF-8 sequences across blocks" do
+    validator = Simdjson::Stage1::Utf8Validator.new
+    bytes = Bytes.new(32, 'a'.ord.to_u8)
+    bytes[15] = 0xF0
+    bytes[16] = 0x90
+    bytes[17] = 0x80
+    bytes[18] = 0x80
+    validator.consume(bytes.to_unsafe, bytes.size).should be_true
+    validator.finish?.should be_true
+  end
+
+  it "rejects invalid UTF-8 continuation across blocks" do
+    validator = Simdjson::Stage1::Utf8Validator.new
+    bytes = Bytes.new(32, 'a'.ord.to_u8)
+    bytes[15] = 0xF0
+    bytes[16] = 0x41
+    validator.consume(bytes.to_unsafe, bytes.size).should be_false
+  end
   {% end %}
 
   it "runs UTF-8 validation for diverse sequences" do

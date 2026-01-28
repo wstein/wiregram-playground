@@ -140,9 +140,11 @@ describe Simdjson::Parser do
       0xf1, 0x80, 0x80, 0x80, # 4-byte
       0xf4, 0x8f, 0xbf, 0xbf  # 4-byte (F4)
     ]
+    # Ensure 16-byte padding so NEON loads are safe when validating 16-byte blocks
+    padded = bytes + Bytes.new(16)
     state = 0_u32
-    Simdjson::Stage1::Utf8::Neon.validate_block(bytes.to_unsafe, pointerof(state)).should be_true
-    Simdjson::Stage1::Utf8::Neon.validate_block(bytes.to_unsafe + 16, pointerof(state)).should be_true
+    Simdjson::Stage1::Utf8::Neon.validate_block(padded.to_unsafe, pointerof(state)).should be_true
+    Simdjson::Stage1::Utf8::Neon.validate_block(padded.to_unsafe + 16, pointerof(state)).should be_true
     state.should eq(0_u32)
   end
   {% end %}

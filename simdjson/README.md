@@ -3,7 +3,6 @@
 ARM64-focused JSON parsing scaffolding for Apple Silicon (M-series).
 
 This project provides:
-
 - A zero-copy, slice-based token iterator in Crystal.
 - SIMD-accelerated stage1 on AArch64 via NEON
 
@@ -20,26 +19,15 @@ Run the benchmark (`--release` for higher throughput):
 ```
 ./bin/bench [options] <json file> [json file...]
 ```
-
 Options:
-
 - `--release`: re-run with `crystal --release`.
 - `--profile`: report stage1/stage2 timings (runs both stages).
 Multiple files are parsed in parallel automatically.
 
-### Benchmark examples
-
-# Single-file, release (measures single-file throughput ~1 GB/s on Apple Silicon)
+Example:
 
 ```
-CRYSTAL_CACHE_DIR=/tmp/crystal_cache crystal build --release -o bin/bench -O3 bin/bench.cr
-./bin/bench --profile large.json
-```
-
-# Parallel (many files) — aggregate throughput scales with cores and I/O
-
-```
-./bin/bench --profile file1.json file2.json file3.json
+./bin/bench --release ~/Downloads/twitter.json big.json big2.json
 ```
 
 ## Coverage
@@ -49,6 +37,7 @@ Crystal 1.19 does not expose built-in coverage in `crystal spec`. Use kcov:
 ```
 ./scripts/coverage_kcov
 ```
+
 
 ## Usage
 
@@ -73,7 +62,6 @@ end
 ```
 
 Notes:
-
 - The current Crystal parser is a zero-copy token iterator. It does not build a DOM.
 - String values are returned as raw JSON slices (quotes stripped) without unescaping.
 - Stage1 uses Crystal NEON asm on AArch64 with a scalar fallback for non-AArch64 builds.
@@ -82,6 +70,5 @@ Notes:
 - Literal/number validation is optional and can be enabled per-parse without copying.
 
 Limitations:
-
 - No string unescape yet.
 - No DOM builder yet; you get a token stream based on structural indexes.
