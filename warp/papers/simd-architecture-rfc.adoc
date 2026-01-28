@@ -1,0 +1,505 @@
+= SIMD Hardware Abstraction Layer RFC
+
+:doctype: article
+:toc: left
+:toclevels: 3
+:source-highlighter: pygments
+:pygments-style: friendly
+:sectnums:
+
+== Overview
+
+This RFC proposes a three-layer architecture for SIMD support in simdjson Crystal implementation:
+
+1. *Hardware Abstraction Layer (HAL)*: CPU-specific implementations (AVX, SSE2, NEON)
+2. *SIMD Length Layer*: Block size optimizations (8, 16, 32, 64 bytes)
+3. *Crystal Implementation Layer*: Pure Crystal fallback and length-specific optimizations
+
+== Current Architecture Analysis
+
+=== Current SIMD Implementation
+
+The current implementation has several limitations for broader SIMD support:
+
+* **Block size**: Fixed 8 bytes per SIMD operation (`scan8` method)
+* **Data types**: `Masks8` struct with `UInt8` fields
+* **Processing**: 64-byte chunks processed in 8-byte increments
+* **Platform detection**: Simple `{% if flag?(:aarch64) %}` conditional compilation
+
+=== Limitations for AVX512 Support
+
+1. **Block size mismatch**: AVX512 operates on 64 bytes, not 8 bytes
+2. **Data structure limitations**: `UInt8` masks can't represent 64-byte blocks
+3. **Processing loop inefficiency**: Current 8-byte loop doesn't leverage AVX512's full width
+4. **Platform detection**: No AVX512 feature detection mechanism
+
+== Proposed Architecture
+
+=== Three-Layer Design
+
+```mermaid
+graph TB
+    subgraph "Layer 3: SIMD Length Optimization"
+        L3A[Length 8: Optimal for NEON]
+        L3B[Length 16: Optimal for SSE2]
+        L3C[Length 32: Optimal for AVX]
+        L3D[Length 64: Optimal for AVX512]
+        L3E[Length 1: Crystal Fallback]
+    end
+
+    subgraph "Layer 2: Hardware Abstraction"
+        L2A[AVX Backend: AVX-AVX512]
+        L2B[SSE2 Backend]
+        L2C[NEON Backend]
+        L2D[Crystal Backend]
+    end
+
+    subgraph "Layer 1: SIMD Interface"
+        L1A[SimdBackendSelector]
+        L1B[Runtime Feature Detection]
+        L1C[Unified Mask Interface]
+    end
+
+    subgraph "Application Layer"
+        App[Stage1.index]
+    end
+
+    App --> L1A
+    L1A --> L1B
+    L1A --> L1C
+
+    L1C --> L2A
+    L1C --> L2B
+    L1C --> L2C
+    L1C --> L2D
+
+    L2A --> L3C
+    L2A --> L3D
+    L2B --> L3B
+    L2C --> L3A
+    L2D --> L3E
+
+    L3A --> L3E
+    L3B --> L3E
+    L3C --> L3E
+    L3D --> L3E
+```
+
+=== Layer 1: SIMD Interface Layer
+
+==== Unified SIMD Interface
+
+```crystal
+module Simdjson
+  module Stage1
+    # Unified interface for all SIMD operations
+    abstract struct SimdMask
+      abstract def backslash : UInt64
+      abstract def quote : UInt64
+      abstract def whitespace : UInt64
+      abstract def op : UInt64
+      abstract def control : UInt64
+      abstract def block_size : Int32
+      abstract def bytes_processed : Int32
+    end
+
+    # Runtime backend selector with feature detection
+    class SimdBackendSelector
+      def self.select_backend : SimdBackend
+        # Priority: AVX512 > AVX > SSE2 > NEON > Scalar
+        if avx512_available?
+          AVX512Backend.new
+        elsif avx_available?
+          AVXBackend.new
+        elsif sse2_available?
+          SSE2Backend.new
+        elsif neon_available?
+          NEONBackend.new
+        else
+          ScalarBackend.new
+        end
+      end
+
+      def self.select_block_size(backend : SimdBackend, data_size : Int32) : Int32
+        # Choose optimal block size based on data size and backend capabilities
+        case backend
+        when AVX512Backend
+          data_size >= 64 ? 64 : (data_size >= 32 ? 32 : (data_size >= 16 ? 16 : 8))
+        when AVXBackend
+          data_size >= 32 ? 32 : (data_size >= 16 ? 16 : 8)
+        when SSE2Backend
+          data_size >= 16 ? 16 : 8
+        when NEONBackend
+          data_size >= 8 ? 8 : 1
+        else
+          1
+        end
+      end
+    end
+  end
+end
+```
+
+=== Layer 2: Hardware Abstraction Layer
+
+==== Backend Implementations
+
+```crystal
+module Simdjson
+  module Stage1
+    # AVX Backend (supports AVX, AVX2, AVX512)
+    class AVXBackend < SimdBackend
+      def scan_block(ptr : Pointer(UInt8), block_size : Int32) : SimdMask
+        case block_size
+        when 64
+          avx512_scan64(ptr)
+        when 32
+          avx_scan32(ptr)
+        when 16
+          avx_scan16(ptr)
+        else
+          scalar_scan(ptr, block_size)
+        end
+      end
+
+      private def avx512_scan64(ptr : Pointer(UInt8)) : AVX512Mask64
+        # AVX512 assembly for 64-byte processing
+      end
+
+      private def avx_scan32(ptr : Pointer(UInt8)) : AVXMask32
+        # AVX assembly for 32-byte processing
+      end
+    end
+
+    # SSE2 Backend
+    class SSE2Backend < SimdBackend
+      def scan_block(ptr : Pointer(UInt8), block_size : Int32) : SimdMask
+        case block_size
+        when 16
+          sse2_scan16(ptr)
+        when 8
+          sse2_scan8(ptr)
+        else
+          scalar_scan(ptr, block_size)
+        end
+      end
+    end
+
+    # NEON Backend
+    class NEONBackend < SimdBackend
+      def scan_block(ptr : Pointer(UInt8), block_size : Int32) : SimdMask
+        case block_size
+        when 8
+          neon_scan8(ptr)
+        when 16
+          neon_scan16(ptr)
+        else
+          scalar_scan(ptr, block_size)
+        end
+      end
+    end
+
+    # Crystal Backend (Pure Crystal implementation)
+    class CrystalBackend < SimdBackend
+      def scan_block(ptr : Pointer(UInt8), block_size : Int32) : SimdMask
+        crystal_scan(ptr, block_size)
+      end
+    end
+  end
+end
+```
+
+=== Layer 3: SIMD Length Optimization
+
+==== Mask Structures
+
+```crystal
+module Simdjson
+  module Stage1
+    # 64-byte mask for AVX512
+    struct AVX512Mask64 < SimdMask
+      @backslash : UInt64
+      @quote : UInt64
+      @whitespace : UInt64
+      @op : UInt64
+      @control : UInt64
+
+      def block_size : Int32
+        64
+      end
+
+      def bytes_processed : Int32
+        64
+      end
+    end
+
+    # 32-byte mask for AVX
+    struct AVXMask32 < SimdMask
+      @backslash : UInt32
+      @quote : UInt32
+      @whitespace : UInt32
+      @op : UInt32
+      @control : UInt32
+
+      def block_size : Int32
+        32
+      end
+
+      def bytes_processed : Int32
+        32
+      end
+    end
+
+    # 16-byte mask for SSE2
+    struct SSE2Mask16 < SimdMask
+      @backslash : UInt16
+      @quote : UInt16
+      @whitespace : UInt16
+      @op : UInt16
+      @control : UInt16
+
+      def block_size : Int32
+        16
+      end
+
+      def bytes_processed : Int32
+        16
+      end
+    end
+
+    # 8-byte mask for NEON
+    struct NEONMask8 < SimdMask
+      @backslash : UInt8
+      @quote : UInt8
+      @whitespace : UInt8
+      @op : UInt8
+      @control : UInt8
+
+      def block_size : Int32
+        8
+      end
+
+      def bytes_processed : Int32
+        8
+      end
+    end
+
+    # Crystal fallback mask
+    struct CrystalMask < SimdMask
+      @backslash : UInt64
+      @quote : UInt64
+      @whitespace : UInt64
+      @op : UInt64
+      @control : UInt64
+      @block_size : Int32
+
+      def block_size : Int32
+        @block_size
+      end
+
+      def bytes_processed : Int32
+        @block_size
+      end
+    end
+  end
+end
+```
+
+== Architecture Alternatives and Evaluation
+
+=== Alternative 1: Monolithic Backend Approach ⭐⭐⭐⭐
+
+**Description**: Single backend per CPU architecture with hardcoded block sizes
+
+**Pros**:
+- Simple implementation
+- Direct mapping CPU → Block size
+- Easy to understand
+
+**Cons**:
+- Inflexible for mixed workloads
+- No graceful degradation
+- Limited optimization opportunities
+
+**Rating**: 7/10
+
+**Use Case**: Simple applications with known target hardware
+
+=== Alternative 2: Layered Abstraction with Runtime Selection ⭐⭐⭐⭐⭐
+
+**Description**: Three-layer architecture with runtime backend and block size selection
+
+**Pros**:
+- Maximum flexibility
+- Graceful degradation
+- Optimal performance per platform
+- Easy to extend with new instruction sets
+
+**Cons**:
+- More complex implementation
+- Runtime overhead for selection
+
+**Rating**: 9/10
+
+**Use Case**: Production systems requiring maximum performance and compatibility
+
+=== Alternative 3: Compile-Time Specialization ⭐⭐⭐
+
+**Description**: Compile-time feature detection with specialized code paths
+
+**Pros**:
+- Zero runtime overhead
+- Maximum performance
+- Clean code paths
+
+**Cons**:
+- Requires recompilation for different targets
+- Larger binary size
+- Complex build system
+
+**Rating**: 6/10
+
+**Use Case**: Embedded systems with fixed hardware targets
+
+=== Alternative 4: Hybrid Approach ⭐⭐⭐⭐⭐
+
+**Description**: Runtime backend selection with compile-time block size optimization
+
+**Pros**:
+- Best of both worlds
+- Runtime flexibility for backends
+- Compile-time optimization for block sizes
+- Good performance characteristics
+
+**Cons**:
+- Complex implementation
+- Requires sophisticated build system
+
+**Rating**: 9/10
+
+**Use Case**: High-performance applications with complex build requirements
+
+== Recommended Architecture
+
+Based on the evaluation, **Alternative 2 (Layered Abstraction with Runtime Selection)** is recommended for the following reasons:
+
+1. **Maximum Compatibility**: Supports all major platforms and instruction sets
+2. **Performance Flexibility**: Can adapt to different data sizes and hardware capabilities
+3. **Maintainability**: Clean separation of concerns makes the codebase easier to maintain
+4. **Extensibility**: Easy to add new instruction sets or optimization levels
+5. **Graceful Degradation**: Falls back to slower but compatible implementations when advanced features aren't available
+
+== Performance Analysis
+
+=== Expected Performance Improvements
+
+[cols="1,2,2,2"]
+|===
+|Backend |Block Size |Throughput Improvement |Memory Efficiency
+
+|AVX512
+|64 bytes
+|8x vs current NEON
+|Excellent
+
+|AVX
+|32 bytes
+|4x vs current NEON
+|Very Good
+
+|SSE2
+|16 bytes
+|2x vs current NEON
+|Good
+
+|NEON
+|8 bytes
+|Baseline (current)
+|Good
+
+|Crystal
+|1-8 bytes
+|Variable
+|Fair
+|===
+
+=== SSE2 Benefit Analysis
+
+**SSE2 provides moderate benefits:**
+
+- **2x throughput improvement** over current NEON (16 vs 8 bytes)
+- **Better cache utilization** for larger blocks
+- **Wider availability** on older x86 systems
+- **Good fallback** for systems without AVX
+
+**Recommendation**: Include SSE2 support for broader compatibility and performance on older x86 systems.
+
+== Implementation Strategy
+
+=== Phase 1: Foundation (Week 1-2)
+
+1. Implement Layer 1: SIMD Interface and Backend Selector
+2. Create unified `SimdMask` interface
+3. Add runtime feature detection
+4. Basic error handling and validation
+
+=== Phase 2: Core Backends (Week 3-4)
+
+1. Implement AVX Backend (32/64 byte support)
+2. Implement SSE2 Backend (16 byte support)
+3. Refactor existing NEON Backend
+4. Create Crystal Backend
+5. Basic integration with Stage1
+
+=== Phase 3: Optimization (Week 5-6)
+
+1. Add AVX512 specific optimizations
+2. Implement length-specific optimizations
+3. Performance benchmarking and tuning
+4. Integration testing with existing codebase
+
+=== Phase 4: Polish (Week 7-8)
+
+1. Documentation and examples
+2. Error handling and edge cases
+3. Memory management optimization
+4. Final performance validation
+5. Comprehensive testing
+
+== Risk Assessment
+
+=== High Risk
+
+- **Complexity**: Multi-layer architecture increases code complexity
+- **Maintenance**: Multiple backends require ongoing maintenance
+- **Testing**: Comprehensive testing across all platforms and instruction sets
+
+=== Medium Risk
+
+- **Performance**: Runtime selection overhead
+- **Compatibility**: Different instruction set availability across platforms
+- **Memory**: Larger memory footprint due to multiple implementations
+
+=== Low Risk
+
+- **Backward Compatibility**: Maintaining existing API
+- **Build System**: Adding SIMD feature detection to build process
+
+== Success Criteria
+
+1. **Performance**: 4-8x improvement on AVX512 systems
+2. **Compatibility**: Support for all major platforms (x86_64, ARM64)
+3. **Maintainability**: Clean, extensible architecture
+4. **Reliability**: All existing tests pass + new SIMD-specific tests
+5. **Documentation**: Comprehensive documentation for all layers
+
+== Conclusion
+
+The proposed three-layer SIMD architecture provides maximum flexibility while maintaining performance and compatibility across different hardware platforms. The layered approach allows for:
+
+- Optimal performance on each platform through appropriate block sizes
+- Graceful degradation when advanced instruction sets aren't available
+- Easy extensibility for future instruction sets
+- Clean separation of hardware-specific and algorithmic concerns
+
+This architecture positions simdjson Crystal implementation to take full advantage of modern SIMD instruction sets while maintaining broad compatibility and ease of maintenance.
