@@ -1,0 +1,50 @@
+= Testing Strategy and Coverage Constraints for simdjson (Crystal)
+Werner Stein
+
+== Abstract
+This paper defines a testing strategy for the simdjson (Crystal) codebase under strict coverage constraints (98% line coverage, 95% branch coverage). It emphasizes integration tests as the primary driver of coverage, followed by focused unit tests to close residual gaps. The approach is grounded in Crystal 1.19 testing conventions and aims to preserve correctness while enabling performance-focused evolution of the parser.
+
+== Constraints and Assumptions
+- **Coverage targets**: 98% line coverage, 95% branch coverage.
+- **Priority**: Integration tests first, then targeted unit tests for remaining lines/branches.
+- **Correctness**: Stage2 must remain stable under integration tests before performance changes are merged.
+- **Tooling**: `crystal spec --coverage` is the baseline; coverage data is interpreted per file and per function.
+
+== Methodology
+=== Phase 1: Integration Tests
+Integration tests exercise end-to-end parsing flows and cover the dominant execution paths:
+- `Parser#each_token` for token iteration and slicing.
+- `Parser#parse_document` with literals/number validation enabled.
+- Nested arrays/objects, empty containers, and mixed scalar types.
+These tests maximize realistic coverage of hot paths and reduce the need for excessive unit testing.
+
+=== Phase 2: Targeted Unit Tests
+Unit tests address specific residual gaps:
+- Boundary checks (`scan_scalar_end`, `scan_string_end`).
+- Validation helpers (`valid_number?`, `valid_true?`, etc.).
+- Stage1 error conditions (UTF-8 invalid, unclosed strings, control chars).
+These tests are designed to be minimal and deterministic, focusing on missed lines rather than replicating integration coverage.
+
+== Coverage Guidance
+- **Line coverage**: Use integration tests to bring core modules above 90% quickly; unit tests close remaining gaps.
+- **Branch coverage**: Add explicit tests for error branches (invalid literals, invalid numbers, malformed strings).
+- **SIMD paths**: Validate NEON behavior on AArch64 with small, controlled inputs; retain scalar fallbacks as cross-checks for debugging.
+- **Tooling**: Crystal 1.19 lacks built-in coverage; use kcov with a dedicated spec runner.
+
+== Recommendations and Ratings
+[cols="3,5,2,2",options="header"]
+|===
+| Recommendation | Description | Impact | Rating
+| Integration-first testing | Cover parser flows and structural parsing with real JSON samples | High | 5/5
+| Targeted unit gaps | Add minimal tests for missed lines/branches | High | 5/5
+| Deterministic fixtures | Use short, synthetic JSON to cover edge cases | Medium | 4/5
+| SIMD sanity tests | Verify NEON masks on known inputs | Medium | 4/5
+| Error-path coverage | Explicitly test invalid UTF-8, unclosed strings, invalid numbers | High | 5/5
+| Test data scaling | Add large fixtures only for performance profiling | Low | 2/5
+| Branch-focused assertions | Ensure each error branch is exercised | Medium | 4/5
+| Coverage gates | Enforce thresholds in CI for regressions | High | 5/5
+| External coverage runner | Use kcov with a dedicated spec binary | High | 5/5
+|===
+
+== Conclusion
+High coverage targets are feasible when integration tests are prioritized and unit tests are used surgically. This approach reduces maintenance burden while providing strong regression protection for performance-focused changes. The recommended plan aligns with Crystal testing norms and supports ongoing SIMD and parser tuning.

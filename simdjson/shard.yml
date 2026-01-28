@@ -1,0 +1,15 @@
+name: simdjson
+version: 0.1.0
+crystal: ">= 1.19.0"
+license: MIT
+
+authors:
+  - Werner Stein <werner.stein@gmail.com>
+
+targets:
+  simdjson_bench:
+    main: bin/bench.cr
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba

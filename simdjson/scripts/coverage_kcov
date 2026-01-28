@@ -1,0 +1,179 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
+require "optparse"
+
+root = File.expand_path("..", __dir__)
+out_dir = File.join(root, "coverage")
+bin_dir = File.join(root, "tmp")
+spec_bin = File.join(bin_dir, "spec_runner")
+
+options = { verbose: false, mono: false }
+OptionParser.new do |parser|
+  parser.banner = "Usage: coverage_kcov [options]"
+  parser.on("-v", "--verbose", "Print detailed missed line report") { options[:verbose] = true }
+  parser.on("-m", "--mono", "Monochrome output (no ANSI)") { options[:mono] = true }
+  parser.on("-h", "--help", "Show help") do
+    puts parser
+    exit 0
+  end
+end.parse!(ARGV)
+
+verbose = options[:verbose]
+mono = options[:mono]
+
+FileUtils.mkdir_p(out_dir)
+FileUtils.mkdir_p(bin_dir)
+
+env = { "CRYSTAL_CACHE_DIR" => ENV.fetch("CRYSTAL_CACHE_DIR", "/tmp/crystal_cache") }
+build_cmd = ["crystal", "build", File.join(root, "spec", "runner.cr"), "-o", spec_bin]
+system(env, *build_cmd) || abort("Failed to build spec runner.")
+
+kcov_cmd = [
+  "kcov",
+  "--include-pattern=#{File.join(root, "src")},#{File.join(root, "spec")}",
+  "--exclude-pattern=/usr,/opt/homebrew/Cellar",
+  out_dir,
+  spec_bin
+]
+system(*kcov_cmd) || abort("kcov failed. Ensure it is installed and codesigned.")
+
+report_dirs = Dir.glob(File.join(out_dir, "spec_runner.*")).sort_by { |d| File.mtime(d) }.reverse
+report_dir = report_dirs.first
+index_html = File.join(out_dir, "index.html")
+puts "Coverage report generated: #{index_html}" if File.exist?(index_html)
+
+codecov = report_dir ? File.join(report_dir, "codecov.json") : nil
+unless codecov && File.exist?(codecov)
+  warn "No codecov.json found in coverage report."
+  exit 0
+end
+
+data = JSON.parse(File.read(codecov))
+coverage = data["coverage"] || {}
+
+# Interactive color helpers (only when stdout is a TTY)
+interactive = STDOUT.isatty
+no_color = ENV.key?("NO_COLOR") || ENV["TERM"] == "dumb" || mono
+USE_COLOR = interactive && !no_color
+
+def colorize(text, code)
+  return text unless USE_COLOR
+  "\e[#{code}m#{text}\e[0m"
+end
+
+def colored_pct(pct)
+  s = sprintf("%.1f%%", pct)
+  return s unless USE_COLOR
+  code = pct >= 90.0 ? "32" : pct >= 75.0 ? "33" : "31"
+  colorize(s, code)
+end
+
+def gray(text)
+  USE_COLOR ? colorize(text, "90") : text
+end
+
+def summarize_file(lines)
+  line_total = 0
+  line_covered = 0
+  branch_total = 0
+  branch_covered = 0
+
+  lines.each_value do |val|
+    cov, total = val.split("/").map(&:to_i)
+    next if total <= 0
+    line_total += 1
+    line_covered += 1 if cov > 0
+    if total > 1
+      branch_total += total
+      branch_covered += cov
+    end
+  end
+
+  line_pct = line_total.zero? ? 0.0 : (line_covered.to_f / line_total * 100.0)
+  branch_pct = branch_total.zero? ? 0.0 : (branch_covered.to_f / branch_total * 100.0)
+  [line_pct, line_covered, line_total, branch_pct, branch_covered, branch_total]
+end
+
+overall_line_covered = 0
+overall_line_total = 0
+overall_branch_covered = 0
+overall_branch_total = 0
+rows = []
+
+coverage.each do |path, lines|
+  line_pct, line_cov, line_total, branch_pct, branch_cov, branch_total = summarize_file(lines)
+  rows << [path, line_pct, line_cov, line_total, branch_pct, branch_cov, branch_total]
+  overall_line_covered += line_cov
+  overall_line_total += line_total
+  overall_branch_covered += branch_cov
+  overall_branch_total += branch_total
+end
+
+overall_line_pct = overall_line_total.zero? ? 0.0 : (overall_line_covered.to_f / overall_line_total * 100.0)
+overall_branch_pct = overall_branch_total.zero? ? 0.0 : (overall_branch_covered.to_f / overall_branch_total * 100.0)
+
+puts "Overall line coverage: #{colored_pct(overall_line_pct)} (#{overall_line_covered}/#{overall_line_total})"
+if overall_branch_total.zero?
+  puts "Overall branch coverage: #{gray("N/A")}"
+else
+  puts "Overall branch coverage: #{colored_pct(overall_branch_pct)} (#{overall_branch_covered}/#{overall_branch_total})"
+end
+
+puts "\nPer-file coverage:"
+header_fmt = "%-60s %8s %11s %9s %10s"
+if defined?(USE_COLOR) && USE_COLOR
+  puts colorize(format(header_fmt, "File", "Lines", "Branches", "Line Cov", "Branch Cov"), "1;36")
+else
+  puts format(header_fmt, "File", "Lines", "Branches", "Line Cov", "Branch Cov")
+end
+puts "-" * 102
+rows.each do |path, line_pct, line_cov, line_total, branch_pct, branch_cov, branch_total|
+  label = path.sub(%r{^/}, "")
+  label = label.length > 60 ? "..." + label[-57, 57] : label
+  branches = if branch_total.zero?
+               "N/A".rjust(11)
+             else
+               format("%4d/%-4d", branch_cov, branch_total)
+             end
+  branch_cov_str = branch_total.zero? ? "N/A" : format("%.1f%%", branch_pct)
+  line_pct_col = colored_pct(line_pct)
+branch_cov_display = branch_total.zero? ? gray("N/A") : colored_pct(branch_pct)
+puts format("%-60s %4d/%-6d %11s %7s %10s", label, line_cov, line_total, branches, line_pct_col, branch_cov_display)
+end
+
+if verbose
+  puts "\nMissed lines:"
+  coverage.each do |path, lines|
+    line_pct, line_cov, line_total, _bp, _bc, _bt = summarize_file(lines)
+    next if line_total.zero? || line_cov == line_total
+    file_path = File.join(root, path)
+    next unless File.exist?(file_path)
+    content = File.readlines(file_path, chomp: true)
+    missed = []
+    lines.each do |line_no, val|
+      cov, total = val.split("/").map(&:to_i)
+      next if total <= 0
+      if cov.zero?
+        missed << [line_no.to_i, :none, val]
+      #elsif cov < total
+      #  missed << [line_no.to_i, :partial, val]
+      end
+    end
+    next if missed.empty?
+    puts "\n#{path}"
+    missed.sort_by(&:first).each do |line_no, status, val|
+      line = content[line_no - 1] || ""
+      #if status == :partial
+      #  hint = " " + colorize("   # partial branch coverage: ", "38") + colorize(val, "34")
+      #else
+        hint = ""
+      #end
+      num = USE_COLOR ? colorize(format("%5d", line_no), "31") : format("%5d", line_no)
+      line_display = status == :partial ? colorize(line, "33") : colorize(line, "31")
+      puts format("  %s | %s%s", num, line_display, hint)
+    end
+  end
+end

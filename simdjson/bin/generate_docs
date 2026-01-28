@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+set -e
+
+# Robust AsciiDoc generator: extract leading comments and per-symbol doc
+# blocks from Crystal sources and write docs/api/<file>.adoc.
+# This implementation uses Perl for reliable parsing on macOS/Linux.
+
+mkdir -p docs/api
+
+found=0
+for src in src/**/*.cr; do
+  [ -f "$src" ] || continue
+  found=1
+  base=$(basename "$src" .cr)
+  out="docs/api/${base}.adoc"
+  echo "Processing $src -> $out" >&2
+
+  perl -e '
+    use strict; use warnings; my ($src, $basename, $out) = @ARGV;
+    local $/ = undef; open my $fh, "<", $src or die "open $src: $!"; my $text = <$fh>; close $fh;
+    sub unhash { my $s = shift; $s =~ s/^# ?//mg; $s =~ s/\s+$/\n/; return $s }
+    print "= $basename\n\n";
+    if ($text =~ /\A((?:#.*\n)+)/) { my $top = $1; $top = unhash($top); print $top, "\n" }
+    pos($text) = 0;
+    while ($text =~ /(?:\n|\A)((?:#.*\n)+)\s*(\s*(?:class|struct|module|enum|def)\b[^\n]*)/g) {
+      my $comment = $1; my $decl = $2; $comment = unhash($comment);
+      my ($title) = ($comment =~ /^(.*\S.*)$/m); $title = defined $title ? $title : $decl; $title =~ s/^\s+|\s+$//g;
+      print "== $title\n\n"; print $comment, "\n" if $comment =~ /\S/;
+      print "[source,crystal]\n----\n"; print $decl, "\n"; print "----\n\n";
+    }
+  ' -- "$src" "$base" > "$out"
+
+  if [ -s "$out" ]; then
+    size=$(wc -c < "$out" | tr -d ' ')
+    echo "Wrote $out ($size bytes)" >&2
+  else
+    echo "Warning: $out is empty" >&2
+    # Ensure minimal placeholder
+    echo "= $base" > "$out"
+    echo "" >> "$out"
+    echo "(no extracted comments)" >> "$out"
+  fi
+
+done
+
+if [ "$found" -eq 0 ]; then
+  echo "No source files found under src/" >&2
+  exit 1
+fi
+
+echo "Generated docs/api/*.adoc." >&2
