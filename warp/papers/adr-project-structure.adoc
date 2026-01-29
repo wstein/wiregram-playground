@@ -1,0 +1,70 @@
+= ADR: Project Structure and Module Naming
+:doctype: article
+:toc: left
+:toclevels: 3
+:sectnums:
+:author: simdjson Crystal maintainers
+:revdate: 2026-02-01
+:revnumber: 1.0
+
+== Status
+
+Accepted
+
+== Context
+
+The codebase is at the beginning of a large refactor with expected growth
+to 5-10x more files and 20x more code. The current naming (`Stage1`, `Stage2`)
+is specific to a two-stage JSON parser and does not support planned expansion
+to multiple languages (UCL, YAML, TOML, XML, OZ, etc.) or future components
+such as PEG/LALR parsers, ASTs, transformers, semantic analyzers, linters,
+fixers, MCP, and LSP integrations.
+
+To scale, we need:
+
+- intent-driven module names
+- clear architectural boundaries
+- a folder structure that mirrors module namespaces
+
+== Decision
+
+Adopt a language-agnostic architecture split into:
+
+- `Lex` (tokenization / structural scanning)
+- `Parse` (grammar parsing)
+- `IR` (intermediate representations, including tape)
+- `AST` (semantic tree structures)
+
+Supporting namespaces:
+
+- `Input` (buffers, IO, padding)
+- `Transform` (IR/AST transformations)
+- `Validate` (semantic validation)
+- `Tooling` (linter, fixer, formatter, LSP, MCP)
+
+Rename Stage-specific modules:
+
+- `Stage1` → `Lex::StructuralScan` (or `Lex::StructuralIndexer`)
+- `Stage2` → `IR::TapeBuilder`
+
+Maintain CPU-specific SIMD backends under `Lex::Backends`.
+
+== Consequences
+
+- Names become self-explanatory and scale to multiple languages.
+- Future parsers (PEG/LALR) can live under `Parse` without rework.
+- Tooling components are isolated from core parsing logic.
+- A larger number of smaller files is encouraged, but with consistent layout.
+
+== Alternatives Considered
+
+=== Keep Stage1/Stage2 naming
+
+Pros: No renaming work.
+Cons: Does not scale beyond JSON or the current two-stage pipeline.
+
+=== Use front-end/back-end naming
+
+Pros: Common compiler terminology.
+Cons: Too coarse; does not cleanly separate lex/parse/IR/AST responsibilities.
+

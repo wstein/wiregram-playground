@@ -1,0 +1,71 @@
+= Project Structure Review - Meeting Minutes
+:doctype: article
+:toc: left
+:toclevels: 3
+:sectnums:
+:author: simdjson Crystal maintainers
+:revdate: 2026-02-01
+:revnumber: 1.0
+
+== Meeting Information
+
+[cols="1,3"]
+|===
+|Date |2026-02-01
+|Duration |60 minutes
+|Attendees |Core maintainers, performance lead, tooling lead
+|Purpose |Align on project structure for upcoming refactor and multi-language extensibility
+|Status |Completed - Action items assigned
+|===
+
+== Agenda
+
+1. Replace Stage1/Stage2 naming with intent-driven modules
+2. Define long-term extensible folder structure
+3. Confirm Lex/Parse/IR/AST separation
+4. Identify follow-up actions and documentation updates
+
+== Discussion Summary
+
+=== Current Pain Points
+
+- Stage1/Stage2 naming is unclear for new contributors and does not scale to other languages.
+- Anticipated code growth (5-10x files, 20x code) requires strict module boundaries.
+- Future features (PEG/LALR, AST, transformer, linter, fixer, LSP/MCP) need clean ownership.
+
+=== Proposed Structure (Summary)
+
+- Adopt `Lex/Parse/IR/AST` as the primary architecture split.
+- Create supporting namespaces for `Input`, `Transform`, `Validate`, and `Tooling`.
+- Mirror module namespaces in the folder structure for clarity.
+
+=== Key Decisions
+
+- **Approved**: Replace Stage1 with `Lex::StructuralScan` (or `Lex::StructuralIndexer`).
+- **Approved**: Replace Stage2 with `IR::TapeBuilder`.
+- **Approved**: Establish top-level namespaces for `Lex`, `Parse`, `IR`, `AST`.
+- **Approved**: Keep CPU-specific SIMD backends under `Lex::Backends`.
+- **Deferred**: Exact naming for future IR nodes beyond tape.
+
+== Implementation Notes (Current State)
+
+- Stage1 is implemented as `Warp::Lexer::StructuralScan` in `src/warp/lexer/`.
+- Stage2 is implemented as `Warp::IR::TapeBuilder` in `src/warp/ir/`.
+- Backend-specific SIMD logic lives under `src/warp/backend/`, with scalar fallback.
+- The public API uses `Warp::Parser` to expose token iteration and IR parsing.
+
+== Action Items
+
+[cols="2,4,2",options="header"]
+|===
+|Owner |Action |Due
+|Maintainers |Create ADR documenting structure |Completed (ADR added)
+|Maintainers |Draft file path mapping for existing sources |In progress
+|Tooling lead |Propose `Tooling` submodules (linter/fixer/LSP/MCP) |Pending
+|===
+
+== Open Questions
+
+- Should `IR::Tape` be nested under `IR::Tape`, or remain as `IR::TapeBuilder` and `IR::TapeIterator`?
+- How should shared utilities be partitioned between `Core` and `Input`?
+- Should language-specific parsing live under `Parse::Json`, `Parse::Yaml`, etc., or a generic `Parse` with plugins?

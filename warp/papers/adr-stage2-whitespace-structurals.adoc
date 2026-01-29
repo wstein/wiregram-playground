@@ -1,0 +1,68 @@
+= ADR: Stage2 Whitespace Structurals
+:doctype: article
+:toc: left
+:toclevels: 3
+:sectnums:
+:author: simdjson Crystal maintainers
+:revdate: 2026-02-01
+:revnumber: 1.0
+
+== Status
+
+Accepted (Implemented)
+
+== Context
+
+Stage 1 emits structural indices that include operators (commas, colons, braces, brackets),
+quote characters, and scalar starts. The current mask builder classifies `\n` and `\r` as
+operators, which means newlines are emitted as structurals. Stage 2 assumes structural
+indices only contain JSON structural characters and scalar starts, so encountering `\n`
+or `\r` causes a parse failure on pretty-printed JSON.
+
+At the same time, the public token iterator (`Parser#each_token`) benefits from seeing
+newline positions to expose `TokenType::Newline`.
+
+== Decision
+
+Keep `\n` and `\r` in Stage 1 structural indices to preserve newline tokenization, but
+make Stage 2 explicitly skip newline structurals as whitespace during parsing.
+
+In effect:
+
+- Stage 1 remains the source of newline positions for tokenization.
+- Stage 2 treats `\n` and `\r` as ignorable whitespace, skipping them when advancing
+  structural indices for parsing.
+
+== Implementation
+
+- Stage 1 continues to classify `\n` and `\r` as structural operators.
+- Stage 2 skips newline structurals in the iterator when advancing significant indices
+  (see `src/warp/ir/tape_builder.cr`).
+- The token iterator continues to emit `TokenType::Newline` for LF/CR/CRLF via
+  `Warp::Parser#each_token` (`src/warp/parser.cr`).
+
+== Verification
+
+- `spec/unit/ir_spec.cr` covers significant structural counts that skip newlines.
+- `spec/unit/parser_newlines_spec.cr` verifies LF/CR/CRLF tokenization.
+
+== Consequences
+
+- Stage 2 will correctly parse formatted JSON that contains newlines.
+- The token iterator retains its ability to emit `Newline` tokens.
+- Stage 2 gains a small amount of additional logic to skip newline structurals, which is
+  a minimal cost compared to correctness gains.
+
+== Alternatives Considered
+
+=== Remove newlines from Stage 1 structurals
+
+Pros: Stage 2 logic stays unchanged.
+Cons: Loses newline tokenization, and requires a separate path if newlines are still
+desired for token iteration.
+
+=== Treat newlines as regular whitespace in Stage 1 masks
+
+Pros: Simplifies structural output.
+Cons: Diverges from the current tokenization behavior and reduces the visibility of
+newline locations without additional scanning.

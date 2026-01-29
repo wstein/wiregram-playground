@@ -30,6 +30,9 @@ This index provides a guide to the comprehensive SIMD architecture review docume
 
 - RFC: [simd-architecture-rfc.adoc](simd-architecture-rfc.adoc)
 - ADR: [simd-architecture-adr.adoc](simd-architecture-adr.adoc)
+- ADR: [adr-stage2-whitespace-structurals.adoc](adr-stage2-whitespace-structurals.adoc)
+- ADR: [adr-project-structure.adoc](adr-project-structure.adoc)
+- Minutes: [structure-review-minutes.adoc](structure-review-minutes.adoc)
 
 == Document Descriptions
 
@@ -246,7 +249,7 @@ For implementation team members:
 4. [expert-panel-review.adoc](expert-panel-review.adoc) - Read relevant expert sections:
    - Crystal Developer's Perspective (for language-specific guidance)
    - Assembly Programmer's Perspective (for performance optimization)
-5. Current codebase: [src/simdjson/stage1.cr](../src/simdjson/stage1.cr), [src/simdjson/neon.cr](../src/simdjson/neon.cr)
+5. Current codebase: [src/warp/lexer/structural_scan.cr](../src/warp/lexer/structural_scan.cr), [src/warp/backend/neon_masks.cr](../src/warp/backend/neon_masks.cr)
 
 **Outcome**: Ready to begin implementation
 
@@ -388,13 +391,13 @@ For students, researchers, or those interested in the theory:
 == Related Files
 
 === Source Code
-- [src/simdjson/stage1.cr](../src/simdjson/stage1.cr) - Current Stage1 implementation
-- [src/simdjson/neon.cr](../src/simdjson/neon.cr) - Current NEON backend
-- [src/simdjson/stage2.cr](../src/simdjson/stage2.cr) - Stage2 implementation
-- [src/simdjson/types.cr](../src/simdjson/types.cr) - Type definitions
+- [src/warp/lexer/structural_scan.cr](../src/warp/lexer/structural_scan.cr) - Structural scanning (Stage1)
+- [src/warp/backend/neon_masks.cr](../src/warp/backend/neon_masks.cr) - NEON mask builder
+- [src/warp/ir/tape_builder.cr](../src/warp/ir/tape_builder.cr) - Tape building (Stage2)
+- [src/warp/core/types.cr](../src/warp/core/types.cr) - Type definitions
 
 === Tests
-- [spec/unit/stage1_spec.cr](../spec/unit/stage1_spec.cr) - Stage1 unit tests
+- [spec/unit/lexer_spec.cr](../spec/unit/lexer_spec.cr) - Lexer unit tests
 - [spec/integration/](../spec/integration/) - Integration tests
 
 === Benchmarks
