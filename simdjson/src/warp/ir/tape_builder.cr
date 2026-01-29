@@ -1,16 +1,18 @@
-# Stage 2: Tape builder and document representation
+# IR: Tape builder and document representation
 #
 # Summary
 #
-# Converts the structural indices (from stage 1) into a compact "tape"
+# Converts the structural indices (from the lexer) into a compact "tape"
 # representation that is efficient to traverse. The tape stores typed
 # entries (strings, numbers, structural markers) and supports iteration
 # and slicing into the original `Bytes` buffer.
 #
-# See `Stage2::Builder` for how the tape is constructed and `Document`
+# See `IR::Builder` for how the tape is constructed and `Document`
 # / `TapeIterator` for traversal utilities.
-module Simdjson
-  module Stage2
+module Warp
+  module IR
+    alias ErrorCode = Core::ErrorCode
+    alias LexerBuffer = Core::LexerBuffer
     # TapeType enumerates kinds of entries stored on the tape.
     enum TapeType
       Root
@@ -61,7 +63,7 @@ module Simdjson
     end
 
     # Result wraps an optional `Document` and an `ErrorCode` returned by
-    # `Stage2.parse`.
+    # `IR.parse`.
     struct Result
       getter doc : Document?
       getter error : ErrorCode
@@ -103,7 +105,7 @@ module Simdjson
     end
 
     # Builder incrementally constructs the tape. It is used internally by
-    # `Stage2.parse` but documented here for completeness.
+    # `IR.parse` but documented here for completeness.
     class Builder
       getter tape : Array(Entry)
 
@@ -167,27 +169,27 @@ module Simdjson
 
       def primitive(start_index : Int32, next_struct : Int32) : ErrorCode
         first = @bytes[start_index]
-        end_index = Stage2.scan_scalar_end(@bytes, start_index, next_struct)
+        end_index = IR.scan_scalar_end(@bytes, start_index, next_struct)
         length = end_index - start_index
 
         case first
         when 't'.ord
-          if @validate_literals && !Stage2.valid_true?(@bytes, start_index, length)
+          if @validate_literals && !IR.valid_true?(@bytes, start_index, length)
             return ErrorCode::TAtomError
           end
           @tape << Entry.new(TapeType::True, start_index, length)
         when 'f'.ord
-          if @validate_literals && !Stage2.valid_false?(@bytes, start_index, length)
+          if @validate_literals && !IR.valid_false?(@bytes, start_index, length)
             return ErrorCode::FAtomError
           end
           @tape << Entry.new(TapeType::False, start_index, length)
         when 'n'.ord
-          if @validate_literals && !Stage2.valid_null?(@bytes, start_index, length)
+          if @validate_literals && !IR.valid_null?(@bytes, start_index, length)
             return ErrorCode::NAtomError
           end
           @tape << Entry.new(TapeType::Null, start_index, length)
         else
-          if @validate_numbers && !Stage2.valid_number?(@bytes, start_index, length)
+          if @validate_numbers && !IR.valid_number?(@bytes, start_index, length)
             return ErrorCode::NumberError
           end
           @tape << Entry.new(TapeType::Number, start_index, length)
@@ -201,16 +203,16 @@ module Simdjson
       end
 
       private def string_entry(start_index : Int32, type : TapeType, next_struct : Int32) : ErrorCode
-        end_index = Stage2.scan_string_end(@bytes, start_index + 1, next_struct)
+        end_index = IR.scan_string_end(@bytes, start_index + 1, next_struct)
         return ErrorCode::UnclosedString if end_index < 0
         @tape << Entry.new(type, start_index + 1, end_index - (start_index + 1))
         ErrorCode::Success
       end
     end
 
-    # Iterator over structural indices returned by stage1.
+    # Iterator over structural indices returned by the lexer.
     class Iterator
-      def initialize(@bytes : Bytes, buffer : Stage1Buffer)
+      def initialize(@bytes : Bytes, buffer : LexerBuffer)
         @indices = buffer.ptr
         @count = buffer.count
         @pos = 0
@@ -237,15 +239,60 @@ module Simdjson
         idx
       end
 
+      def peek_significant_byte : UInt8
+        idx = peek_significant_index
+        return 0_u8 if idx < 0
+        @bytes[idx]
+      end
+
+      def peek_significant_index : Int32
+        i = @pos
+        while i < @count
+          idx = @indices[i].to_i
+          b = @bytes[idx]
+          return idx unless b == '\n'.ord || b == '\r'.ord
+          i += 1
+        end
+        -1
+      end
+
+      def advance_significant_index : Int32
+        skip_newlines
+        return -1 if at_eof?
+        idx = @indices[@pos].to_i
+        @pos += 1
+        idx
+      end
+
       @[NoInline]
       def remaining_structurals : Int32
         remaining = @count - @pos
         remaining
       end
 
+      def remaining_significant_structurals : Int32
+        count = 0
+        i = @pos
+        while i < @count
+          idx = @indices[i].to_i
+          b = @bytes[idx]
+          count += 1 unless b == '\n'.ord || b == '\r'.ord
+          i += 1
+        end
+        count
+      end
+
       def last_structural_byte : UInt8
         return 0_u8 if @count == 0
         @bytes[@indices[@count - 1]]
+      end
+
+      private def skip_newlines
+        while @pos < @count
+          b = @bytes[@indices[@pos]]
+          break unless b == '\n'.ord || b == '\r'.ord
+          @pos += 1
+        end
       end
     end
 
@@ -289,16 +336,16 @@ module Simdjson
       end
     end
 
-    # Parse a document from the structural indices produced by stage1.
+    # Parse a document from the structural indices produced by the lexer.
     # Build a `Document` (tape) from structural indices.
     #
     # Summary
     #
-    # Converts structural indices from `Stage1` into a compact tape representation.
-    # Returns `Stage2::Result` with a `Document` on success or an `ErrorCode` on failure.
+    # Converts structural indices from the lexer into a compact tape representation.
+    # Returns `IR::Result` with a `Document` on success or an `ErrorCode` on failure.
     def self.parse(
       bytes : Bytes,
-      buffer : Stage1Buffer,
+      buffer : LexerBuffer,
       max_depth : Int32,
       validate_literals : Bool = false,
       validate_numbers : Bool = false,
@@ -309,7 +356,7 @@ module Simdjson
       builder = Builder.new(bytes, validate_literals, validate_numbers, buffer.count)
       stack = Array(Context).new(max_depth)
 
-      root_index = iter.advance_index
+      root_index = iter.advance_significant_index
       return Result.new(nil, ErrorCode::TapeError) if root_index < 0
 
       error = parse_value(bytes, root_index, iter, builder, stack, max_depth)
@@ -322,50 +369,50 @@ module Simdjson
         when ContextKind::Object
           case ctx.state
           when ContextState::ObjectKey
-            idx = iter.advance_index
+            idx = iter.advance_significant_index
             return Result.new(nil, ErrorCode::TapeError) if idx < 0
             if bytes[idx] != '"'.ord
               return Result.new(nil, ErrorCode::TapeError)
             end
             builder.increment_count
-            error = builder.key(idx, iter.peek_index)
+            error = builder.key(idx, iter.peek_significant_index)
             return Result.new(nil, error) unless error.success?
             ctx = stack[ctx_index]
             ctx.state = ContextState::ObjectColon
             stack[ctx_index] = ctx
           when ContextState::ObjectColon
-            idx = iter.advance_index
+            idx = iter.advance_significant_index
             return Result.new(nil, ErrorCode::TapeError) if idx < 0
             return Result.new(nil, ErrorCode::TapeError) if bytes[idx] != ':'.ord
             ctx = stack[ctx_index]
             ctx.state = ContextState::ObjectValue
             stack[ctx_index] = ctx
           when ContextState::ObjectValue
-            idx = iter.advance_index
+            idx = iter.advance_significant_index
             return Result.new(nil, ErrorCode::TapeError) if idx < 0
             ctx = stack[ctx_index]
             ctx.state = ContextState::ObjectCommaOrEnd
             stack[ctx_index] = ctx
             error = parse_value(bytes, idx, iter, builder, stack, max_depth)
             return Result.new(nil, error) unless error.success?
-            nxt = iter.peek_index
+            nxt = iter.peek_significant_index
             if nxt >= 0
               b = bytes[nxt]
               if b == ','.ord
-                iter.advance_index
+                iter.advance_significant_index
                 ctx = stack[ctx_index]
                 ctx.state = ContextState::ObjectKey
                 stack[ctx_index] = ctx
                 next
               elsif b == '}'.ord
-                iter.advance_index
+                iter.advance_significant_index
                 builder.end_object
                 stack.pop
                 next
               end
             end
           when ContextState::ObjectCommaOrEnd
-            idx = iter.advance_index
+            idx = iter.advance_significant_index
             return Result.new(nil, ErrorCode::TapeError) if idx < 0
             case bytes[idx]
             when ','.ord
@@ -385,31 +432,31 @@ module Simdjson
           case ctx.state
           when ContextState::ArrayValue
             builder.increment_count
-            idx = iter.advance_index
+            idx = iter.advance_significant_index
             return Result.new(nil, ErrorCode::TapeError) if idx < 0
             ctx = stack[ctx_index]
             ctx.state = ContextState::ArrayCommaOrEnd
             stack[ctx_index] = ctx
             error = parse_value(bytes, idx, iter, builder, stack, max_depth)
             return Result.new(nil, error) unless error.success?
-            nxt = iter.peek_index
+            nxt = iter.peek_significant_index
             if nxt >= 0
               b = bytes[nxt]
               if b == ','.ord
-                iter.advance_index
+                iter.advance_significant_index
                 ctx = stack[ctx_index]
                 ctx.state = ContextState::ArrayValue
                 stack[ctx_index] = ctx
                 next
               elsif b == ']'.ord
-                iter.advance_index
+                iter.advance_significant_index
                 builder.end_array
                 stack.pop
                 next
               end
             end
           when ContextState::ArrayCommaOrEnd
-            idx = iter.advance_index
+            idx = iter.advance_significant_index
             return Result.new(nil, ErrorCode::TapeError) if idx < 0
             case bytes[idx]
             when ','.ord
@@ -428,7 +475,7 @@ module Simdjson
         end
       end
 
-      if iter.remaining_structurals > 0
+      if iter.remaining_significant_structurals > 0
         return Result.new(nil, ErrorCode::TapeError)
       end
 
@@ -444,11 +491,11 @@ module Simdjson
       stack : Array(Context),
       max_depth : Int32,
     ) : ErrorCode
-      next_struct = iter.peek_index
+      next_struct = iter.peek_significant_index
       case bytes[idx]
       when '{'.ord
-        if iter.peek_byte == '}'.ord
-          iter.advance_index
+        if iter.peek_significant_byte == '}'.ord
+          iter.advance_significant_index
           builder.empty_object
           return ErrorCode::Success
         end
@@ -457,8 +504,8 @@ module Simdjson
         stack << Context.new(ContextKind::Object, ContextState::ObjectKey)
         ErrorCode::Success
       when '['.ord
-        if iter.peek_byte == ']'.ord
-          iter.advance_index
+        if iter.peek_significant_byte == ']'.ord
+          iter.advance_significant_index
           builder.empty_array
           return ErrorCode::Success
         end
