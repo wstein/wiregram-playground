@@ -1,4 +1,4 @@
-name: simdjson
+name: warp
 version: 0.1.0
 crystal: ">= 1.19.0"
 license: MIT
@@ -7,7 +7,7 @@ authors:
   - Werner Stein <werner.stein@gmail.com>
 
 targets:
-  simdjson_bench:
+  warp_bench:
     main: bin/bench.cr
 
 development_dependencies:

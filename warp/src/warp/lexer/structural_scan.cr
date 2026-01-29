@@ -1,4 +1,4 @@
-# Stage 1: Structural index scanner
+# Lexer: Structural index scanner
 #
 # Summary
 #
@@ -8,12 +8,15 @@
 # performs lightweight UTF-8 validation and string escape scanning.
 #
 # Details
-# - Produces an `Array(UInt32)` of structural indices via `Stage1.index`.
+# - Produces a `LexerBuffer` of structural indices via `StructuralScan.index`.
 # - Exposes utilities for scanning strings, escapes, and validating UTF-8.
-module Simdjson
-  module Stage1
+module Warp
+  module Lexer
+    alias ErrorCode = Core::ErrorCode
+    alias LexerBuffer = Core::LexerBuffer
+    alias LexerResult = Core::LexerResult
+
     ODD_BITS = 0xAAAAAAAAAAAAAAAA_u64
-    VERIFY_NEON = ENV["SIMDJSON_VERIFY_NEON"]? == "1"
 
     struct EscapeScanResult
       getter escaped : UInt64
@@ -76,7 +79,7 @@ module Simdjson
       def next(backslash : UInt64, quote_mask : UInt64) : StringBlock
         escaped = @escape_scanner.next(backslash).escaped
         quote = quote_mask & ~escaped
-        in_string = Stage1.prefix_xor(quote) ^ @prev_in_string
+        in_string = Lexer.prefix_xor(quote) ^ @prev_in_string
         @prev_in_string = (in_string & 0x8000000000000000_u64) == 0 ? 0_u64 : 0xFFFFFFFFFFFFFFFF_u64
         StringBlock.new(escaped, quote, in_string)
       end
@@ -143,14 +146,6 @@ module Simdjson
         result = (match << 1) | (@prev_scalar & 1_u64)
         @prev_scalar = match >> 63
         result
-      end
-    end
-
-    struct Result
-      getter indices : Array(UInt32)
-      getter error : ErrorCode
-
-      def initialize(@indices : Array(UInt32), @error : ErrorCode)
       end
     end
 
@@ -344,23 +339,26 @@ module Simdjson
       end
     end
 
-    def self.index(bytes : Bytes) : Result
+    def self.index(bytes : Bytes) : LexerResult
       ptr = bytes.to_unsafe
       len = bytes.size
       indices = Array(UInt32).new
       scanner = Scanner.new
       unescaped_error = 0_u64
       utf8 = Utf8Validator.new
+      backend = Backend.current
+      error = ErrorCode::Success
 
       offset = 0
       while offset < len
         block_len = len - offset
         block_len = 64 if block_len > 64
         unless utf8.consume(ptr + offset, block_len)
-          return Result.new(indices, ErrorCode::Utf8Error)
+          error = ErrorCode::Utf8Error
+          break
         end
 
-        masks = build_masks(ptr + offset, block_len)
+        masks = backend.build_masks(ptr + offset, block_len)
         block = scanner.next(masks.backslash, masks.quote, masks.whitespace, masks.op)
 
         structural = block.structural_start
@@ -379,236 +377,22 @@ module Simdjson
         offset += 64
       end
 
-      error = scanner.finish
-      if error == ErrorCode::Success && !utf8.finish?
-        error = ErrorCode::Utf8Error
-      end
-      if error == ErrorCode::Success && unescaped_error != 0
-        error = ErrorCode::UnescapedChars
-      end
-      if error == ErrorCode::Success && indices.empty?
-        error = ErrorCode::Empty
+      if error == ErrorCode::Success
+        error = scanner.finish
+        if error == ErrorCode::Success && !utf8.finish?
+          error = ErrorCode::Utf8Error
+        end
+        if error == ErrorCode::Success && unescaped_error != 0
+          error = ErrorCode::UnescapedChars
+        end
+        if error == ErrorCode::Success && indices.empty?
+          error = ErrorCode::Empty
+        end
       end
 
-      Result.new(indices, error)
+      buffer = LexerBuffer.new(indices.to_unsafe, indices.size, indices)
+      LexerResult.new(buffer, error)
     end
-
-    private def self.build_masks(ptr : Pointer(UInt8), block_len : Int32) : Masks
-      backslash = 0_u64
-      quote = 0_u64
-      whitespace = 0_u64
-      op = 0_u64
-      control = 0_u64
-
-      i = 0
-      {% if flag?(:aarch64) %}
-        while i + 7 < block_len
-          m = Neon.scan8(ptr + i)
-          if VERIFY_NEON
-            scalar = scalar_masks(ptr + i, 8)
-            if (scalar.backslash & 0xff_u16).to_u8 != m.backslash ||
-               (scalar.quote & 0xff_u16).to_u8 != m.quote ||
-               (scalar.whitespace & 0xff_u16).to_u8 != m.whitespace ||
-               (scalar.op & 0xff_u16).to_u8 != m.op ||
-               (scalar.control & 0xff_u16).to_u8 != m.control
-              m = Neon::Masks8.new(
-                (scalar.backslash & 0xff_u16).to_u8,
-                (scalar.quote & 0xff_u16).to_u8,
-                (scalar.whitespace & 0xff_u16).to_u8,
-                (scalar.op & 0xff_u16).to_u8,
-                (scalar.control & 0xff_u16).to_u8
-              )
-            end
-          end
-          shift = i
-          backslash |= m.backslash.to_u64 << shift
-          quote |= m.quote.to_u64 << shift
-          whitespace |= m.whitespace.to_u64 << shift
-          op |= m.op.to_u64 << shift
-          control |= m.control.to_u64 << shift
-          i += 8
-        end
-      {% end %}
-      while i < block_len
-        c = ptr[i]
-        bit = 1_u64 << i
-
-        if c <= 0x1f_u8
-          control |= bit
-        end
-
-        case c
-        when 0x20_u8, 0x09_u8
-          whitespace |= bit
-        when 0x0a_u8, 0x0d_u8
-          op |= bit
-        when '['.ord, ']'.ord, '{'.ord, '}'.ord, ':'.ord, ','.ord
-          op |= bit
-        end
-
-        if c == '\\'.ord
-          backslash |= bit
-        elsif c == '"'.ord
-          quote |= bit
-        end
-
-        i += 1
-      end
-
-      # TODO optimize! Partial blocks should be not be possible, as padded buffers are used.
-      if block_len < 64
-        whitespace |= ~0_u64 << block_len
-      end
-
-      Masks.new(backslash, quote, whitespace, op, control)
-    end
-
-    private def self.scalar_masks(ptr : Pointer(UInt8), len : Int32) : Neon::Masks16
-      backslash = 0_u16
-      quote = 0_u16
-      whitespace = 0_u16
-      op = 0_u16
-      control = 0_u16
-
-      i = 0
-      while i < len
-        b = ptr[i]
-        bit = 1_u16 << i
-        control |= bit if b <= 0x1f
-        case b
-        when 0x20, 0x09
-          whitespace |= bit
-        when 0x0a, 0x0d
-          op |= bit
-        when '{'.ord, '}'.ord, '['.ord, ']'.ord, ':'.ord, ','.ord
-          op |= bit
-        end
-        backslash |= bit if b == '\\'.ord
-        quote |= bit if b == '"'.ord
-        i += 1
-      end
-
-      Neon::Masks16.new(backslash, quote, whitespace, op, control)
-    end
-
-    # Why padding may be required for NEON
-    #
-    # Some NEON helpers load 16 bytes at a time (e.g. ld1 {v0.16b}, [ptr]).
-    # Stage1 avoids overreads by only invoking those helpers on full blocks.
-    # If you plan to call the NEON helpers on arbitrary buffers without
-    # bounds checks, pad the input with 16 zero bytes to keep the loads safe.
-    #
-    # We provide utility helpers below that allocate a padded buffer, read a
-    # file into it, and zero the trailing bytes. Callers are responsible for
-    # freeing the returned buffer with `free_padded_buffer`.
-
-    {% if flag?(:aarch64) %}
-    lib LibC_Read
-      fun malloc(size : UInt64) : Pointer(Void)
-      fun free(ptr : Pointer(Void)) : Nil
-      fun memcpy(dest : Pointer(Void), src : Pointer(Void), n : UInt64) : Pointer(Void)
-      fun memset(dest : Pointer(Void), c : Int32, n : UInt64) : Pointer(Void)
-    end
-
-    # read_file_padded(path) -> (ptr, len)
-    #
-    # Allocates a buffer of file_size + 16, reads the file content into it and
-    # zeroes the trailing 16 bytes. Returns a pointer to the buffer (Pointer(UInt8))
-    # and the original file length as Int32. On error the function returns
-    # Pointer(UInt8).null and length 0.
-    def self.read_file_padded(path : String) : Tuple(Pointer(UInt8), Int32)
-      o_rdonly = 0
-      seek_set = 0
-      seek_end = 2
-
-      fd = LibC.open(path.to_unsafe, o_rdonly, 0)
-      if fd < 0
-        return {Pointer(UInt8).null, 0}
-      end
-
-      size = LibC.lseek(fd, 0, seek_end)
-      if size < 0
-        LibC.close(fd)
-        return {Pointer(UInt8).null, 0}
-      end
-      LibC.lseek(fd, 0, seek_set)
-
-      total = size.to_u64 + 16_u64
-      allocated = LibC_Read.malloc(total)
-      if allocated.null?
-        LibC.close(fd)
-        return {Pointer(UInt8).null, 0}
-      end
-
-      read_total = 0_i64
-      while read_total < size
-        r = LibC.read(fd, allocated + read_total, (size - read_total).to_u64)
-        if r <= 0
-          LibC_Read.free(allocated)
-          LibC.close(fd)
-          return {Pointer(UInt8).null, 0}
-        end
-        read_total += r
-      end
-
-      LibC_Read.memset(allocated + size, 0, 16_u64)
-      LibC.close(fd)
-
-      {allocated.as(Pointer(UInt8)), size.to_i}
-    end
-
-    # free_padded_buffer(ptr)
-    #
-    # Free a buffer previously returned by `read_file_padded`.
-    def self.free_padded_buffer(ptr : Pointer(UInt8))
-      return if ptr.null?
-      LibC_Read.free(ptr.as(Pointer(Void)))
-    end
-
-    # read_file_padded_bytes(path) -> Bytes
-    #
-    # Convenience wrapper that returns a GC-managed `Bytes` slice backed by an
-    # `Array(UInt8)` containing the file contents plus 16 zero bytes. This is
-    # the recommended high-level API in Crystal code since it avoids manual
-    # malloc/free and is safe to pass to NEON-backed functions.
-    def self.read_file_padded_bytes(path : String) : Bytes
-      # Try to read directly into a Crystal-managed Array(UInt8) to avoid
-      # an extra copy. This is done using low-level libc syscalls to get the
-      # file size and perform direct reads into the array's memory.
-      begin
-        o_rdonly = 0
-        seek_end = 2
-        seek_set = 0
-
-        fd = LibC.open(path.to_unsafe, o_rdonly, 0)
-        return Bytes.new(0) if fd < 0
-
-        size = LibC.lseek(fd, 0, seek_end)
-        if size < 0
-          LibC.close(fd)
-          return Bytes.new(0)
-        end
-        LibC.lseek(fd, 0, seek_set)
-
-        buf = Bytes.new(size.to_i + 16)
-        read_total = 0_i64
-        while read_total < size
-          r = LibC.read(fd, buf.to_unsafe + read_total, (size - read_total).to_u64)
-          if r <= 0
-            LibC.close(fd)
-            return Bytes.new(0)
-          end
-          read_total += r
-        end
-
-        LibC.close(fd)
-        # trailing bytes are zero-initialized by Bytes.new
-        buf
-      rescue ex
-        Bytes.new(0)
-      end
-    end
-    {% end %}
 
     def self.prefix_xor(bitmask : UInt64) : UInt64
       bitmask ^= bitmask << 1

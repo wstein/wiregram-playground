@@ -33,7 +33,8 @@ system(env, *build_cmd) || abort("Failed to build spec runner.")
 
 kcov_cmd = [
   "kcov",
-  "--include-pattern=#{File.join(root, "src")},#{File.join(root, "spec")}",
+  "--include-pattern=#{File.join(root, "src")}",
+  "--exclude-pattern=#{File.join(root, "spec")}",
   "--exclude-pattern=/usr,/opt/homebrew/Cellar",
   out_dir,
   spec_bin
@@ -117,7 +118,7 @@ overall_branch_pct = overall_branch_total.zero? ? 0.0 : (overall_branch_covered.
 
 puts "Overall line coverage: #{colored_pct(overall_line_pct)} (#{overall_line_covered}/#{overall_line_total})"
 if overall_branch_total.zero?
-  puts "Overall branch coverage: #{gray("N/A")}"
+  puts "Overall branch coverage: #{gray("N/A") }"
 else
   puts "Overall branch coverage: #{colored_pct(overall_branch_pct)} (#{overall_branch_covered}/#{overall_branch_total})"
 end
@@ -149,8 +150,22 @@ if verbose
   coverage.each do |path, lines|
     line_pct, line_cov, line_total, _bp, _bc, _bt = summarize_file(lines)
     next if line_total.zero? || line_cov == line_total
-    file_path = File.join(root, path)
-    next unless File.exist?(file_path)
+
+    # Try to resolve the coverage JSON path to an actual file on disk.
+    candidates = []
+    if path.start_with?("/")
+      candidates << path
+    else
+      candidates << File.join(root, path)
+      candidates << File.join(root, "src", path)
+      candidates << File.join(root, "src", "warp", path)
+      # also try if the JSON path already contains src/ prefix
+      candidates << File.join(root, path.sub(%r{^src/}, ""))
+    end
+
+    file_path = candidates.find { |p| File.exist?(p) }
+    next unless file_path
+
     content = File.readlines(file_path, chomp: true)
     missed = []
     lines.each do |line_no, val|
@@ -158,19 +173,14 @@ if verbose
       next if total <= 0
       if cov.zero?
         missed << [line_no.to_i, :none, val]
-      #elsif cov < total
-      #  missed << [line_no.to_i, :partial, val]
       end
     end
     next if missed.empty?
-    puts "\n#{path}"
+    rel = file_path.sub(/^#{Regexp.escape(root)}\/?/, "")
+    puts "\n#{rel}"
     missed.sort_by(&:first).each do |line_no, status, val|
       line = content[line_no - 1] || ""
-      #if status == :partial
-      #  hint = " " + colorize("   # partial branch coverage: ", "38") + colorize(val, "34")
-      #else
-        hint = ""
-      #end
+      hint = ""
       num = USE_COLOR ? colorize(format("%5d", line_no), "31") : format("%5d", line_no)
       line_display = status == :partial ? colorize(line, "33") : colorize(line, "31")
       puts format("  %s | %s%s", num, line_display, hint)

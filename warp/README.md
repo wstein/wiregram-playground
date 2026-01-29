@@ -1,4 +1,4 @@
-# simdjson (Crystal)
+# warp (Crystal)
 
 ARM64-focused JSON parsing scaffolding for Apple Silicon (M-series).
 
@@ -8,7 +8,7 @@ This project provides:
 
 ## Architecture Overview
 
-simdjson follows a two-stage parsing pipeline optimized for performance while maintaining zero-copy semantics.
+Warp follows a lexer + IR parsing pipeline optimized for performance while maintaining zero-copy semantics.
 
 ### Stage 1: Lexer (Structural Scanning)
 **Purpose**: Acts as a high-performance lexer that identifies all structural JSON tokens.
@@ -86,13 +86,13 @@ Build the Crystal side:
 crystal build bin/bench.cr
 ```
 
-Run the benchmark (`--release` for higher throughput):
+Run the benchmark (build with `crystal --release` for higher throughput):
 
 ```
 ./bin/bench [options] <json file> [json file...]
 ```
 Options:
-- `--release`: re-run with `crystal --release` (this is the default behavior).
+- `--backend <name>`: force backend selection (`scalar`, `neon`, `sse2`, `avx`, `avx2`, `avx512`).
 - `--profile`: report stage1/stage2 timings (runs both stages). When passed, `bin/bench` will attempt to enable compile-time LLVM instrumentation and set `LLVM_PROFILE_FILE=bench-%p.profraw` so an `.profraw` file is generated; processing requires `llvm-profdata`/`llvm-cov` (toolchain support may be needed).
 
   Example workflow (when instrumentation succeeds):
@@ -111,7 +111,8 @@ Note: the CLI no longer displays an interactive progress bar during parallel run
 Example:
 
 ```
-./bin/bench --release ~/Downloads/twitter.json big.json big2.json
+crystal build bin/bench.cr -o bin/bench --release
+./bin/bench --backend scalar ~/Downloads/twitter.json big.json big2.json
 ```
 
 ## Coverage
@@ -131,13 +132,13 @@ The parser supports comprehensive newline handling for all common line ending fo
 - **CR** (`\r`) - Classic Mac OS line endings
 - **CRLF** (`\r\n`) - Windows/DOS line endings
 
-All newline types are detected as `TokenType::Newline` tokens during parsing. When a CRLF sequence is encountered, it is treated as a single newline token with length 2.
+All newline types are detected as `TokenType::Newline` tokens during parsing. When a CRLF sequence is encountered, it is treated as a single newline token with length 2 (the trailing `\n` structural index is skipped).
 
 ```crystal
-require "./src/simdjson"
+require "./src/warp"
 
 # All newline types are properly detected
-parser = Simdjson::Parser.new
+parser = Warp::Parser.new
 
 # LF newline
 lf_json = "123\n456".to_slice
@@ -167,10 +168,10 @@ end
 ## Usage
 
 ```crystal
-require "./src/simdjson"
+require "./src/warp"
 
 bytes = File.read("data.json").to_slice
-parser = Simdjson::Parser.new
+parser = Warp::Parser.new
 parser.each_token(bytes) do |tok|
   # tok.type, tok.start, tok.length
   # tok.slice(bytes) returns a zero-copy slice
@@ -326,7 +327,7 @@ def string_entry(start_index : Int32, type : TapeType, next_struct : Int32) : Er
 end
 ```
 
-**Location**: Implement in `src/simdjson/stage2.cr` in the `Builder` class.
+**Location**: Implement in `src/warp/ir/tape_builder.cr` in the `Builder` class.
 
 ### 2. No String Unescaping
 
@@ -375,7 +376,7 @@ def unescape_string(escaped_slice : Bytes) : Bytes
 end
 ```
 
-**Location**: Add to `src/simdjson/stage2.cr` and modify `string_entry` method.
+**Location**: Add to `src/warp/ir/tape_builder.cr` and modify `string_entry` method.
 
 ### 3. No Character Set Conversion
 
@@ -384,7 +385,7 @@ end
 **Suggested Implementation**:
 ```crystal
 # Add conversion module
-module Simdjson::Conversion
+module Warp::Conversion
   def self.to_utf16(utf8_slice : Bytes) : Bytes
     # Convert UTF-8 to UTF-16
     # Could use external library or implement conversion
@@ -400,12 +401,12 @@ class Document
   def string_as_utf16(entry : Stage2::Entry) : Bytes?
     slice = self.slice(entry)
     return nil unless slice
-    Simdjson::Conversion.to_utf16(slice)
+    Warp::Conversion.to_utf16(slice)
   end
 end
 ```
 
-**Location**: Create new file `src/simdjson/conversion.cr` and extend `Document` class.
+**Location**: Create new file `src/warp/conversion.cr` and extend `Document` class.
 
 ### Implementation Strategy
 
@@ -436,11 +437,11 @@ parser.parse_document(bytes,
 ### Basic Token Iteration
 
 ```crystal
-require "./src/simdjson"
+require "./src/warp"
 
 # Read JSON file
 bytes = File.read("data.json").to_slice
-parser = Simdjson::Parser.new
+parser = Warp::Parser.new
 
 # Iterate all tokens
 parser.each_token(bytes) do |token|
@@ -542,7 +543,7 @@ end
 
 ```crystal
 # Reuse parser instance for multiple files
-parser = Simdjson::Parser.new(max_depth: 512)
+parser = Warp::Parser.new(max_depth: 512)
 
 # Process multiple files efficiently
 files = ["file1.json", "file2.json", "file3.json"]
@@ -590,7 +591,7 @@ end
 
 ```crystal
 class JsonValidator
-  def initialize(@parser : Simdjson::Parser)
+  def initialize(@parser : Warp::Parser)
   end
 
   def validate_schema(bytes : Bytes, schema : Hash(String, Symbol))
@@ -651,9 +652,9 @@ end
 ```crystal
 # Example with Kemal framework
 require "kemal"
-require "./src/simdjson"
+require "./src/warp"
 
-parser = Simdjson::Parser.new
+parser = Warp::Parser.new
 
 post "/api/process" do |env|
   body = env.request.body.not_nil!.gets_to_end
@@ -710,7 +711,7 @@ end
 # Efficient memory usage patterns
 
 # 1. Reuse parser instances
-parser = Simdjson::Parser.new
+parser = Warp::Parser.new
 
 # 2. Process files in batches to avoid memory pressure
 def process_files_batch(filenames : Array(String), batch_size : Int32 = 10)
