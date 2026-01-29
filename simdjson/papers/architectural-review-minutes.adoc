@@ -71,7 +71,7 @@ Single backend per CPU architecture with hardcoded block sizes:
 
 [source,crystal]
 ----
-module Simdjson::Stage1
+module Warp::Backend
   {% if flag?(:x86_64) %}
     BLOCK_SIZE = 64  # AVX512
     backend = AVX512Backend
@@ -285,7 +285,7 @@ Runtime backend selection with compile-time block size optimization:
 
 [source,crystal]
 ----
-module Simdjson::Stage1
+module Warp::Backend
   # Runtime backend selection (done once at initialization)
   @@backend = select_best_backend()
 
@@ -339,7 +339,7 @@ end
 
 [source,crystal]
 ----
-module Simdjson::Stage1
+module Warp::Backend
   # Runtime backend selection (cached, done once)
   @@backend : SimdBackend = begin
     if cpu_has_avx512?

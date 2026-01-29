@@ -130,7 +130,7 @@ toc::[]
 [source,text]
 ----
 ┌─────────────────────────────────────┐
-│  Application (Stage1.index)         │
+│  Application (Lexer.index)         │
 └──────────────┬──────────────────────┘
                │
                ▼ (runtime, cached)

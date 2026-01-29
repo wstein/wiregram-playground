@@ -5,18 +5,18 @@ Werner Stein
 This paper summarizes the performance techniques currently present in the simdjson (Crystal) codebase, evaluates their alignment with the Crystal 1.19 performance guide, and proposes further optimizations with an emphasis on SIMD and low-level tuning. The goal is to balance throughput, correctness, and maintainability on Apple Silicon while keeping the code portable to non-AArch64 targets.
 
 == Background
-The project delivers a zero-copy JSON token iterator and a tape-building stage2 parser. Stage1 is SIMD-accelerated on AArch64 via NEON inline assembly and falls back to scalar on other architectures. Stage2 remains scalar but leverages precomputed structural indexes from stage1. The implementation follows Crystal idioms (slices, enums, struct-based results) while adopting low-level techniques inspired by simdjson.
+The project delivers a zero-copy JSON token iterator and a tape-building stage2 parser. Stage1 structural scanning is SIMD-accelerated on AArch64 via NEON inline assembly, with scalar fallback and optional x86 SIMD backends (SSE2/AVX/AVX2/AVX512) when built with the corresponding flags. Stage2 remains scalar but leverages precomputed structural indexes from stage1. The implementation follows Crystal idioms (slices, enums, struct-based results) while adopting low-level techniques inspired by simdjson.
 
 == Current Performance Techniques
-- NEON stage1 scanning: `src/simdjson/neon.cr` uses 128-bit NEON to classify structural characters in 16-byte chunks, minimizing branches and memory traffic.
-- ASCII-fast UTF-8 validation: Stage1 validates ASCII blocks via NEON and carries scalar state for multibyte sequences, avoiding rescans.
+- NEON stage1 scanning: `src/warp/backend/neon_masks.cr` uses NEON to classify structural characters in 16-byte chunks, minimizing branches and memory traffic.
+- ASCII-fast UTF-8 validation: Stage1 validates ASCII blocks via NEON and carries scalar state for multibyte sequences, avoiding rescans (`src/warp/lexer/structural_scan.cr`).
 - Zero-copy slices: Tokens and tape entries reference the original `Bytes` without copying or unescaping.
 - Structural-index–driven stage2: Parsing reuses stage1 indexes to avoid rescanning the byte buffer.
 - Preallocation: Tape and context stack are sized from the structural count to reduce allocations and bounds checks.
 - Parallel benchmarks: `bin/bench` runs per-file benchmarks concurrently to saturate cores during measurement.
 
 == Measured Throughput
-In our local measurements on Apple Silicon (release builds), the current implementation reaches about 1 GB/s of parsed throughput when processing a single large file with the shipped `bin/bench` harness (built with `--release -O3` and using a tuned `CRYSTAL_CACHE_DIR`).
+In our local measurements on Apple Silicon (release builds), the current implementation reaches about 1 GB/s of parsed throughput when processing a single large file with the shipped `bin/bench` harness (built via `crystal build bin/bench.cr --release -O3` and using a tuned `CRYSTAL_CACHE_DIR`).
 
 Thanks to Crystal fibers and the benchmark's per-file concurrency model, aggregate throughput when parsing multiple files in parallel is substantially higher — running the same benchmark over many files typically scales with available cores and I/O bandwidth, yielding several GB/s of total throughput depending on the machine and dataset. Use `bin/bench --profile` to obtain separate stage1/stage2 timings for more detailed measurement.
 
@@ -40,7 +40,7 @@ Thanks to Crystal fibers and the benchmark's per-file concurrency model, aggrega
 - Simplified fast paths: Split common object/array cases (value + comma/end) into branch-light paths once correctness is restored.
 
 === Build and Tooling
-- Benchmark flags: Use `--release -O3 --no-debug` and a fast `CRYSTAL_CACHE_DIR` to keep measurement noise low.
+- Benchmark flags: Use `crystal build bin/bench.cr --release -O3 --no-debug` and a fast `CRYSTAL_CACHE_DIR` to keep measurement noise low.
 - Verification toggles: Keep debug-only cross-checks (e.g., `SIMDJSON_VERIFY_NEON`) off in production builds to avoid overhead.
 
 == Proposed Work Plan

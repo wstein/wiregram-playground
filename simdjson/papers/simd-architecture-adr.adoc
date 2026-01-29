@@ -1,0 +1,177 @@
+= simdjson SIMD Implementation Architecture (ADR)
+:doctype: article
+:toc: left
+:toclevels: 3
+:sectnums:
+:author: simdjson Crystal maintainers
+:revdate: 2026-01-28
+:revnumber: 1.0
+
+[abstract]
+== Abstract
+
+This Architecture Decision Record (ADR) defines the target architecture for multi-platform SIMD support in the simdjson Crystal implementation, focusing on Stage 1 (structural index scanning). The decision is to adopt the *Hybrid Approach* (Alternative 4): *backend selection* combined with *compile-time constant block sizes inside each backend*.
+
+== Status
+
+*Accepted* (Architectural Review Board, 2026-01-28)
+
+== Context
+
+=== Current State
+
+- Stage 1 produces structural indices via `Warp::Lexer.index(bytes : Bytes)`.
+- The hot-path mask building is currently optimized for AArch64 via NEON inline assembly (`src/warp/backend/neon_masks.cr`) and falls back to scalar mask building on other platforms (`src/warp/backend/scalar_backend.cr`).
+- Stage 1 uses bitmasks (`UInt64`) to represent character categories over a 64-byte window, and uses those masks to compute:
+  - quote/backslash handling (string scanning)
+  - structural character discovery (object/array delimiters, commas, colons, whitespace/newlines)
+  - control character validation inside strings
+  - lightweight UTF-8 validation with carried state
+
+This design is correct and fast on Apple Silicon, but leaves substantial performance on the table on x86_64 due to the scalar fallback.
+
+=== Drivers
+
+1. *Performance portability*: x86_64 should be competitive (SSE2/AVX2/AVX512), while preserving the current Apple Silicon performance baseline.
+2. *Single-binary usability*: within a given ISA (e.g., x86_64), users should not need multiple builds to get optimal performance.
+3. *Safety*: never execute unsupported SIMD instructions (avoid `SIGILL`), avoid out-of-bounds loads, and keep verification/debugging paths.
+4. *Maintainability*: preserve the current Stage 1 scanning logic and isolate architecture-specific SIMD into backends.
+
+=== Non-goals
+
+- Replacing Stage 2 with SIMD is out of scope for this ADR.
+- Cross-ISA “universal binaries” are out of scope; “single binary” means *single artifact per CPU architecture* (e.g., one x86_64 binary that adapts to AVX512/AVX2/SSE2 at runtime).
+
+== Decision
+
+Adopt *Alternative 4 (Hybrid Approach)*:
+
+- Select a SIMD backend once per process (or per parser instance) using runtime CPU feature detection and an optional override.
+- Keep each backend’s inner loop fully specialized by using compile-time constants for block size and mask extraction strategy.
+- Preserve the existing Stage 1 scanner/string/UTF-8 logic, but make mask building a pluggable backend.
+
+== Architecture
+
+=== High-Level Structure
+
+[source,text]
+----
+Warp::Parser
+  └─ Lexer.index(bytes)
+        ├─ Backend selection (once; cached)
+        └─ Backend.build_masks(ptr, len)  # hot path, specialized per backend
+              ├─ build category masks per block
+              ├─ run existing Lexer Scanner/StringScanner logic
+              └─ emit structural indices
+----
+
+The key separation is:
+
+- *Backend responsibility*: quickly classify bytes into category masks for a block size native to the instruction set.
+- *Shared responsibility*: interpret those masks to find structurals, handle strings/escapes, and enforce correctness checks (UTF-8, unescaped control chars, unclosed strings).
+
+=== Backend Contract
+
+Backends expose a single hot-path entry point for Stage 1 mask building:
+
+[source,crystal]
+----
+module Warp::Backend
+  abstract class Base
+    # Build category masks for the given block.
+    abstract def build_masks(ptr : Pointer(UInt8), block_len : Int32) : Warp::Lexer::Masks
+  end
+end
+----
+
+Implementation notes:
+
+- Each backend uses `BLOCK_SIZE` as a compile-time constant so LLVM can unroll loops and optimize address arithmetic.
+- Backends must never read past the end of the buffer. Tail handling is explicit (scalar remainder, masked loads, or padded buffers).
+- Backends must produce the same observable `Stage1::Result` as the scalar implementation.
+
+=== Backends and Block Sizes
+
+Target backends (per review):
+
+[cols="1,1,3",options="header"]
+|===
+|Backend |Block Size |Notes
+|AVX512 |64 bytes |Requires AVX512BW; compile-time gated.
+|AVX2 |32 bytes |Compile-time gated; preferred on modern AMD/Intel.
+|SSE2 |16 bytes |Baseline x86_64 SIMD; universally available on x86_64.
+|NEON |16 bytes |AArch64 NEON is mandatory; current code uses 16-byte `scan16`.
+|Scalar |1 byte |Correctness baseline and universal fallback.
+|===
+
+The current implementation effectively uses a *64-byte mask window* and builds it by composing smaller chunks (NEON `scan8`). The hybrid architecture preserves the 64-byte window concept but allows each backend to choose its natural block size and mask extraction mechanism.
+
+=== Backend Selection
+
+Backend selection happens once and is cached:
+
+- Default: pick a compile-time default (AArch64 → NEON, otherwise scalar).
+- Override: allow forcing a backend via environment variable (e.g., `SIMDJSON_BACKEND=scalar|sse2|avx|avx2|avx512|neon`) for testing and debugging.
+- Verification: retain a verification mode where the chosen backend is cross-checked against a scalar path on small inputs (existing `SIMDJSON_VERIFY_NEON` becomes a generalized “verify SIMD backend” mechanism).
+
+Future selection should consider:
+
+- *x86_64*: CPUID feature bits plus OS support for saving YMM/ZMM state (XGETBV/XCR0 checks) before using AVX/AVX512.
+- *AArch64*: NEON is always present; selection is typically NEON vs scalar (or future SVE/SVE2 where available).
+
+=== Tail Handling and Padding
+
+The architecture supports two safe approaches (both acceptable; choose per backend implementation constraints):
+
+1. *Remainder loop*: process full blocks with SIMD, then handle the final `len % BLOCK_SIZE` bytes with a scalar tail.
+2. *Padded buffers*: allow callers (e.g., benchmark/file loaders) to provide a buffer padded with at least `max_vector_load_bytes` zeros so SIMD loads can safely overread within that padding. The codebase provides a padded read helper (`Warp::Input.read_file_padded_bytes` in `src/warp/input/padded_buffer.cr`).
+
+The default library API should remain safe without requiring padding. Padding is an optimization for controlled call sites.
+
+== Consequences
+
+=== Positive
+
+- Large performance gains on x86_64 by avoiding scalar fallback (expected 5x–33x on 1MB JSON in the review’s estimates depending on ISA level).
+- Clean modularization: architecture-specific SIMD is isolated in backends; shared Stage 1 logic remains central and testable.
+- Better production ergonomics: single artifact per ISA that adapts to runtime capabilities.
+
+=== Negative / Costs
+
+- Increased code size and maintenance due to multiple backends.
+- Larger testing matrix (must validate correctness across backends and tail/padding modes).
+- CPU feature detection complexity on x86_64 (must be correct to avoid `SIGILL`).
+
+=== Mitigations
+
+- Provide backend forcing + verification mode to reproduce issues deterministically.
+- Keep scalar implementation as the reference model and use it in tests for differential checking.
+- Introduce backends incrementally (SSE2 → AVX2 → AVX512), keeping the NEON path stable.
+
+== Alternatives Considered
+
+See the reviewed alternatives and ratings:
+
+- Alternative 1: Monolithic backend (compile-time selection) — simple but inflexible for heterogeneous x86 fleets.
+- Alternative 2: Fully layered runtime selection — flexible but risks runtime dispatch overhead and complexity in the hot path.
+- Alternative 3: Compile-time specialization into multiple binaries — fastest in theory but operationally impractical for shard distribution.
+- Alternative 4: Hybrid approach — chosen for best balance of performance, portability, and maintainability.
+
+== Implementation Plan (Phased)
+
+Aligns with the architectural review plan:
+
+1. Foundation: CPU feature detection + backend interface + selector + generalized verification.
+2. Core backends: refactor existing NEON into a backend; add SSE2 and AVX2 backends.
+3. Advanced backend: add AVX512 backend (including OS support checks) and optimize inner loops.
+4. Testing & docs: backend-specific unit tests, cross-backend differential tests, benchmarks, and user-facing documentation.
+
+== References
+
+- Review index: [README.adoc](README.adoc)
+- Executive summary: [executive-summary.adoc](executive-summary.adoc)
+- Alternatives summary: [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc)
+- Meeting minutes: [architectural-review-minutes.adoc](architectural-review-minutes.adoc)
+- Visual reference: [architecture-visual-reference.adoc](architecture-visual-reference.adoc)
+- Current Stage 1 code: `src/warp/lexer/structural_scan.cr`
+- Current NEON masks: `src/warp/backend/neon_masks.cr`
