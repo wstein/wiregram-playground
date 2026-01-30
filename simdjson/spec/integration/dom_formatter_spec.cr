@@ -34,4 +34,32 @@ describe "Warp DOM and Formatter" do
     pretty.includes?("\n").should be_true
     pretty.includes?("\"a\": \"line\\nbreak\"").should be_true
   end
+
+  it "decodes Unicode surrogate pairs in strings" do
+    json = %({"emoji":"\\uD83D\\uDE00"})
+    parser = Warp::Parser.new
+    result = parser.parse_dom(json.to_slice)
+    result.error.success?.should be_true
+
+    dom = result.value.not_nil!.as(Hash(String, Warp::DOM::Value))
+    emoji = dom["emoji"].as(String)
+    expected = String.new(Bytes[0xF0, 0x9F, 0x98, 0x80])
+    emoji.should eq(expected)
+  end
+
+  it "rejects invalid Unicode escape sequences" do
+    parser = Warp::Parser.new
+
+    result = parser.parse_dom(%({"bad":"\\uD83D"}).to_slice)
+    result.error.should eq(Warp::ErrorCode::StringError)
+
+    result = parser.parse_dom(%({"bad":"\\uDE00"}).to_slice)
+    result.error.should eq(Warp::ErrorCode::StringError)
+
+    result = parser.parse_dom(%({"bad":"\\uD83D\\u0041"}).to_slice)
+    result.error.should eq(Warp::ErrorCode::StringError)
+
+    result = parser.parse_dom(%({"bad":"\\uZZZZ"}).to_slice)
+    result.error.should eq(Warp::ErrorCode::StringError)
+  end
 end
