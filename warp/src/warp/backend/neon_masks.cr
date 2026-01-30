@@ -301,6 +301,96 @@ module Warp
         {% end %}
       end
 
+      def self.newline_mask8(ptr : Pointer(UInt8)) : UInt8
+        {% if flag?(:aarch64) %}
+          mask = 0_u8
+          asm(
+            %(
+            ld1 {v0.8b}, [$1]
+            mov w9, 0x0201
+            mov v30.h[0], w9
+            mov w9, 0x0804
+            mov v30.h[1], w9
+            mov w9, 0x2010
+            mov v30.h[2], w9
+            mov w9, 0x8040
+            mov v30.h[3], w9
+
+            movi v1.8b, 10
+            cmeq v2.8b, v0.8b, v1.8b
+            movi v1.8b, 13
+            cmeq v3.8b, v0.8b, v1.8b
+            orr v2.8b, v2.8b, v3.8b
+
+            and v4.8b, v2.8b, v30.8b
+            uaddlv h10, v4.8b
+            umov w10, v10.h[0]
+            uxtb x10, w10
+            mov $0, x10
+            )
+            : "=r"(mask)
+            : "r"(ptr)
+            : "v0", "v1", "v2", "v3", "v4", "v10", "v30", "w9", "w10"
+            : "volatile"
+          )
+          mask
+        {% else %}
+          mask = 0_u8
+          8.times do |i|
+            b = ptr[i]
+            mask |= (1_u8 << i) if b == 0x0a_u8 || b == 0x0d_u8
+          end
+          mask
+        {% end %}
+      end
+
+      def self.newline_mask16(ptr : Pointer(UInt8)) : UInt16
+        {% if flag?(:aarch64) %}
+          mask = 0_u16
+          asm(
+            %(
+            ld1 {v0.16b}, [$1]
+            mov w9, 0x0201
+            mov v30.h[0], w9
+            mov w9, 0x0804
+            mov v30.h[1], w9
+            mov w9, 0x2010
+            mov v30.h[2], w9
+            mov w9, 0x8040
+            mov v30.h[3], w9
+
+            movi v1.16b, 10
+            cmeq v2.16b, v0.16b, v1.16b
+            movi v1.16b, 13
+            cmeq v3.16b, v0.16b, v1.16b
+            orr v2.16b, v2.16b, v3.16b
+
+            mov v9.d[0], v2.d[1]
+            and v4.8b, v2.8b, v30.8b
+            uaddlv h10, v4.8b
+            umov w10, v10.h[0]
+            and v9.8b, v9.8b, v30.8b
+            uaddlv h11, v9.8b
+            umov w11, v11.h[0]
+            orr w10, w10, w11, lsl #8
+            uxtw $0, w10
+            )
+            : "=r"(mask)
+            : "r"(ptr)
+            : "v0", "v1", "v2", "v3", "v4", "v9", "v10", "v11", "v30", "w9", "w10", "w11"
+            : "volatile"
+          )
+          mask
+        {% else %}
+          mask = 0_u16
+          16.times do |i|
+            b = ptr[i]
+            mask |= (1_u16 << i) if b == 0x0a_u8 || b == 0x0d_u8
+          end
+          mask
+        {% end %}
+      end
+
     end
   end
 end

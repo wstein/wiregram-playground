@@ -64,6 +64,24 @@ module Warp
       def all_digits16?(ptr : Pointer(UInt8)) : Bool
         X86Masks.all_digits16?(ptr)
       end
+
+      def newline_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
+        mask = 0_u64
+        i = 0
+        {% if flag?(:x86_64) && (flag?(:avx2) || flag?(:avx)) %}
+          while i + 15 < block_len
+            block_mask = X86Masks.newline_mask16(ptr + i)
+            mask |= block_mask.to_u64 << i
+            i += 16
+          end
+        {% end %}
+        while i < block_len
+          b = ptr[i]
+          mask |= (1_u64 << i) if b == 0x0a_u8 || b == 0x0d_u8
+          i += 1
+        end
+        mask
+      end
     end
   end
 end

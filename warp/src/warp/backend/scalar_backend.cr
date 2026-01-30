@@ -54,6 +54,17 @@ module Warp
         end
         true
       end
+
+      def newline_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
+        mask = 0_u64
+        i = 0
+        while i < block_len
+          b = ptr[i]
+          mask |= (1_u64 << i) if b == 0x0a_u8 || b == 0x0d_u8
+          i += 1
+        end
+        mask
+      end
     end
   end
 end

@@ -132,6 +132,29 @@ module Warp
         {% end %}
       end
 
+      def newline_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
+        mask = 0_u64
+        i = 0
+        {% if flag?(:aarch64) %}
+          while i + 15 < block_len
+            block_mask = NeonMasks.newline_mask16(ptr + i)
+            mask |= block_mask.to_u64 << i
+            i += 16
+          end
+          while i + 7 < block_len
+            block_mask = NeonMasks.newline_mask8(ptr + i)
+            mask |= block_mask.to_u64 << i
+            i += 8
+          end
+        {% end %}
+        while i < block_len
+          b = ptr[i]
+          mask |= (1_u64 << i) if b == 0x0a_u8 || b == 0x0d_u8
+          i += 1
+        end
+        mask
+      end
+
       private def scalar_masks(ptr : Pointer(UInt8), len : Int32) : NeonMasks::Masks16
         backslash = 0_u16
         quote = 0_u16

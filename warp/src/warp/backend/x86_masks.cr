@@ -404,6 +404,40 @@ module Warp
           true
         {% end %}
       end
+
+      def self.newline_mask16(ptr : Pointer(UInt8)) : UInt16
+        {% if flag?(:x86_64) && flag?(:sse2) %}
+          mask = 0_u32
+          asm(
+            %(
+            movdqu ($1), %xmm0
+
+            movdqa %xmm0, %xmm1
+            pcmpeqb ($2), %xmm1
+
+            movdqa %xmm0, %xmm2
+            pcmpeqb ($3), %xmm2
+
+            por %xmm2, %xmm1
+            pmovmskb %xmm1, $0
+            )
+            : "=r"(mask)
+            : "r"(ptr),
+              "r"(LF_16.to_unsafe),
+              "r"(CR_16.to_unsafe)
+            : "xmm0", "xmm1", "xmm2", "memory"
+            : "volatile"
+          )
+          mask.to_u16
+        {% else %}
+          mask = 0_u16
+          16.times do |i|
+            b = ptr[i]
+            mask |= (1_u16 << i) if b == 0x0a_u8 || b == 0x0d_u8
+          end
+          mask
+        {% end %}
+      end
     end
   end
 end
