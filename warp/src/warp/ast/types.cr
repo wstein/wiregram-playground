@@ -41,7 +41,7 @@ module Warp
           Node.new(NodeKind::String, [] of Node, value)
         when CST::NodeKind::Number
           token = node.token
-          value = token ? String.new(bytes[token.start, token.length]) : ""
+          value = token ? String.build { |io| io.write(bytes[token.start, token.length]) } : ""
           Node.new(NodeKind::Number, [] of Node, value)
         when CST::NodeKind::True
           Node.new(NodeKind::True)

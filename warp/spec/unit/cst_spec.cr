@@ -2,7 +2,7 @@ require "../spec_helper"
 
 describe Warp::CST do
   it "tokenizes and parses JSONC comments" do
-    json = %({ // comment\n \"a\": 1 /* block */ })
+    json = %({ // comment\n "a": 1 /* block */ })
     bytes = json.to_slice
 
     result = Warp::CST::Parser.parse(bytes, jsonc: true)

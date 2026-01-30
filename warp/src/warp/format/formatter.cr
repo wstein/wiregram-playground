@@ -402,14 +402,14 @@ module Warp
     private def self.write_cst_slice(io : String::Builder, doc : CST::Document, node : CST::RedNode) : Nil
       token = node.token
       return unless token
-      io << String.new(doc.bytes[token.start, token.length])
+      io.write(doc.bytes[token.start, token.length])
     end
 
     private def self.write_cst_string(io : String::Builder, doc : CST::Document, node : CST::RedNode) : Nil
       token = node.token
       return unless token
       io << '"'
-      io << String.new(doc.bytes[token.start, token.length])
+      io.write(doc.bytes[token.start, token.length])
       io << '"'
     end
 
@@ -550,13 +550,13 @@ module Warp
 
     private def self.write_slice(io : String::Builder, doc : IR::Document, entry : IR::Entry) : Nil
       slice = doc.bytes[entry.a, entry.b]
-      io << String.new(slice)
+      io.write(slice)
     end
 
     private def self.write_string_slice(io : String::Builder, doc : IR::Document, entry : IR::Entry) : Nil
       slice = doc.bytes[entry.a, entry.b]
       io << '"'
-      io << String.new(slice)
+      io.write(slice)
       io << '"'
     end
   end
