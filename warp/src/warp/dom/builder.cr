@@ -192,7 +192,9 @@ module Warp
             code = read_hex4(bytes, i + 1)
             return StringResult.new(nil, ErrorCode::StringError) if code < 0
             i += 5
-            if code >= 0xD800 && code <= 0xDBFF
+            if code >= 0xDC00 && code <= 0xDFFF
+              return StringResult.new(nil, ErrorCode::StringError)
+            elsif code >= 0xD800 && code <= 0xDBFF
               return StringResult.new(nil, ErrorCode::StringError) if i + 1 >= bytes.size
               return StringResult.new(nil, ErrorCode::StringError) unless bytes[i] == '\\'.ord && bytes[i + 1] == 'u'.ord
               low = read_hex4(bytes, i + 2)
@@ -201,6 +203,7 @@ module Warp
               code = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00)
               i += 6
             end
+            return StringResult.new(nil, ErrorCode::StringError) if code > 0x10FFFF
             builder << code.chr
           else
             return StringResult.new(nil, ErrorCode::StringError)

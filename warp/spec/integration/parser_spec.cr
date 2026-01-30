@@ -41,7 +41,7 @@ describe Warp::Parser do
     result.error.success?.should be_true
 
     doc = result.doc.not_nil!
-    entries = [] of Warp::IR::Entry
+    entries = [] of Warp::IR::Record
     doc.each_entry { |entry| entries << entry }
     entries.size.should be > 0
 
