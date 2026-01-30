@@ -64,6 +64,10 @@ module Warp
         Lexer::Masks.new(backslash, quote, whitespace, op, control)
       end
 
+      def all_digits16?(ptr : Pointer(UInt8)) : Bool
+        X86Masks.all_digits16?(ptr)
+      end
+
       private def scalar_masks(ptr : Pointer(UInt8), len : Int32) : X86Masks::Masks32
         backslash = 0_u32
         quote = 0_u32

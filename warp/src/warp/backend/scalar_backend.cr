@@ -46,6 +46,14 @@ module Warp
 
         Lexer::Masks.new(backslash, quote, whitespace, op, control)
       end
+
+      def all_digits16?(ptr : Pointer(UInt8)) : Bool
+        16.times do |i|
+          b = ptr[i]
+          return false unless b >= '0'.ord && b <= '9'.ord
+        end
+        true
+      end
     end
   end
 end

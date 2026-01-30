@@ -60,6 +60,10 @@ module Warp
 
         Lexer::Masks.new(backslash, quote, whitespace, op, control)
       end
+
+      def all_digits16?(ptr : Pointer(UInt8)) : Bool
+        X86Masks.all_digits16?(ptr)
+      end
     end
   end
 end
