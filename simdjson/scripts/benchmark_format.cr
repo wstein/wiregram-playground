@@ -159,6 +159,11 @@ args = [] of String
 argv = ARGV.dup
 while argv.size > 0
   arg = argv.shift
+  if arg == "--help" || arg == "-h"
+    puts "Usage: crystal run scripts/benchmark_format.cr --release -O3 -- [--only tape|dom|cst|ast] [--stress-seconds N] [--stress-workers N] <json file> [json file...]"
+    puts "  --only accepts comma-separated values (e.g. --only tape,dom)."
+    exit 0
+  end
   if arg == "--only"
     list = argv.shift
     only = list ? list.split(',').map(&.strip).reject(&.empty?) : [] of String

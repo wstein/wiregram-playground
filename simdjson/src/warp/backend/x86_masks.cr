@@ -65,6 +65,9 @@ module Warp
       private XOR80_1 = StaticArray(UInt8, 1).new(0x80_u8)
       private THRESH_1 = StaticArray(UInt8, 1).new(0x9f_u8)
 
+      private ZERO_XOR80_16 = StaticArray(UInt8, 16).new(('0'.ord ^ 0x80).to_u8)
+      private NINE_XOR80_16 = StaticArray(UInt8, 16).new(('9'.ord ^ 0x80).to_u8)
+
       def self.scan16(ptr : Pointer(UInt8)) : Masks16
         {% if flag?(:x86_64) && flag?(:sse2) %}
           backslash32 = 0_u32
@@ -363,6 +366,42 @@ module Warp
             quote |= bit if b == '"'.ord
           end
           Masks64.new(backslash, quote, whitespace, op, control)
+        {% end %}
+      end
+
+      def self.all_digits16?(ptr : Pointer(UInt8)) : Bool
+        {% if flag?(:x86_64) && flag?(:sse2) %}
+          mask = 0_u32
+          asm(
+            %(
+            movdqu ($1), %xmm0
+            movdqa %xmm0, %xmm1
+            pxor ($2), %xmm1
+
+            movdqa %xmm1, %xmm2
+            pcmpgtb ($3), %xmm2
+
+            movdqa ($4), %xmm3
+            pcmpgtb %xmm1, %xmm3
+
+            por %xmm3, %xmm2
+            pmovmskb %xmm2, $0
+            )
+            : "=r"(mask)
+            : "r"(ptr),
+              "r"(XOR80_16.to_unsafe),
+              "r"(NINE_XOR80_16.to_unsafe),
+              "r"(ZERO_XOR80_16.to_unsafe)
+            : "xmm0", "xmm1", "xmm2", "xmm3", "memory"
+            : "volatile"
+          )
+          mask == 0_u32
+        {% else %}
+          16.times do |i|
+            b = ptr[i]
+            return false unless b >= '0'.ord && b <= '9'.ord
+          end
+          true
         {% end %}
       end
     end

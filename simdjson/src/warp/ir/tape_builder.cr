@@ -686,9 +686,7 @@ module Warp
         i += 1
       elsif bytes[i] >= '1'.ord && bytes[i] <= '9'.ord
         i += 1
-        while i < finish && bytes[i] >= '0'.ord && bytes[i] <= '9'.ord
-          i += 1
-        end
+        i = scan_digits(bytes, i, finish)
       else
         return false
       end
@@ -697,9 +695,7 @@ module Warp
         i += 1
         return false if i == finish
         return false unless bytes[i] >= '0'.ord && bytes[i] <= '9'.ord
-        while i < finish && bytes[i] >= '0'.ord && bytes[i] <= '9'.ord
-          i += 1
-        end
+        i = scan_digits(bytes, i, finish)
       end
 
       if i < finish && (bytes[i] == 'e'.ord || bytes[i] == 'E'.ord)
@@ -710,12 +706,22 @@ module Warp
           return false if i == finish
         end
         return false unless bytes[i] >= '0'.ord && bytes[i] <= '9'.ord
-        while i < finish && bytes[i] >= '0'.ord && bytes[i] <= '9'.ord
-          i += 1
-        end
+        i = scan_digits(bytes, i, finish)
       end
 
       i == finish
+    end
+
+    private def self.scan_digits(bytes : Bytes, i : Int32, finish : Int32) : Int32
+      ptr = bytes.to_unsafe
+      backend = Backend.current
+      while i + 16 <= finish && backend.all_digits16?(ptr + i)
+        i += 16
+      end
+      while i < finish && bytes[i] >= '0'.ord && bytes[i] <= '9'.ord
+        i += 1
+      end
+      i
     end
   end
 end
