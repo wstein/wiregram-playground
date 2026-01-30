@@ -49,7 +49,7 @@ module Bench
   end
 
   def self.print_result(result : Result) : Nil
-    puts "%-24s avg=%7.2f ms  throughput=%7.2f MB/s  out=%d bytes" % {
+    puts "%-24s avg=%7.2f ms  throughput=%8.2f MB/s  out=%d bytes" % {
       result.label,
       result.avg_ms,
       result.throughput_mb_s,
@@ -58,7 +58,7 @@ module Bench
   end
 end
 
-def run_for_file(path : String, only : Array(String) = [] of String) : Nil
+def run_for_file(path : String, only : Array(String) = [] of String, soa : Bool = false) : Nil
   bytes = File.read(path).to_slice
   puts "File: #{path} (#{bytes.size} bytes)"
 
@@ -73,6 +73,7 @@ def run_for_file(path : String, only : Array(String) = [] of String) : Nil
   dom = dom_result ? dom_result.value : nil
   cst = cst_result ? cst_result.doc : nil
   ast = ast_result ? ast_result.node : nil
+  soa_view = nil
 
   if doc_result && !doc_result.error.success?
     puts "tape skipped: #{doc_result.error}"
@@ -124,6 +125,21 @@ def run_for_file(path : String, only : Array(String) = [] of String) : Nil
     end
   end
 
+  if soa && doc_result && doc_result.error.success?
+    results << Bench.time("soa build", 5, bytes) do
+      doc.not_nil!.soa_view
+      0
+    end
+    soa_view = doc.not_nil!.soa_view
+    results << Bench.time("soa scan types", 5, bytes) do
+      count = 0
+      soa_view.not_nil!.types.each do |t|
+        count += 1 if t == Warp::IR::TapeType::Number
+      end
+      count
+    end
+  end
+
   if doc_result && doc_result.error.success?
     results << Bench.time("tape pretty only", 5, bytes) do
       Warp::Format.pretty(doc.not_nil!).bytesize
@@ -153,6 +169,7 @@ def run_for_file(path : String, only : Array(String) = [] of String) : Nil
 end
 
 only = [] of String
+soa = false
 stress_seconds = 0.0
 stress_workers = 0
 args = [] of String
@@ -160,11 +177,13 @@ argv = ARGV.dup
 while argv.size > 0
   arg = argv.shift
   if arg == "--help" || arg == "-h"
-    puts "Usage: crystal run scripts/benchmark_format.cr --release -O3 -- [--only tape|dom|cst|ast] [--stress-seconds N] [--stress-workers N] <json file> [json file...]"
+    puts "Usage: crystal run scripts/benchmark_format.cr --release -O3 -- [--only tape|dom|cst|ast] [--soa] [--stress-seconds N] [--stress-workers N] <json file> [json file...]"
     puts "  --only accepts comma-separated values (e.g. --only tape,dom)."
+    puts "  --soa adds SoA view build and scan benchmarks (requires tape parse)."
     exit 0
-  end
-  if arg == "--only"
+  elsif arg == "--soa"
+    soa = true
+  elsif arg == "--only"
     list = argv.shift
     only = list ? list.split(',').map(&.strip).reject(&.empty?) : [] of String
   elsif arg.starts_with?("--only=")
@@ -188,7 +207,7 @@ while argv.size > 0
 end
 
 if args.empty?
-  puts "Usage: crystal run scripts/benchmark_format.cr --release -O3 -- [--only tape|dom|cst|ast] [--stress-seconds N] [--stress-workers N] <json file> [json file...]"
+  puts "Usage: crystal run scripts/benchmark_format.cr --release -O3 -- [--only tape|dom|cst|ast] [--soa] [--stress-seconds N] [--stress-workers N] <json file> [json file...]"
   exit 1
 end
 
@@ -196,4 +215,4 @@ if stress_seconds > 0 && stress_workers > 0
   Bench.stress_cpu(stress_seconds, stress_workers)
 end
 
-args.each { |path| run_for_file(path, only) }
+args.each { |path| run_for_file(path, only, soa) }
