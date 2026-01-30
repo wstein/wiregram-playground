@@ -35,6 +35,18 @@ describe "Warp DOM and Formatter" do
     pretty.includes?("\"a\": \"line\\nbreak\"").should be_true
   end
 
+  it "formats pretty JSON directly from tape" do
+    json = %({"a":"line\\nbreak","b":[1,2.5,true,null]})
+    parser = Warp::Parser.new
+    doc_result = parser.parse_document(json.to_slice, validate_literals: true, validate_numbers: true)
+    doc_result.error.success?.should be_true
+    doc = doc_result.doc.not_nil!
+
+    pretty = Warp::Format.pretty(doc, indent: 2)
+    pretty.includes?("\"a\": \"line\\\\nbreak\"").should be_true
+    pretty.includes?("\"b\": [").should be_true
+  end
+
   it "decodes Unicode surrogate pairs in strings" do
     json = %({"emoji":"\\uD83D\\uDE00"})
     parser = Warp::Parser.new
