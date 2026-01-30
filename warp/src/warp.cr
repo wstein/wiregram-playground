@@ -50,4 +50,5 @@ require "./warp/parser"
 # Language support modules (for future extensibility)
 require "./warp/lang/json/types"
 require "./warp/lang/ruby/types"
+require "./warp/lang/ruby/lexer"
 require "./warp/lang/ruby/tape_prototype"

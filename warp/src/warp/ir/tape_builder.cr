@@ -15,7 +15,7 @@
 # - Ruby heredocs, string interpolation, and regex would need special handling
 #
 # ============================================================================
-# Suggestion #4: Lossless Trivia Handling in Tape
+# Suggestion #4: Lossless Trivia Handling in Tape (OPTIMIZED)
 # ============================================================================
 #
 # PROBLEM: The paper claims "Tape avoids AST allocations when formatting only"
@@ -29,44 +29,41 @@
 # - Formatter must look back at source to reconstruct formatting
 # - This negates tape's speed advantage for formatting
 #
-# SOLUTION OPTIONS:
-# 1. Add Trivia entries to the tape (simpler, more storage)
-# 2. Store trivia_start/trivia_end indices in each Entry (compact)
-# 3. Require formatter to always reference source (limits optimization)
+# SOLUTION: LEADING TRIVIA ONLY (Minimal, Elegant)
+# - Store only LEADING trivia (trivia before each token)
+# - Each tape entry stores: trivia_start, lexeme_start, lexeme_end
+# - Since trivia_end == lexeme_start, no need for separate field
+# - Formatter streams tape: trivia_start → lexeme_start → lexeme_end
 #
-# RECOMMENDATION: Option 1 (Trivia entries)
-# - Add TapeType::Trivia entries that record comments/whitespace slices
-# - Formatter can stream tape entries and interleave trivia without source lookups
-# - Slight overhead (more tape entries) but enables true tape-based formatting
-#
-# DESIGN (Proposed):
-#   enum TapeType
-#     Root
-#     StartObject
-#     EndObject
-#     # ... existing types ...
-#     Trivia          # NEW: Comment or whitespace region
+# DESIGN (Optimized):
+#   struct Entry
+#     type : TapeType
+#     trivia_start : Int32    # Start of leading whitespace/comments
+#     lexeme_start : Int32    # Start of actual token
+#     lexeme_end : Int32      # End of actual token (trivia_end implicit)
 #   end
 #
-#   When parsing, insert Trivia entries into tape:
-#     tape << Entry.new(TapeType::Trivia, start, length)  # Whitespace
-#     tape << Entry.new(TapeType::String, ...)           # Actual content
+#   When building tape, for each significant token:
+#     trivia_start = last_token_end  # Where whitespace began
+#     lexeme_start = token.start      # Where actual content starts
+#     lexeme_end = token.end          # Where it ends
+#     tape << Entry.new(type, trivia_start, lexeme_start, lexeme_end)
 #
-#   Formatter streams tape and outputs trivia slices directly:
+#   Formatter streams tape without source lookups:
 #     case entry.type
-#     when TapeType::Trivia
-#       output << bytes[entry.a, entry.b]  # Copy whitespace/comment
 #     when TapeType::String
-#       output << process(bytes[entry.a, entry.b])
+#       output << bytes[entry.trivia_start...entry.lexeme_start]  # Trivia
+#       output << process_string(bytes[entry.lexeme_start...entry.lexeme_end])
 #     end
 #
-# IMPACT:
-# - ✓ Enables tape-only formatting without source lookups
+# BENEFITS:
+# - ✓ Minimal overhead (3 Int32 per entry instead of separate Trivia entries)
+# - ✓ Enables complete tape-based formatting without source lookups
 # - ✓ Preserves exact formatting (round-trip fidelity)
-# - ✓ Scales to Ruby/Crystal with language-specific Trivia handling
-# - ✗ Slightly larger tape (more entries)
+# - ✓ Simple, elegant design (leading trivia is sufficient)
+# - ✓ Scales to Ruby/Crystal naturally
 #
-# NEXT STEP: When implementing Ruby tape builder, use Trivia entries
+# NEXT STEP: Implement Ruby tape builder with leading trivia tracking
 #
 module Warp
   module IR

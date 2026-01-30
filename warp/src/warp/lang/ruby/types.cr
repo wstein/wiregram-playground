@@ -75,10 +75,16 @@ module Warp
         Match
         NotMatch
         Spaceship
+        LessThan
+        GreaterThan
+        LessEqual
+        GreaterEqual
         Range
         ExclusiveRange
         Arrow
         DoubleColon
+        DoubleSplat
+        Splat
 
         # Delimiters
         LParen
