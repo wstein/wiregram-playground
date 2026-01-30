@@ -1,0 +1,272 @@
+= Implementation Plan: Multi-Language Warp Architecture
+
+Werner Stein
+v1.0, January 30, 2026
+
+== Overview
+
+This document outlines the refactoring and implementation plan for transforming Warp from a JSON-only parser into a multi-language pipeline supporting Ruby, Crystal, and JSON.
+
+**Status**: Suggestion #1 (Namespace Refactoring) and #2 (Ruby Tape Prototype) completed. Ready for full Ruby lexer implementation.
+
+== Refactoring Completed: Suggestion #1
+
+=== Objective
+Separate JSON-specific types from language-agnostic CST infrastructure to establish a foundation for multi-language support.
+
+=== Changes Made
+
+==== 1. Preserved Core JSON Types with Multi-Language Documentation
+**File**: `src/warp/cst/types.cr`
+
+Kept the existing, proven JSON CST types intact:
+- `Token` - Lexical token with TokenKind, start, length
+- `GreenNode` - Immutable CST node with kind, children, trivia
+- `RedNode` - Navigation view over GreenNode
+- `Document` - Wraps bytes and root RedNode
+- `Result` - Result tuple with optional Document and ErrorCode
+
+**Rationale**: Crystal's type system works best with concrete types rather than heavy generics. Each language module (JSON, Ruby, Crystal) can define its own equivalent types. This maintains backward compatibility and avoids complex generic machinery that could hurt compile times.
+
+==== 2. Created Language-Specific Type Modules
+**Files**:
+- `src/warp/lang/json/types.cr`
+- `src/warp/lang/ruby/types.cr`
+
+Moved language-specific definitions into separate modules:
+- Each language defines its own `TokenKind` enum with language-specific tokens
+- Each language defines its own `NodeKind` enum with language-specific syntax nodes
+- JSON types are now explicitly in `Warp::Lang::JSON` namespace
+- Ruby types are in `Warp::Lang::Ruby` namespace
+
+**Impact**: JSON parser continues to work unchanged; the type names available in the CST module are now documented as JSON-specific types. New languages can follow the same pattern.
+
+==== 3. Created Ruby Language Namespace
+**File**: `src/warp/lang/ruby/types.cr`
+
+Defined comprehensive Ruby node and token types:
+
+===== Ruby TokenKind (71 entries)
+Covers:
+- Keywords (def, end, class, module, if, else, etc.)
+- Identifiers and literals (String, Symbol, Number, Heredoc, Regex)
+- Operators (arithmetic, logical, comparison, range, spaceship)
+- Delimiters (parens, brackets, braces, colons, etc.)
+- Comments and whitespace
+
+===== Ruby NodeKind (54 entries)
+Covers:
+- Definitions (MethodDef, ClassDef, ModuleDef)
+- Control flow (If, Unless, Case, While, Until, For, etc.)
+- Expressions (Binary, Unary, Call, Index, Assignment)
+- Literals (String, InterpolatedString, Array, Hash, Range, Regex)
+- Structure (Block, Lambda, Proc, Begin/Rescue/Ensure)
+- Special (Identifier, Constant, InstanceVar, Self, Super)
+
+**Status**: Comprehensive type definitions; implementation of actual parsing deferred to next phase.
+
+==== 4. Updated Module Structure
+**File**: `src/warp.cr`
+
+Updated to require:
+1. `src/warp/cst/generic_types.cr` - Generic infrastructure
+2. `src/warp/lang/json/types.cr` - JSON types
+3. `src/warp/lang/ruby/types.cr` - Ruby types (placeholder)
+4. `src/warp/cst/types.cr` - Backward-compatible JSON aliases
+
+**Module Updated Header**: Changed from "JSON parser" to "multi-language pipeline with JSON, Ruby, and Crystal support."
+
+==== 5. Updated Tape IR Documentation
+**File**: `src/warp/ir/tape_builder.cr`
+
+Added architectural notes clarifying:
+- Current tape is JSON-specific
+- TapeType enum reflects JSON structures only
+- Future languages need parallel tape IR or generalization
+- Known limitations for Ruby/Crystal support documented
+
+== Feasibility Study Completed: Suggestion #2
+
+=== Objective
+Determine whether the "Tape" IR concept (optimized for JSON) can efficiently represent Ruby source code for formatting and scanning.
+
+=== Prototype Created
+**File**: `src/warp/lang/ruby/tape_prototype.cr`
+
+===== Key Contributions
+
+1. **RubyTapeType Enum** (20+ entries)
+   - Extends tape concept with scope markers (MethodDefStart, MethodDefEnd, etc.)
+   - Includes Ruby-specific constructs (InterpolatedStringStart/End, BlockStart/End)
+   - Adds metadata markers (ScopeMarker, TriviaBoundary)
+
+2. **RubyTapeEntry Struct**
+   - Extends tape entry with scope tracking
+   - Includes trivia boundary markers (trivia_start, trivia_end)
+   - Enables precise formatting preservation
+
+3. **Detailed Feasibility Analysis**
+   - Documented 4 major problems and solutions:
+     a) Indentation-sensitive constructs → Explicit scope markers
+     b) Complex string literals (heredocs) → Atomic tape entries
+     c) Method calls with blocks → BlockStart/BlockEnd markers
+     d) Reversibility/round-tripping → Full trivia integration
+
+4. **SimplifiedRubyTapeBuilder**
+   - Prototype demonstrates tape construction from Ruby AST
+   - Example: `def foo(x); x + 1; end` → 8 tape entries
+   - Shows scope depth tracking and entry structure
+
+=== Key Findings
+
+**FEASIBLE**: Ruby can be represented as tape with modifications:
+✓ Scope markers enable tracking of nested constructs
+✓ Extended trivia fields preserve formatting information
+✓ Atomic string literal entries handle heredocs and %q strings
+✓ Round-trip validation is achievable with byte-direct references
+
+**CHALLENGES**:
+✗ Performance: Ruby tape scanning may be O(n) with higher constants due to scope tracking
+✗ Complexity: Indentation handling requires context-sensitive parsing
+✗ Trivia alignment: Comments and spacing must be precisely tracked
+
+**RECOMMENDATION**: Proceed with full Ruby lexer/parser implementation with focus on:
+1. Trivia-preserving token stream
+2. CST construction with scope markers
+3. Tape builder with scope and trivia tracking
+4. Round-trip validation suite
+
+== Next Steps
+
+=== Phase 2: Ruby Lexer Implementation (Estimated 2-3 weeks)
+
+Create `src/warp/lang/ruby/lexer.cr`:
+- Implement tokenizer for Ruby's complex token stream
+- Handle:
+  * String literals (%, %q, %Q, heredocs, interpolation)
+  * Regex literals (/.../, %r{...})
+  * Comments (# and =begin/=end)
+  * Whitespace and indentation
+  * Keywords and identifiers
+
+Key Tests:
+- Tokenize every Ruby file in `corpus/ruby/`
+- Verify token stream preserves trivia boundaries
+
+=== Phase 3: Ruby Parser Implementation (Estimated 3-4 weeks)
+
+Create `src/warp/lang/ruby/parser.cr`:
+- Build Green nodes from token stream
+- Track scope depth (method/class/block nesting)
+- Construct Red nodes for navigation
+- Create Document with CST root
+
+Key Tests:
+- Parse every Ruby file in `corpus/ruby/`
+- Verify CST round-trip: Ruby → CST → Ruby (byte-for-byte)
+
+=== Phase 4: Ruby Tape Builder (Estimated 2-3 weeks)
+
+Create `src/warp/lang/ruby/tape_builder.cr`:
+- Convert CST to tape entries
+- Integrate scope markers and trivia
+- Optimize for formatting scans
+
+Key Tests:
+- Tape can be used for formatting (preserve/normalize modes)
+- Performance benchmarks against CST-based formatter
+
+=== Phase 5: Ruby Formatter (Estimated 2-3 weeks)
+
+Extend `src/warp/format/formatter.cr`:
+- Implement Ruby-specific formatting rules
+- Support preserve and normalize modes
+- Validate with Ruby style guide samples
+
+=== Phase 6: Reversible Transpiler (Ruby ↔ Crystal) (Estimated 4-6 weeks)
+
+Implement transpilation logic:
+- Define Ruby → Crystal and Crystal → Ruby transformations
+- Tag lossy transformations (eval, refinements, etc.)
+- Emit CST with trivia preserved
+
+=== Crystal Support (Future)
+
+Once Ruby is complete, Crystal support will follow the same pattern:
+- `src/warp/lang/crystal/types.cr` - Token and node kinds
+- `src/warp/lang/crystal/lexer.cr`
+- `src/warp/lang/crystal/parser.cr`
+- `src/warp/lang/crystal/tape_builder.cr`
+
+== File Structure (New)
+
+```
+src/warp/
+├── core/                    (existing, low-level types)
+├── backend/                 (existing, SIMD optimizations)
+├── lexer/                   (existing, JSON-specific lexer)
+├── parser/                  (existing, JSON parser integration)
+├── cst/
+│   └── types.cr            (JSON types, documented as language-agnostic base)
+│       parser.cr           (existing, JSON parser)
+├── ir/
+│   ├── tape_builder.cr     (updated: documentation for multi-language support)
+│   └── soa_view.cr         (existing)
+├── format/                  (existing, JSON formatter)
+├── lang/
+│   ├── json/
+│   │   └── types.cr        (NEW: JSON TokenKind/NodeKind in Warp::Lang::JSON)
+│   ├── ruby/
+│   │   ├── types.cr        (NEW: Ruby TokenKind/NodeKind in Warp::Lang::Ruby)
+│   │   ├── tape_prototype.cr   (NEW: Ruby tape feasibility study)
+│   │   ├── lexer.cr        (TODO)
+│   │   ├── parser.cr       (TODO)
+│   │   └── tape_builder.cr (TODO)
+│   └── crystal/
+│       ├── types.cr        (TODO)
+│       ├── lexer.cr        (TODO)
+│       ├── parser.cr       (TODO)
+│       └── tape_builder.cr (TODO)
+└── warp.cr                 (updated: multi-language header, requires lang modules)
+```
+
+== Validation & Testing
+
+=== Corpus-Based Testing
+Create `corpus/ruby/` and `corpus/crystal/` directories with:
+- Ruby stdlib samples (100+ real-world files)
+- Complex constructs (heredocs, regex, string interpolation)
+- Edge cases (trailing commas, optional parens, etc.)
+
+=== Round-Trip Validation
+For each corpus file:
+```
+source → lexer → parser → CST → tape → formatter → output
+assert output == source (byte-for-byte)
+```
+
+=== Performance Benchmarks
+Compare:
+- JSON tape scan vs. CST scan (baseline)
+- Ruby tape scan vs. Ruby CST scan (target: <2x JSON overhead)
+
+=== Integration Tests
+- Parse `corpus/ruby/some_file.rb` → CST → Tape
+- Format with preserve mode → compare to original
+- Format with normalize mode → verify consistent output
+
+== Risk Mitigation
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Ruby grammar complexity | HIGH | Corpus-driven development; incremental parser |
+| Indentation sensitivity | HIGH | Explicit scope markers in tape; validation suite |
+| Performance regression | MEDIUM | Benchmarking at each phase; optimize hot paths |
+| Transpiler lossy cases | MEDIUM | Explicit lossiness tags; documentation |
+| Maintenance burden | MEDIUM | Separate language modules; shared CST core |
+
+== Conclusion
+
+The refactoring establishes a robust foundation for multi-language support. The Ruby tape prototype validates that the Tape IR concept is feasible with appropriate extensions. Proceeding with Phase 2 (Ruby Lexer) is recommended.
+
+**Current Status**: ✓ Suggestion #1 and #2 complete. Ready for Phase 2.

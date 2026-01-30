@@ -1,14 +1,19 @@
 # IR: Tape builder and document representation
 #
-# Summary
+# ARCHITECTURAL NOTE:
+# The tape is a compact, linear intermediate representation optimized for
+# iteration and formatting. Currently, this is JSON-specific (TapeType enum
+# reflects JSON constructs). For other languages (Ruby, Crystal), a parallel
+# tape IR will be needed or this will be generalized to support pluggable
+# TapeType enums per language.
 #
-# Converts the structural indices (from the lexer) into a compact "tape"
-# representation that is efficient to traverse. The tape stores typed
-# entries (strings, numbers, structural markers) and supports iteration
-# and slicing into the original `Bytes` buffer.
+# See IR::Builder for tape construction and Document/TapeIterator for traversal.
 #
-# See `IR::Builder` for how the tape is constructed and `Document`
-# / `TapeIterator` for traversal utilities.
+# Known Limitations for Ruby/Crystal Support:
+# - TapeType is hardcoded to JSON structures
+# - Scope and context information not preserved in tape
+# - Ruby heredocs, string interpolation, and regex would need special handling
+#
 module Warp
   module IR
     alias ErrorCode = Core::ErrorCode
@@ -448,7 +453,7 @@ module Warp
       tokens : Array(Token),
       max_depth : Int32,
       validate_literals : Bool = false,
-      validate_numbers : Bool = false
+      validate_numbers : Bool = false,
     ) : Result
       iter = TokenIterator.new(tokens)
       return Result.new(nil, ErrorCode::Empty) if iter.at_eof?
@@ -586,7 +591,7 @@ module Warp
       iter : TokenIterator,
       builder : Builder,
       stack : Array(Context),
-      max_depth : Int32
+      max_depth : Int32,
     ) : ErrorCode
       case token.type
       when TokenType::StartObject
