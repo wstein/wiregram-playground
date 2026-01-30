@@ -69,7 +69,7 @@ module Warp
         io << value.to_s
       when String
         io << '"'
-        io << escape_string(value)
+        write_escaped_string(io, value)
         io << '"'
       when Array
         write_array(io, value, pretty, indent, newline, level)
@@ -138,7 +138,7 @@ module Warp
           io << (" " * ((level + 1) * indent))
         end
         io << '"'
-        io << escape_string(key)
+        write_escaped_string(io, key)
         io << '"'
         io << (pretty ? ": " : ":")
         write_value(io, val, pretty, indent, newline, level + 1)
@@ -155,33 +155,60 @@ module Warp
       io << '}'
     end
 
-    private def self.escape_string(value : String) : String
-      builder = String::Builder.new
-      value.each_char do |ch|
-        case ch
-        when '"'
-          builder << "\\\""
-        when '\\'
-          builder << "\\\\"
-        when '\b'
-          builder << "\\b"
-        when '\f'
-          builder << "\\f"
-        when '\n'
-          builder << "\\n"
-        when '\r'
-          builder << "\\r"
-        when '\t'
-          builder << "\\t"
-        else
-          if ch.ord < 0x20
-            builder << "\\u%04X" % ch.ord
+    private def self.write_escaped_string(io : String::Builder, value : String) : Nil
+      if needs_escape?(value)
+        value.each_char do |ch|
+          case ch
+          when '"'
+            io << "\\\""
+          when '\\'
+            io << "\\\\"
+          when '\b'
+            io << "\\b"
+          when '\f'
+            io << "\\f"
+          when '\n'
+            io << "\\n"
+          when '\r'
+            io << "\\r"
+          when '\t'
+            io << "\\t"
           else
-            builder << ch
+            if ch.ord < 0x20
+              io << "\\u%04X" % ch.ord
+            else
+              io << ch
+            end
           end
         end
+      else
+        io << value
       end
-      builder.to_s
+    end
+
+    private def self.needs_escape?(value : String) : Bool
+      bytes = value.to_slice
+      len = bytes.size
+      return false if len == 0
+
+      if len < 32
+        bytes.each do |byte|
+          return true if byte < 0x20 || byte == '"'.ord || byte == '\\'.ord
+        end
+        return false
+      end
+
+      backend = Backend.current
+      ptr = bytes.to_unsafe
+      offset = 0
+      while offset < len
+        block_len = len - offset
+        block_len = 64 if block_len > 64
+        masks = backend.build_masks(ptr + offset, block_len)
+        return true if (masks.backslash | masks.quote | masks.control) != 0
+        offset += 64
+      end
+      false
     end
 
     private def self.write_ast_node(
