@@ -2,6 +2,7 @@ module Warp
   module Backend
     class NeonBackend < Base
       VERIFY_BACKEND = (ENV["WARP_VERIFY_BACKEND"]? == "1") ||
+        (ENV["WARP_VERIFY_NEON"]? == "1") ||
         (ENV["SIMDJSON_VERIFY_BACKEND"]? == "1") ||
         (ENV["SIMDJSON_VERIFY_NEON"]? == "1")
 

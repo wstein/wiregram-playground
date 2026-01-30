@@ -13,6 +13,8 @@ module Warp
   module IR
     alias ErrorCode = Core::ErrorCode
     alias LexerBuffer = Core::LexerBuffer
+    alias Token = Core::Token
+    alias TokenType = Core::TokenType
     # TapeType enumerates kinds of entries stored on the tape.
     enum TapeType
       Root
@@ -28,7 +30,7 @@ module Warp
       Null
     end
 
-    # Entry represents a single tape entry with a type and two integer
+    # Entry represents a single tape record with a type and two integer
     # fields. For string/number/atom entries `a` and `b` encode slice
     # offsets/lengths; for containers they encode index links.
     struct Entry
@@ -40,15 +42,18 @@ module Warp
       end
     end
 
+    alias Record = Entry
+    alias Tape = Array(Entry)
+
     # Document wraps the original bytes and the tape produced by the
     # parser. Use `Document#iterator` or `Document#each_entry` to walk
     # the tape. `TapeIterator#slice(entry)` returns a `Bytes` slice for
     # scalar entries.
     class Document
       getter bytes : Bytes
-      getter tape : Array(Entry)
+      getter tape : Tape
 
-      def initialize(@bytes : Bytes, @tape : Array(Entry))
+      def initialize(@bytes : Bytes, @tape : Tape)
       end
 
       def iterator : TapeIterator
@@ -198,6 +203,45 @@ module Warp
         ErrorCode::Success
       end
 
+      def key_token(token : Token) : ErrorCode
+        @tape << Entry.new(TapeType::Key, token.start, token.length)
+        ErrorCode::Success
+      end
+
+      def string_token(token : Token) : ErrorCode
+        @tape << Entry.new(TapeType::String, token.start, token.length)
+        ErrorCode::Success
+      end
+
+      def primitive_token(token : Token) : ErrorCode
+        case token.type
+        when TokenType::True
+          if @validate_literals && !IR.valid_true?(@bytes, token.start, token.length)
+            return ErrorCode::TAtomError
+          end
+          @tape << Entry.new(TapeType::True, token.start, token.length)
+        when TokenType::False
+          if @validate_literals && !IR.valid_false?(@bytes, token.start, token.length)
+            return ErrorCode::FAtomError
+          end
+          @tape << Entry.new(TapeType::False, token.start, token.length)
+        when TokenType::Null
+          if @validate_literals && !IR.valid_null?(@bytes, token.start, token.length)
+            return ErrorCode::NAtomError
+          end
+          @tape << Entry.new(TapeType::Null, token.start, token.length)
+        when TokenType::Number
+          if @validate_numbers && !IR.valid_number?(@bytes, token.start, token.length)
+            return ErrorCode::NumberError
+          end
+          @tape << Entry.new(TapeType::Number, token.start, token.length)
+        else
+          return ErrorCode::TapeError
+        end
+
+        ErrorCode::Success
+      end
+
       def root_entry(root_index : Int32)
         @tape << Entry.new(TapeType::Root, root_index, 0)
       end
@@ -207,6 +251,46 @@ module Warp
         return ErrorCode::UnclosedString if end_index < 0
         @tape << Entry.new(type, start_index + 1, end_index - (start_index + 1))
         ErrorCode::Success
+      end
+    end
+
+    # Iterator over tokens returned by Stage1b.
+    class TokenIterator
+      def initialize(@tokens : Array(Token))
+        @pos = 0
+      end
+
+      def at_eof? : Bool
+        @pos >= @tokens.size
+      end
+
+      def peek_significant : Token?
+        i = @pos
+        while i < @tokens.size
+          tok = @tokens[i]
+          return tok unless tok.type == TokenType::Newline
+          i += 1
+        end
+        nil
+      end
+
+      def advance_significant : Token?
+        while @pos < @tokens.size
+          tok = @tokens[@pos]
+          @pos += 1
+          return tok unless tok.type == TokenType::Newline
+        end
+        nil
+      end
+
+      def remaining_significant : Int32
+        count = 0
+        i = @pos
+        while i < @tokens.size
+          count += 1 unless @tokens[i].type == TokenType::Newline
+          i += 1
+        end
+        count
       end
     end
 
@@ -337,7 +421,7 @@ module Warp
     end
 
     # Parse a document from the structural indices produced by the lexer.
-    # Build a `Document` (tape) from structural indices.
+    # Build a `Document` (tape) via the Stage1b token assembly.
     #
     # Summary
     #
@@ -350,16 +434,32 @@ module Warp
       validate_literals : Bool = false,
       validate_numbers : Bool = false,
     ) : Result
-      iter = Iterator.new(bytes, buffer)
+      tokens = [] of Token
+      token_error = Lexer::TokenAssembler.each_token(bytes, buffer) do |tok|
+        tokens << tok
+      end
+      return Result.new(nil, token_error) unless token_error.success?
+
+      parse_tokens(bytes, tokens, max_depth, validate_literals, validate_numbers)
+    end
+
+    def self.parse_tokens(
+      bytes : Bytes,
+      tokens : Array(Token),
+      max_depth : Int32,
+      validate_literals : Bool = false,
+      validate_numbers : Bool = false
+    ) : Result
+      iter = TokenIterator.new(tokens)
       return Result.new(nil, ErrorCode::Empty) if iter.at_eof?
 
-      builder = Builder.new(bytes, validate_literals, validate_numbers, buffer.count)
+      builder = Builder.new(bytes, validate_literals, validate_numbers, tokens.size)
       stack = Array(Context).new(max_depth)
 
-      root_index = iter.advance_significant_index
-      return Result.new(nil, ErrorCode::TapeError) if root_index < 0
+      root_token = iter.advance_significant
+      return Result.new(nil, ErrorCode::TapeError) unless root_token
 
-      error = parse_value(bytes, root_index, iter, builder, stack, max_depth)
+      error = parse_value_token(root_token, iter, builder, stack, max_depth)
       return Result.new(nil, error) unless error.success?
 
       while stack.size > 0
@@ -369,57 +469,55 @@ module Warp
         when ContextKind::Object
           case ctx.state
           when ContextState::ObjectKey
-            idx = iter.advance_significant_index
-            return Result.new(nil, ErrorCode::TapeError) if idx < 0
-            if bytes[idx] != '"'.ord
-              return Result.new(nil, ErrorCode::TapeError)
-            end
+            tok = iter.advance_significant
+            return Result.new(nil, ErrorCode::TapeError) unless tok
+            return Result.new(nil, ErrorCode::TapeError) unless tok.type == TokenType::String
             builder.increment_count
-            error = builder.key(idx, iter.peek_significant_index)
+            error = builder.key_token(tok)
             return Result.new(nil, error) unless error.success?
             ctx = stack[ctx_index]
             ctx.state = ContextState::ObjectColon
             stack[ctx_index] = ctx
           when ContextState::ObjectColon
-            idx = iter.advance_significant_index
-            return Result.new(nil, ErrorCode::TapeError) if idx < 0
-            return Result.new(nil, ErrorCode::TapeError) if bytes[idx] != ':'.ord
+            tok = iter.advance_significant
+            return Result.new(nil, ErrorCode::TapeError) unless tok
+            return Result.new(nil, ErrorCode::TapeError) unless tok.type == TokenType::Colon
             ctx = stack[ctx_index]
             ctx.state = ContextState::ObjectValue
             stack[ctx_index] = ctx
           when ContextState::ObjectValue
-            idx = iter.advance_significant_index
-            return Result.new(nil, ErrorCode::TapeError) if idx < 0
+            tok = iter.advance_significant
+            return Result.new(nil, ErrorCode::TapeError) unless tok
             ctx = stack[ctx_index]
             ctx.state = ContextState::ObjectCommaOrEnd
             stack[ctx_index] = ctx
-            error = parse_value(bytes, idx, iter, builder, stack, max_depth)
+            error = parse_value_token(tok, iter, builder, stack, max_depth)
             return Result.new(nil, error) unless error.success?
-            nxt = iter.peek_significant_index
-            if nxt >= 0
-              b = bytes[nxt]
-              if b == ','.ord
-                iter.advance_significant_index
+            nxt = iter.peek_significant
+            if nxt
+              case nxt.type
+              when TokenType::Comma
+                iter.advance_significant
                 ctx = stack[ctx_index]
                 ctx.state = ContextState::ObjectKey
                 stack[ctx_index] = ctx
                 next
-              elsif b == '}'.ord
-                iter.advance_significant_index
+              when TokenType::EndObject
+                iter.advance_significant
                 builder.end_object
                 stack.pop
                 next
               end
             end
           when ContextState::ObjectCommaOrEnd
-            idx = iter.advance_significant_index
-            return Result.new(nil, ErrorCode::TapeError) if idx < 0
-            case bytes[idx]
-            when ','.ord
+            tok = iter.advance_significant
+            return Result.new(nil, ErrorCode::TapeError) unless tok
+            case tok.type
+            when TokenType::Comma
               ctx = stack[ctx_index]
               ctx.state = ContextState::ObjectKey
               stack[ctx_index] = ctx
-            when '}'.ord
+            when TokenType::EndObject
               builder.end_object
               stack.pop
             else
@@ -432,38 +530,38 @@ module Warp
           case ctx.state
           when ContextState::ArrayValue
             builder.increment_count
-            idx = iter.advance_significant_index
-            return Result.new(nil, ErrorCode::TapeError) if idx < 0
+            tok = iter.advance_significant
+            return Result.new(nil, ErrorCode::TapeError) unless tok
             ctx = stack[ctx_index]
             ctx.state = ContextState::ArrayCommaOrEnd
             stack[ctx_index] = ctx
-            error = parse_value(bytes, idx, iter, builder, stack, max_depth)
+            error = parse_value_token(tok, iter, builder, stack, max_depth)
             return Result.new(nil, error) unless error.success?
-            nxt = iter.peek_significant_index
-            if nxt >= 0
-              b = bytes[nxt]
-              if b == ','.ord
-                iter.advance_significant_index
+            nxt = iter.peek_significant
+            if nxt
+              case nxt.type
+              when TokenType::Comma
+                iter.advance_significant
                 ctx = stack[ctx_index]
                 ctx.state = ContextState::ArrayValue
                 stack[ctx_index] = ctx
                 next
-              elsif b == ']'.ord
-                iter.advance_significant_index
+              when TokenType::EndArray
+                iter.advance_significant
                 builder.end_array
                 stack.pop
                 next
               end
             end
           when ContextState::ArrayCommaOrEnd
-            idx = iter.advance_significant_index
-            return Result.new(nil, ErrorCode::TapeError) if idx < 0
-            case bytes[idx]
-            when ','.ord
+            tok = iter.advance_significant
+            return Result.new(nil, ErrorCode::TapeError) unless tok
+            case tok.type
+            when TokenType::Comma
               ctx = stack[ctx_index]
               ctx.state = ContextState::ArrayValue
               stack[ctx_index] = ctx
-            when ']'.ord
+            when TokenType::EndArray
               builder.end_array
               stack.pop
             else
@@ -475,7 +573,7 @@ module Warp
         end
       end
 
-      if iter.remaining_significant_structurals > 0
+      if iter.remaining_significant > 0
         return Result.new(nil, ErrorCode::TapeError)
       end
 
@@ -483,19 +581,18 @@ module Warp
       Result.new(Document.new(bytes, builder.tape), ErrorCode::Success)
     end
 
-    private def self.parse_value(
-      bytes : Bytes,
-      idx : Int32,
-      iter : Iterator,
+    private def self.parse_value_token(
+      token : Token,
+      iter : TokenIterator,
       builder : Builder,
       stack : Array(Context),
-      max_depth : Int32,
+      max_depth : Int32
     ) : ErrorCode
-      next_struct = iter.peek_significant_index
-      case bytes[idx]
-      when '{'.ord
-        if iter.peek_significant_byte == '}'.ord
-          iter.advance_significant_index
+      case token.type
+      when TokenType::StartObject
+        nxt = iter.peek_significant
+        if nxt && nxt.type == TokenType::EndObject
+          iter.advance_significant
           builder.empty_object
           return ErrorCode::Success
         end
@@ -503,9 +600,10 @@ module Warp
         builder.start_object
         stack << Context.new(ContextKind::Object, ContextState::ObjectKey)
         ErrorCode::Success
-      when '['.ord
-        if iter.peek_significant_byte == ']'.ord
-          iter.advance_significant_index
+      when TokenType::StartArray
+        nxt = iter.peek_significant
+        if nxt && nxt.type == TokenType::EndArray
+          iter.advance_significant
           builder.empty_array
           return ErrorCode::Success
         end
@@ -513,10 +611,12 @@ module Warp
         builder.start_array
         stack << Context.new(ContextKind::Array, ContextState::ArrayValue)
         ErrorCode::Success
-      when '"'.ord
-        builder.string(idx, next_struct)
+      when TokenType::String
+        builder.string_token(token)
+      when TokenType::Number, TokenType::True, TokenType::False, TokenType::Null
+        builder.primitive_token(token)
       else
-        builder.primitive(idx, next_struct)
+        ErrorCode::TapeError
       end
     end
 
