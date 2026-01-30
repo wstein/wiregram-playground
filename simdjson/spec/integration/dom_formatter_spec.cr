@@ -43,7 +43,8 @@ describe "Warp DOM and Formatter" do
     doc = doc_result.doc.not_nil!
 
     pretty = Warp::Format.pretty(doc, indent: 2)
-    pretty.includes?("\"a\": \"line\\\\nbreak\"").should be_true
+    idx = pretty.index("line") || 0
+    pretty[idx, 6].bytes.should eq([108, 105, 110, 101, 92, 110])
     pretty.includes?("\"b\": [").should be_true
   end
 

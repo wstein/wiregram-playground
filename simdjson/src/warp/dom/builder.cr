@@ -134,7 +134,7 @@ module Warp
       end
 
       private def self.parse_number(slice : Bytes) : ValueResult
-        text = String.new(slice)
+        text = String.build { |io| io.write(slice) }
         if text.includes?('.') || text.includes?('e') || text.includes?('E')
           ValueResult.new(text.to_f64, ErrorCode::Success)
         else
