@@ -156,9 +156,12 @@ module Warp
         while i < len
           block_len = len - i
           block_len = 64 if block_len > 64
-          masks = backend.build_masks(ptr + i, block_len)
-          break unless masks.op == 0
-          i += block_len
+          mask = backend.newline_mask(ptr + i, block_len)
+          if mask == 0
+            i += block_len
+          else
+            return i + mask.trailing_zeros_count
+          end
         end
 
         while i < len
