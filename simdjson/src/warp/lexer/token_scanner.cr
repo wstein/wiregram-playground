@@ -9,6 +9,7 @@ module Warp
         tokens = [] of Token
         i = 0
         len = bytes.size
+        backend = Backend.current
 
         while i < len
           last_i = i
@@ -16,10 +17,7 @@ module Warp
           case c
           when ' '.ord, '\t'.ord
             start = i
-            i += 1
-            while i < len && (bytes[i] == ' '.ord || bytes[i] == '\t'.ord)
-              i += 1
-            end
+            i = scan_space_tab_end(bytes, i, backend)
             tokens << Token.new(TokenKind::Whitespace, start, i - start)
           when '\n'.ord
             tokens << Token.new(TokenKind::Newline, i, 1)
@@ -37,24 +35,13 @@ module Warp
             if jsonc && i + 1 < len
               if bytes[i + 1] == '/'.ord
                 start = i
-                i += 2
-                while i < len && bytes[i] != '\n'.ord && bytes[i] != '\r'.ord
-                  i += 1
-                end
+                i = scan_line_comment_end(bytes, i + 2, backend)
                 tokens << Token.new(TokenKind::CommentLine, start, i - start)
               elsif bytes[i + 1] == '*'.ord
                 start = i
-                i += 2
-                closed = false
-                while i + 1 < len
-                  if bytes[i] == '*'.ord && bytes[i + 1] == '/'.ord
-                    i += 2
-                    closed = true
-                    break
-                  end
-                  i += 1
-                end
-                return {tokens, ErrorCode::StringError} unless closed
+                end_idx = scan_block_comment_end(bytes, i + 2)
+                return {tokens, ErrorCode::StringError} if end_idx < 0
+                i = end_idx
                 tokens << Token.new(TokenKind::CommentBlock, start, i - start)
               else
                 tokens << Token.new(TokenKind::Unknown, i, 1)
@@ -137,6 +124,57 @@ module Warp
             escaped = true
           elsif c == '"'.ord
             return i
+          end
+          i += 1
+        end
+        -1
+      end
+
+      private def self.scan_space_tab_end(bytes : Bytes, start : Int32, backend : Backend::Base) : Int32
+        len = bytes.size
+        i = start
+        ptr = bytes.to_unsafe
+
+        while i + 16 <= len
+          masks = backend.build_masks(ptr + i, 16)
+          expected = 0xFFFF_u64
+          break unless (masks.whitespace & expected) == expected
+          i += 16
+        end
+
+        while i < len && (bytes[i] == ' '.ord || bytes[i] == '\t'.ord)
+          i += 1
+        end
+        i
+      end
+
+      private def self.scan_line_comment_end(bytes : Bytes, start : Int32, backend : Backend::Base) : Int32
+        len = bytes.size
+        i = start
+        ptr = bytes.to_unsafe
+
+        while i < len
+          block_len = len - i
+          block_len = 64 if block_len > 64
+          masks = backend.build_masks(ptr + i, block_len)
+          break unless masks.op == 0
+          i += block_len
+        end
+
+        while i < len
+          c = bytes[i]
+          return i if c == '\n'.ord || c == '\r'.ord
+          i += 1
+        end
+        i
+      end
+
+      private def self.scan_block_comment_end(bytes : Bytes, start : Int32) : Int32
+        i = start
+        len = bytes.size
+        while i + 1 < len
+          if bytes[i] == '*'.ord && bytes[i + 1] == '/'.ord
+            return i + 2
           end
           i += 1
         end
