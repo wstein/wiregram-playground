@@ -1,0 +1,1780 @@
+{
+  // JSONC example with comments, trailing commas, and unicode escapes
+  "items": [
+    // entry 0: ja
+    {
+      "id": 0,
+      "lang": "ja",
+      "title": "Sample 0",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/0"
+    },
+    /* block comment 0: line\nwrap */
+    // entry 1: ru
+    {
+      "id": 1,
+      "lang": "ru",
+      "title": "Sample 1",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/1"
+    },
+    /* block comment 1: multi\nline\ntext */
+    // entry 2: he
+    {
+      "id": 2,
+      "lang": "he",
+      "title": "Sample 2",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/2"
+    },
+    /* block comment 2: short */
+    // entry 3: th
+    {
+      "id": 3,
+      "lang": "th",
+      "title": "Sample 3",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/3"
+    },
+    /* block comment 3: edge\tcase */
+    // entry 4: de
+    {
+      "id": 4,
+      "lang": "de",
+      "title": "Sample 4",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/4"
+    },
+    /* block comment 4: unicode \uD83D\uDE80 */
+    // entry 5: en
+    {
+      "id": 5,
+      "lang": "en",
+      "title": "Sample 5",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/5"
+    },
+    /* block comment 5: line\nwrap */
+    // entry 6: fr
+    {
+      "id": 6,
+      "lang": "fr",
+      "title": "Sample 6",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/6"
+    },
+    /* block comment 6: multi\nline\ntext */
+    // entry 7: sw
+    {
+      "id": 7,
+      "lang": "sw",
+      "title": "Sample 7",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/7"
+    },
+    /* block comment 7: short */
+    // entry 8: ar
+    {
+      "id": 8,
+      "lang": "ar",
+      "title": "Sample 8",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/8"
+    },
+    /* block comment 8: edge\tcase */
+    // entry 9: kn
+    {
+      "id": 9,
+      "lang": "kn",
+      "title": "Sample 9",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/9"
+    },
+    /* block comment 9: unicode \uD83D\uDE80 */
+    // entry 10: hi
+    {
+      "id": 10,
+      "lang": "hi",
+      "title": "Sample 10",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/10"
+    },
+    /* block comment 10: line\nwrap */
+    // entry 11: zh
+    {
+      "id": 11,
+      "lang": "zh",
+      "title": "Sample 11",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/11"
+    },
+    /* block comment 11: multi\nline\ntext */
+    // entry 12: ja
+    {
+      "id": 12,
+      "lang": "ja",
+      "title": "Sample 12",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://example.com/item/12"
+    },
+    /* block comment 12: short */
+    // entry 13: ru
+    {
+      "id": 13,
+      "lang": "ru",
+      "title": "Sample 13",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/13"
+    },
+    /* block comment 13: edge\tcase */
+    // entry 14: he
+    {
+      "id": 14,
+      "lang": "he",
+      "title": "Sample 14",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/14"
+    },
+    /* block comment 14: unicode \uD83D\uDE80 */
+    // entry 15: th
+    {
+      "id": 15,
+      "lang": "th",
+      "title": "Sample 15",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/15"
+    },
+    /* block comment 15: line\nwrap */
+    // entry 16: de
+    {
+      "id": 16,
+      "lang": "de",
+      "title": "Sample 16",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/16"
+    },
+    /* block comment 16: multi\nline\ntext */
+    // entry 17: en
+    {
+      "id": 17,
+      "lang": "en",
+      "title": "Sample 17",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/17"
+    },
+    /* block comment 17: short */
+    // entry 18: fr
+    {
+      "id": 18,
+      "lang": "fr",
+      "title": "Sample 18",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/18"
+    },
+    /* block comment 18: edge\tcase */
+    // entry 19: sw
+    {
+      "id": 19,
+      "lang": "sw",
+      "title": "Sample 19",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/19"
+    },
+    /* block comment 19: unicode \uD83D\uDE80 */
+    // entry 20: ar
+    {
+      "id": 20,
+      "lang": "ar",
+      "title": "Sample 20",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/20"
+    },
+    /* block comment 20: line\nwrap */
+    // entry 21: kn
+    {
+      "id": 21,
+      "lang": "kn",
+      "title": "Sample 21",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/21"
+    },
+    /* block comment 21: multi\nline\ntext */
+    // entry 22: hi
+    {
+      "id": 22,
+      "lang": "hi",
+      "title": "Sample 22",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/22"
+    },
+    /* block comment 22: short */
+    // entry 23: zh
+    {
+      "id": 23,
+      "lang": "zh",
+      "title": "Sample 23",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/23"
+    },
+    /* block comment 23: edge\tcase */
+    // entry 24: ja
+    {
+      "id": 24,
+      "lang": "ja",
+      "title": "Sample 24",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/24"
+    },
+    /* block comment 24: unicode \uD83D\uDE80 */
+    // entry 25: ru
+    {
+      "id": 25,
+      "lang": "ru",
+      "title": "Sample 25",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/25"
+    },
+    /* block comment 25: line\nwrap */
+    // entry 26: he
+    {
+      "id": 26,
+      "lang": "he",
+      "title": "Sample 26",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/26"
+    },
+    /* block comment 26: multi\nline\ntext */
+    // entry 27: th
+    {
+      "id": 27,
+      "lang": "th",
+      "title": "Sample 27",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://example.com/item/27"
+    },
+    /* block comment 27: short */
+    // entry 28: de
+    {
+      "id": 28,
+      "lang": "de",
+      "title": "Sample 28",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/28"
+    },
+    /* block comment 28: edge\tcase */
+    // entry 29: en
+    {
+      "id": 29,
+      "lang": "en",
+      "title": "Sample 29",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/29"
+    },
+    /* block comment 29: unicode \uD83D\uDE80 */
+    // entry 30: fr
+    {
+      "id": 30,
+      "lang": "fr",
+      "title": "Sample 30",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/30"
+    },
+    /* block comment 30: line\nwrap */
+    // entry 31: sw
+    {
+      "id": 31,
+      "lang": "sw",
+      "title": "Sample 31",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/31"
+    },
+    /* block comment 31: multi\nline\ntext */
+    // entry 32: ar
+    {
+      "id": 32,
+      "lang": "ar",
+      "title": "Sample 32",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/32"
+    },
+    /* block comment 32: short */
+    // entry 33: kn
+    {
+      "id": 33,
+      "lang": "kn",
+      "title": "Sample 33",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/33"
+    },
+    /* block comment 33: edge\tcase */
+    // entry 34: hi
+    {
+      "id": 34,
+      "lang": "hi",
+      "title": "Sample 34",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/34"
+    },
+    /* block comment 34: unicode \uD83D\uDE80 */
+    // entry 35: zh
+    {
+      "id": 35,
+      "lang": "zh",
+      "title": "Sample 35",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/35"
+    },
+    /* block comment 35: line\nwrap */
+    // entry 36: ja
+    {
+      "id": 36,
+      "lang": "ja",
+      "title": "Sample 36",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/36"
+    },
+    /* block comment 36: multi\nline\ntext */
+    // entry 37: ru
+    {
+      "id": 37,
+      "lang": "ru",
+      "title": "Sample 37",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/37"
+    },
+    /* block comment 37: short */
+    // entry 38: he
+    {
+      "id": 38,
+      "lang": "he",
+      "title": "Sample 38",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/38"
+    },
+    /* block comment 38: edge\tcase */
+    // entry 39: th
+    {
+      "id": 39,
+      "lang": "th",
+      "title": "Sample 39",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/39"
+    },
+    /* block comment 39: unicode \uD83D\uDE80 */
+    // entry 40: de
+    {
+      "id": 40,
+      "lang": "de",
+      "title": "Sample 40",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/40"
+    },
+    /* block comment 40: line\nwrap */
+    // entry 41: en
+    {
+      "id": 41,
+      "lang": "en",
+      "title": "Sample 41",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/41"
+    },
+    /* block comment 41: multi\nline\ntext */
+    // entry 42: fr
+    {
+      "id": 42,
+      "lang": "fr",
+      "title": "Sample 42",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://example.com/item/42"
+    },
+    /* block comment 42: short */
+    // entry 43: sw
+    {
+      "id": 43,
+      "lang": "sw",
+      "title": "Sample 43",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/43"
+    },
+    /* block comment 43: edge\tcase */
+    // entry 44: ar
+    {
+      "id": 44,
+      "lang": "ar",
+      "title": "Sample 44",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/44"
+    },
+    /* block comment 44: unicode \uD83D\uDE80 */
+    // entry 45: kn
+    {
+      "id": 45,
+      "lang": "kn",
+      "title": "Sample 45",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/45"
+    },
+    /* block comment 45: line\nwrap */
+    // entry 46: hi
+    {
+      "id": 46,
+      "lang": "hi",
+      "title": "Sample 46",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/46"
+    },
+    /* block comment 46: multi\nline\ntext */
+    // entry 47: zh
+    {
+      "id": 47,
+      "lang": "zh",
+      "title": "Sample 47",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/47"
+    },
+    /* block comment 47: short */
+    // entry 48: ja
+    {
+      "id": 48,
+      "lang": "ja",
+      "title": "Sample 48",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/48"
+    },
+    /* block comment 48: edge\tcase */
+    // entry 49: ru
+    {
+      "id": 49,
+      "lang": "ru",
+      "title": "Sample 49",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/49"
+    },
+    /* block comment 49: unicode \uD83D\uDE80 */
+    // entry 50: he
+    {
+      "id": 50,
+      "lang": "he",
+      "title": "Sample 50",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/50"
+    },
+    /* block comment 50: line\nwrap */
+    // entry 51: th
+    {
+      "id": 51,
+      "lang": "th",
+      "title": "Sample 51",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/51"
+    },
+    /* block comment 51: multi\nline\ntext */
+    // entry 52: de
+    {
+      "id": 52,
+      "lang": "de",
+      "title": "Sample 52",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/52"
+    },
+    /* block comment 52: short */
+    // entry 53: en
+    {
+      "id": 53,
+      "lang": "en",
+      "title": "Sample 53",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/53"
+    },
+    /* block comment 53: edge\tcase */
+    // entry 54: fr
+    {
+      "id": 54,
+      "lang": "fr",
+      "title": "Sample 54",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/54"
+    },
+    /* block comment 54: unicode \uD83D\uDE80 */
+    // entry 55: sw
+    {
+      "id": 55,
+      "lang": "sw",
+      "title": "Sample 55",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/55"
+    },
+    /* block comment 55: line\nwrap */
+    // entry 56: ar
+    {
+      "id": 56,
+      "lang": "ar",
+      "title": "Sample 56",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/56"
+    },
+    /* block comment 56: multi\nline\ntext */
+    // entry 57: kn
+    {
+      "id": 57,
+      "lang": "kn",
+      "title": "Sample 57",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://example.com/item/57"
+    },
+    /* block comment 57: short */
+    // entry 58: hi
+    {
+      "id": 58,
+      "lang": "hi",
+      "title": "Sample 58",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/58"
+    },
+    /* block comment 58: edge\tcase */
+    // entry 59: zh
+    {
+      "id": 59,
+      "lang": "zh",
+      "title": "Sample 59",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/59"
+    },
+    /* block comment 59: unicode \uD83D\uDE80 */
+    // entry 60: ja
+    {
+      "id": 60,
+      "lang": "ja",
+      "title": "Sample 60",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/60"
+    },
+    /* block comment 60: line\nwrap */
+    // entry 61: ru
+    {
+      "id": 61,
+      "lang": "ru",
+      "title": "Sample 61",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/61"
+    },
+    /* block comment 61: multi\nline\ntext */
+    // entry 62: he
+    {
+      "id": 62,
+      "lang": "he",
+      "title": "Sample 62",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/62"
+    },
+    /* block comment 62: short */
+    // entry 63: th
+    {
+      "id": 63,
+      "lang": "th",
+      "title": "Sample 63",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/63"
+    },
+    /* block comment 63: edge\tcase */
+    // entry 64: de
+    {
+      "id": 64,
+      "lang": "de",
+      "title": "Sample 64",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/64"
+    },
+    /* block comment 64: unicode \uD83D\uDE80 */
+    // entry 65: en
+    {
+      "id": 65,
+      "lang": "en",
+      "title": "Sample 65",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/65"
+    },
+    /* block comment 65: line\nwrap */
+    // entry 66: fr
+    {
+      "id": 66,
+      "lang": "fr",
+      "title": "Sample 66",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/66"
+    },
+    /* block comment 66: multi\nline\ntext */
+    // entry 67: sw
+    {
+      "id": 67,
+      "lang": "sw",
+      "title": "Sample 67",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/67"
+    },
+    /* block comment 67: short */
+    // entry 68: ar
+    {
+      "id": 68,
+      "lang": "ar",
+      "title": "Sample 68",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/68"
+    },
+    /* block comment 68: edge\tcase */
+    // entry 69: kn
+    {
+      "id": 69,
+      "lang": "kn",
+      "title": "Sample 69",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/69"
+    },
+    /* block comment 69: unicode \uD83D\uDE80 */
+    // entry 70: hi
+    {
+      "id": 70,
+      "lang": "hi",
+      "title": "Sample 70",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/70"
+    },
+    /* block comment 70: line\nwrap */
+    // entry 71: zh
+    {
+      "id": 71,
+      "lang": "zh",
+      "title": "Sample 71",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/71"
+    },
+    /* block comment 71: multi\nline\ntext */
+    // entry 72: ja
+    {
+      "id": 72,
+      "lang": "ja",
+      "title": "Sample 72",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://example.com/item/72"
+    },
+    /* block comment 72: short */
+    // entry 73: ru
+    {
+      "id": 73,
+      "lang": "ru",
+      "title": "Sample 73",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/73"
+    },
+    /* block comment 73: edge\tcase */
+    // entry 74: he
+    {
+      "id": 74,
+      "lang": "he",
+      "title": "Sample 74",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/74"
+    },
+    /* block comment 74: unicode \uD83D\uDE80 */
+    // entry 75: th
+    {
+      "id": 75,
+      "lang": "th",
+      "title": "Sample 75",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/75"
+    },
+    /* block comment 75: line\nwrap */
+    // entry 76: de
+    {
+      "id": 76,
+      "lang": "de",
+      "title": "Sample 76",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/76"
+    },
+    /* block comment 76: multi\nline\ntext */
+    // entry 77: en
+    {
+      "id": 77,
+      "lang": "en",
+      "title": "Sample 77",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/77"
+    },
+    /* block comment 77: short */
+    // entry 78: fr
+    {
+      "id": 78,
+      "lang": "fr",
+      "title": "Sample 78",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/78"
+    },
+    /* block comment 78: edge\tcase */
+    // entry 79: sw
+    {
+      "id": 79,
+      "lang": "sw",
+      "title": "Sample 79",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/79"
+    },
+    /* block comment 79: unicode \uD83D\uDE80 */
+    // entry 80: ar
+    {
+      "id": 80,
+      "lang": "ar",
+      "title": "Sample 80",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/80"
+    },
+    /* block comment 80: line\nwrap */
+    // entry 81: kn
+    {
+      "id": 81,
+      "lang": "kn",
+      "title": "Sample 81",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/81"
+    },
+    /* block comment 81: multi\nline\ntext */
+    // entry 82: hi
+    {
+      "id": 82,
+      "lang": "hi",
+      "title": "Sample 82",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/82"
+    },
+    /* block comment 82: short */
+    // entry 83: zh
+    {
+      "id": 83,
+      "lang": "zh",
+      "title": "Sample 83",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/83"
+    },
+    /* block comment 83: edge\tcase */
+    // entry 84: ja
+    {
+      "id": 84,
+      "lang": "ja",
+      "title": "Sample 84",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/84"
+    },
+    /* block comment 84: unicode \uD83D\uDE80 */
+    // entry 85: ru
+    {
+      "id": 85,
+      "lang": "ru",
+      "title": "Sample 85",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/85"
+    },
+    /* block comment 85: line\nwrap */
+    // entry 86: he
+    {
+      "id": 86,
+      "lang": "he",
+      "title": "Sample 86",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/86"
+    },
+    /* block comment 86: multi\nline\ntext */
+    // entry 87: th
+    {
+      "id": 87,
+      "lang": "th",
+      "title": "Sample 87",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://example.com/item/87"
+    },
+    /* block comment 87: short */
+    // entry 88: de
+    {
+      "id": 88,
+      "lang": "de",
+      "title": "Sample 88",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/88"
+    },
+    /* block comment 88: edge\tcase */
+    // entry 89: en
+    {
+      "id": 89,
+      "lang": "en",
+      "title": "Sample 89",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/89"
+    },
+    /* block comment 89: unicode \uD83D\uDE80 */
+    // entry 90: fr
+    {
+      "id": 90,
+      "lang": "fr",
+      "title": "Sample 90",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/90"
+    },
+    /* block comment 90: line\nwrap */
+    // entry 91: sw
+    {
+      "id": 91,
+      "lang": "sw",
+      "title": "Sample 91",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/91"
+    },
+    /* block comment 91: multi\nline\ntext */
+    // entry 92: ar
+    {
+      "id": 92,
+      "lang": "ar",
+      "title": "Sample 92",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/92"
+    },
+    /* block comment 92: short */
+    // entry 93: kn
+    {
+      "id": 93,
+      "lang": "kn",
+      "title": "Sample 93",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/93"
+    },
+    /* block comment 93: edge\tcase */
+    // entry 94: hi
+    {
+      "id": 94,
+      "lang": "hi",
+      "title": "Sample 94",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/94"
+    },
+    /* block comment 94: unicode \uD83D\uDE80 */
+    // entry 95: zh
+    {
+      "id": 95,
+      "lang": "zh",
+      "title": "Sample 95",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/95"
+    },
+    /* block comment 95: line\nwrap */
+    // entry 96: ja
+    {
+      "id": 96,
+      "lang": "ja",
+      "title": "Sample 96",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/96"
+    },
+    /* block comment 96: multi\nline\ntext */
+    // entry 97: ru
+    {
+      "id": 97,
+      "lang": "ru",
+      "title": "Sample 97",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/97"
+    },
+    /* block comment 97: short */
+    // entry 98: he
+    {
+      "id": 98,
+      "lang": "he",
+      "title": "Sample 98",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/98"
+    },
+    /* block comment 98: edge\tcase */
+    // entry 99: th
+    {
+      "id": 99,
+      "lang": "th",
+      "title": "Sample 99",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/99"
+    },
+    /* block comment 99: unicode \uD83D\uDE80 */
+    // entry 100: de
+    {
+      "id": 100,
+      "lang": "de",
+      "title": "Sample 100",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/100"
+    },
+    /* block comment 100: line\nwrap */
+    // entry 101: en
+    {
+      "id": 101,
+      "lang": "en",
+      "title": "Sample 101",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/101"
+    },
+    /* block comment 101: multi\nline\ntext */
+    // entry 102: fr
+    {
+      "id": 102,
+      "lang": "fr",
+      "title": "Sample 102",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://example.com/item/102"
+    },
+    /* block comment 102: short */
+    // entry 103: sw
+    {
+      "id": 103,
+      "lang": "sw",
+      "title": "Sample 103",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://warp.local/resource/103"
+    },
+    /* block comment 103: edge\tcase */
+    // entry 104: ar
+    {
+      "id": 104,
+      "lang": "ar",
+      "title": "Sample 104",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://data.example.org/entry/104"
+    },
+    /* block comment 104: unicode \uD83D\uDE80 */
+    // entry 105: kn
+    {
+      "id": 105,
+      "lang": "kn",
+      "title": "Sample 105",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://example.com/item/105"
+    },
+    /* block comment 105: line\nwrap */
+    // entry 106: hi
+    {
+      "id": 106,
+      "lang": "hi",
+      "title": "Sample 106",
+      "text": "\u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947\u0902\u0939\u0948\u3002 \u0932\u0947\u0916\u0928\u092f\u0939\u093e\u0909\u0926\u093e\u0939\u0930\u0923\u092f\u0939\u093e\u0901\u0939\u093f\u0928\u094d\u0926\u0940\u092e\u0947",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://warp.local/resource/106"
+    },
+    /* block comment 106: multi\nline\ntext */
+    // entry 107: zh
+    {
+      "id": 107,
+      "lang": "zh",
+      "title": "Sample 107",
+      "text": "\u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587\u6587\u672c\u7528\u4e8e\u6d4b\u8bd5\u89e3\u6790\u548c\u683c\u5f0f\u5316\u3002 \u8fd9\u662f\u4e00\u6bb5\u4e2d\u6587",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://data.example.org/entry/107"
+    },
+    /* block comment 107: short */
+    // entry 108: ja
+    {
+      "id": 108,
+      "lang": "ja",
+      "title": "Sample 108",
+      "text": "\u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \u6771\u4eac\u30ab\u30d5\u30a7\u3067\u304a\u8336\u3092\u98f2\u3080\u3002 \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.8,
+        "note": "edge\tcase"
+      },
+      "url": "https://example.com/item/108"
+    },
+    /* block comment 108: edge\tcase */
+    // entry 109: ru
+    {
+      "id": 109,
+      "lang": "ru",
+      "title": "Sample 109",
+      "text": "\u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414\u0430\u043d\u043d\u044b\u0435\u0438\u043f\u043e\u0442\u043e\u043a\u0438\u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0438\u0432\u0430\u044e\u0442\u0441\u044f\u0431\u044b\u0441\u0442\u0440\u043e\u0438\u0442\u043e\u0447\u043d\u043e\u3002 \u0414",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.9,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://warp.local/resource/109"
+    },
+    /* block comment 109: unicode \uD83D\uDE80 */
+    // entry 110: he
+    {
+      "id": 110,
+      "lang": "he",
+      "title": "Sample 110",
+      "text": "\u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd\u05d1\u05e2\u05d1\u05e8\u05d9\u05ea\u05de\u05e9\u05ea\u05de\u05e9\u05d9\u05dd\u05dc\u05d4\u05d3\u05d2\u05de\u05d4\u3002 \u05e0\u05ea\u05d5\u05e0",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.0,
+        "note": "line\nwrap"
+      },
+      "url": "https://data.example.org/entry/110"
+    },
+    /* block comment 110: line\nwrap */
+    // entry 111: th
+    {
+      "id": 111,
+      "lang": "th",
+      "title": "Sample 111",
+      "text": "\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49\u0e17\u0e35\u0e48\u0e19\u0e35\u0e48\u3002 \u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e41\u0e25\u0e30\u0e15\u0e31\u0e27\u0e2d\u0e22\u0e48\u0e32\u0e07\u0e16\u0e39\u0e01\u0e43\u0e0a\u0e49",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.1,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://example.com/item/111"
+    },
+    /* block comment 111: multi\nline\ntext */
+    // entry 112: de
+    {
+      "id": 112,
+      "lang": "de",
+      "title": "Sample 112",
+      "text": "Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. Dies ist ein Beispieltext auf Deutsch mit einigen Worten zur Datenverarbeitung. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.2,
+        "note": "short"
+      },
+      "url": "https://warp.local/resource/112"
+    },
+    /* block comment 112: short */
+    // entry 113: en
+    {
+      "id": 113,
+      "lang": "en",
+      "title": "Sample 113",
+      "text": "This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. This is an English sample that talks about parsing, formatting, and performance. \uD83D\uDE00",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.3,
+        "note": "edge\tcase"
+      },
+      "url": "https://data.example.org/entry/113"
+    },
+    /* block comment 113: edge\tcase */
+    // entry 114: fr
+    {
+      "id": 114,
+      "lang": "fr",
+      "title": "Sample 114",
+      "text": "Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. Ceci est un exemple en francais avec des accents et des details techniques. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.4,
+        "note": "unicode \uD83D\uDE80"
+      },
+      "url": "https://example.com/item/114"
+    },
+    /* block comment 114: unicode \uD83D\uDE80 */
+    // entry 115: sw
+    {
+      "id": 115,
+      "lang": "sw",
+      "title": "Sample 115",
+      "text": "Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. Des isch a schwabischer Beispielsatz, wo ma glei merkt, wie's klingt. \uD83D\uDE00\uD83D\uDCC8\uD83D\uDE80",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.5,
+        "note": "line\nwrap"
+      },
+      "url": "https://warp.local/resource/115"
+    },
+    /* block comment 115: line\nwrap */
+    // entry 116: ar
+    {
+      "id": 116,
+      "lang": "ar",
+      "title": "Sample 116",
+      "text": "\u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a\u0648\u0627\u0644\u0623\u062f\u0627\u0621\u3002 \u0647\u0630\u0627\u0645\u062b\u0627\u0644\u0639\u0631\u0628\u064a\u064a\u0634\u0631\u062d\u0627\u0644\u0628\u064a\u0627\u0646",
+      "tags": ["news", "jsonc", "warp", "bench"],
+      "meta": {
+        "active": true,
+        "ratio": 1.6,
+        "note": "multi\nline\ntext"
+      },
+      "url": "https://data.example.org/entry/116"
+    },
+    /* block comment 116: multi\nline\ntext */
+    // entry 117: kn
+    {
+      "id": 117,
+      "lang": "kn",
+      "title": "Sample 117",
+      "text": "\u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd\u0ca8\u0cbf\u0ca8\u0ca4\u0ccd\u0cb8\u0ccd\u0ca5\u0cbf\u0ca4\u0cbf\u0cb9\u0cca\u0ca6\u0cc1\u3002 \u0cb9\u0ccb\u0cb8\u0ca6\u0ca8\u0ca6\u0ca4\u0ca4\u0ca6\u0ca4\u0cb3\u0cc1\u0cae\u0cb9\u0cca\u0ca6\u0ccd",
+      "tags": ["news", "jsonc", "warp", "bench", "simd"],
+      "meta": {
+        "active": false,
+        "ratio": 1.7,
+        "note": "short"
+      },
+      "url": "https://example.com/item/117"
+    },
+    /* block comment 117: short */
+  ],
+  "config": {
+    // trailing comma allowed in JSONC
+    "enabled": true,
+    "threshold": 0.75,
+  },
+}
