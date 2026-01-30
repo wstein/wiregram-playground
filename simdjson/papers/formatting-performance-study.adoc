@@ -36,42 +36,42 @@ These differences explain why output sizes and throughput diverge across dataset
 [cols="2,1,1,1",options="header"]
 |===
 |Variant |Avg ms |Throughput (MB/s) |Output bytes
-|Tape + pretty (parse+format) |0.32 |60.10 |492,375
-|DOM + pretty (parse+format)  |0.91 |21.11 |379,830
-|CST + pretty (parse+format)  |0.55 |34.69 |564,470
-|AST + pretty (parse+format)  |0.69 |27.87 |525,455
-|Tape pretty only             |0.04 |427.97 |492,375
-|DOM pretty only              |0.25 |77.08 |379,830
-|CST pretty only              |0.12 |162.07 |564,470
-|AST pretty only              |0.05 |363.08 |525,455
+|Tape + pretty (parse+format) |0.39 |48.86 |492,375
+|DOM + pretty (parse+format)  |0.60 |32.17 |379,830
+|CST + pretty (parse+format)  |0.55 |34.64 |564,470
+|AST + pretty (parse+format)  |0.73 |26.47 |525,455
+|Tape pretty only             |0.05 |399.54 |492,375
+|DOM pretty only              |0.07 |261.61 |379,830
+|CST pretty only              |0.12 |154.62 |564,470
+|AST pretty only              |0.05 |362.11 |525,455
 |===
 
 === twitter.json
 [cols="2,1,1,1",options="header"]
 |===
 |Variant |Avg ms |Throughput (MB/s) |Output bytes
-|Tape + pretty (parse+format) |1.28 |94.31 |3,157,570
-|DOM + pretty (parse+format)  |3.88 |31.07 |3,312,185
-|CST + pretty (parse+format)  |3.77 |31.97 |3,527,690
-|AST + pretty (parse+format)  |4.68 |25.72 |3,527,690
-|Tape pretty only             |0.41 |291.13 |3,157,570
-|DOM pretty only              |2.10 |57.35 |3,312,185
-|CST pretty only              |1.72 |70.08 |3,527,690
-|AST pretty only              |1.02 |117.94 |3,527,690
+|Tape + pretty (parse+format) |1.30 |92.35 |3,157,570
+|DOM + pretty (parse+format)  |2.52 |47.83 |3,312,185
+|CST + pretty (parse+format)  |3.88 |31.01 |3,527,690
+|AST + pretty (parse+format)  |4.84 |24.91 |3,527,690
+|Tape pretty only             |0.40 |300.50 |3,157,570
+|DOM pretty only              |0.77 |156.45 |3,312,185
+|CST pretty only              |1.61 |74.70 |3,527,690
+|AST pretty only              |0.80 |151.22 |3,527,690
 |===
 
 === rcl_test.json
 [cols="2,1,1,1",options="header"]
 |===
 |Variant |Avg ms |Throughput (MB/s) |Output bytes
-|Tape + pretty (parse+format) |75.27 |48.15 |71,133,395
-|DOM + pretty (parse+format)  |178.16 |20.34 |71,133,395
-|CST + pretty (parse+format)  |210.12 |17.25 |77,951,315
-|AST + pretty (parse+format)  |405.54 |8.94 |77,951,315
-|Tape pretty only             |13.32 |272.13 |71,133,395
-|DOM pretty only              |46.27 |78.33 |71,133,395
-|CST pretty only              |46.46 |78.00 |77,951,315
-|AST pretty only              |30.64 |118.28 |77,951,315
+|Tape + pretty (parse+format) |71.85 |50.44 |71,133,395
+|DOM + pretty (parse+format)  |131.50 |27.56 |71,133,395
+|CST + pretty (parse+format)  |218.05 |16.62 |77,951,315
+|AST + pretty (parse+format)  |366.95 |9.88 |77,951,315
+|Tape pretty only             |14.44 |251.00 |71,133,395
+|DOM pretty only              |20.02 |181.06 |71,133,395
+|CST pretty only              |48.28 |75.07 |77,951,315
+|AST pretty only              |30.78 |117.76 |77,951,315
 |===
 
 == Discussion

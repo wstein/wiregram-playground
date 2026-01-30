@@ -17,11 +17,19 @@ The project delivers a zero-copy JSON token iterator and a tape-building stage2 
 - Preallocation: Tape and context stack are sized from the structural count to reduce allocations and bounds checks.
 - Parallel benchmarks: `bin/bench` runs per-file benchmarks concurrently to saturate cores during measurement.
 - Formatter paths: Tape-based formatting avoids DOM/CST allocation; CST formatting is reserved for JSONC comment preservation.
+- SIMD-assisted DOM escaping: formatter uses backend masks to fast-path strings without escapes.
+- SIMD number validation: stage2 number parsing uses SIMD-assisted digit scans to reduce per-byte branching.
+- SIMD JSONC scanning: token scanner uses SIMD newline/whitespace detection to skip comments faster.
+- SoA view: optional `IR::SoAView` provides columnar tape data for hot scans and benchmarks.
 
 == Measured Throughput
-In our local measurements on Apple Silicon (release builds), the current implementation reaches about 1 GB/s of parsed throughput when processing a single large file with the shipped `bin/bench` harness (built via `crystal build bin/bench.cr --release -O3` and using a tuned `CRYSTAL_CACHE_DIR`).
+Local release builds with `scripts/benchmark_format.cr` and `--stress-seconds 2 --stress-workers 2` show the following steady-state results (Apple Silicon PoC environment):
 
-Thanks to Crystal fibers and the benchmark's per-file concurrency model, aggregate throughput when parsing multiple files in parallel is substantially higher — running the same benchmark over many files typically scales with available cores and I/O bandwidth, yielding several GB/s of total throughput depending on the machine and dataset. Use `bin/bench --profile` to obtain separate stage1/stage2 timings for more detailed measurement.
+* `spec/fixtures/jsonc_example.jsonc`: tape+pretty 48.86 MB/s, dom+pretty 32.17 MB/s, cst+pretty 34.64 MB/s, ast+pretty 26.47 MB/s, tape pretty-only 399.54 MB/s.
+* `spec/fixtures/rcl_test.json`: tape+pretty 50.44 MB/s, dom+pretty 27.56 MB/s, cst+pretty 16.62 MB/s, ast+pretty 9.88 MB/s, tape pretty-only 251.00 MB/s.
+* `spec/fixtures/twitter.json`: tape+pretty 92.35 MB/s, dom+pretty 47.83 MB/s, cst+pretty 31.01 MB/s, ast+pretty 24.91 MB/s, tape pretty-only 300.50 MB/s.
+
+SoA view overhead remains small: building the view adds ~0.01–2.75 ms across the fixtures, and scan-type passes complete in under 0.26 ms for the largest dataset.
 
 == Alignment with Crystal 1.19 Performance Guide
 - Data locality: Uses contiguous `Bytes` and arrays; avoids per-token allocations.
@@ -35,6 +43,7 @@ Thanks to Crystal fibers and the benchmark's per-file concurrency model, aggrega
 - Full NEON UTF-8 validation (multibyte): Extend SIMD beyond the ASCII fast-path by classifying lead bytes, counting expected continuations, and carrying state across blocks to eliminate scalar fallback on mixed text.
 - SIMD string end scan: Use NEON to locate quotes/backslashes within bounded regions defined by structural indexes, reducing scalar scans for string termination.
 - SIMD whitespace/colon/comma scan in stage2: Reuse structural indexes to bypass scalar whitespace trimming and detect delimiters with small NEON masks.
+- SIMD block-comment scanning: add masks for `*` and `/` to accelerate JSONC block comment termination.
 
 === Scalar Tightening
 - Inline hot helpers: Apply `@[AlwaysInline]` to tiny functions (`scalar_type`, iterator accessors) and inline tape-building helpers to reduce call overhead.
@@ -53,6 +62,8 @@ Thanks to Crystal fibers and the benchmark's per-file concurrency model, aggrega
 | UTF-8 | Implement full NEON multibyte validator with carried state | Major: reduces scalar fallback on text-heavy JSON | Requires careful state handling and tests
 | Strings | NEON quote/backslash scan bounded by structurals | Moderate: faster string termination | Must preserve escape correctness
 | Stage2 | SIMD colon/comma/whitespace scan | Moderate: fewer scalar scans | Keep logic aligned with stage1 indexes
+| JSONC | SIMD block-comment termination scan | Small/Moderate: faster comment parsing | Ensure CRLF handling and `*/` detection
+| Tape | SoA view for scan-heavy paths | Moderate: faster scans, better cache locality | Keep AoS canonical to avoid refactors
 | Inlining/unsafe | `@[AlwaysInline]`, guarded `unsafe_fetch` in hot loops | Moderate: lower overhead, fewer bounds checks | Validate with benchmarks; watch code size
 | Buffers | Reuse tape/stack between parses | Small: reduced GC churn | Parser becomes stateful; add reset
 | Fast paths | Restore and simplify object/array common-case branches | Moderate: fewer branches | Only after current TapeError is resolved

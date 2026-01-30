@@ -250,6 +250,24 @@ include::reference-architecture.adoc[tag=scenarios]
 
 ---
 
+=== Performance Considerations
+**File**: [performance.adoc](performance.adoc)
+
+**Length**: ~8 pages
+
+**Purpose**: SIMD, GC, and parser optimization notes with current improvements
+
+**Contents**:
+- SIMD backends summary
+- Recent SIMD improvements (escape scan, number scan, JSONC scanning)
+- SoA view notes and suggested benchmarks
+
+**Audience**: Performance engineers, core contributors
+
+**Reading Time**: 10-15 minutes
+
+---
+
 === JSONC Support Notes
 **File**: [jsonc-support-notes.adoc](jsonc-support-notes.adoc)
 
