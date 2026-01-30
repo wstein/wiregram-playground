@@ -1,0 +1,173 @@
+= Warp Language Pipeline: Ruby and Crystal Parsing, CST/AST, Tape, and Lossless Transpilation
+Werner Stein
+
+include::reference-architecture.adoc[tag=pipeline]
+
+== Abstract
+This paper proposes a unified parsing and representation pipeline for full Ruby and Crystal support inside Warp: a shared tokenizer, green/red CST, a compact tape IR, and a typed AST. We outline how the tape enables high-throughput formatting and how the CST supports a lossless, reversible transpiler between Ruby and Crystal. We also propose a linter that leverages CST trivia for precise diagnostics and an annotation pipeline that emits inline Sorbet signatures for Ruby.
+
+== Motivation
+Ruby and Crystal share syntax heritage yet diverge in semantics, types, and tooling. Supporting both languages with a shared core reduces duplication and enables bidirectional translation. A unified pipeline must preserve original source text, comments, and formatting while also enabling fast scans, linting, and semantic analysis.
+
+== Requirements
+* Full language coverage for Ruby and Crystal (lexing and parsing).
+* Lossless source retention: comments, whitespace, and formatting must survive round-trips.
+* High-throughput tape generation for scanners and formatters.
+* Clear separation of "syntax-preserving" and "semantic-normalizing" operations.
+* Bidirectional transpilation with explicit lossiness flags when constructs diverge.
+* Inline Sorbet annotations for Ruby derived from type metadata.
+
+== Architecture Overview
+The pipeline is designed as two parallel tracks with a shared front-end:
+
+1. **Tokenization**: Language-specific lexer variants share a core scanner.
+2. **CST (Green/Red)**: Green nodes hold immutable structure and trivia slices; red nodes add navigation.
+3. **Tape IR**: A compact sequential record stream for fast traversal and formatting.
+4. **AST**: A semantic tree derived from CST with normalized nodes.
+
+The CST is the primary lossless representation. The tape prioritizes throughput and is derived from CST or directly from the lexer for well-formed inputs.
+
+== CST (Green/Red) Design
+* Green nodes store:
+  - Kind (node type)
+  - Child list
+  - Trivia (leading/trailing)
+  - Slice offsets into the original byte buffer
+* Red nodes provide:
+  - Parent/child navigation
+  - Lightweight views, with no duplication of bytes
+
+This structure allows exact reconstruction of the original source text while supporting structural edits and diagnostics.
+
+== Tape IR for Ruby/Crystal
+The tape is a linear record list optimized for iteration:
+* Records store type + a/b fields (offsets or links).
+* Scalar token entries reference source slices directly.
+* Container entries store index bounds and counts.
+
+The tape is used for:
+* Fast formatting (pretty/minify, style-specific).
+* Low-level scan passes (metrics, indexing, incremental tooling).
+
+== Formatter Design (Tape-Driven)
+The formatter consumes tape records and emits output based on style rules.
+* For Ruby/Crystal, formatter can operate in:
+  - **Preserve** mode: re-emit original slices when safe.
+  - **Normalize** mode: canonical spacing/line breaks.
+* Tape avoids AST allocations when formatting only.
+
+== Linter Design (CST + AST)
+Linting uses:
+* CST for trivia-aware diagnostics (e.g., comment placement, spacing).
+* AST for semantic checks (unused variables, unreachable code).
+* Rule engine supports "syntax-only" and "semantic" passes.
+
+== Lossless Transpiler (Ruby <-> Crystal)
+Transpilation is staged:
+1. Parse to CST (lossless).
+2. Build semantic AST for both languages.
+3. Apply transform rules with explicit lossiness markers.
+4. Emit target CST while preserving trivia.
+5. Format (optional) for style conventions.
+
+=== Reversibility Strategy
+* Maintain original slices for tokens where mappings are bijective.
+* Attach "origin tags" to red nodes to guide reverse mapping.
+* Use a reversible mapping table with explicit "lossy" flags.
+
+=== Ruby 3.4 <-> Crystal 1.9 Mapping Table
+[cols="2,4,2,2",options="header"]
+|===
+|Construct |Mapping |Lossless |Notes
+|Blocks (`do ... end`, `{ ... }`) |Crystal blocks with `do ... end` or `{ ... }` |Yes |Preserve delimiters in CST trivia when possible.
+|Keyword args (`foo(a: 1)`) |Crystal named args (`foo(a: 1)`) |Yes |Direct mapping for shared syntax.
+|Splat (`*args`, `**kwargs`) |Crystal splat (`*args`, `**kwargs`) |Mostly |Crystal `**` requires `NamedTuple` for some cases.
+|Pattern matching (`case ... in`) |Crystal `case ... in` |Mostly |Differences in guards and deconstruction rules.
+|Safe navigation (`&.`) |Crystal `try` or `&.` |Mostly |Crystal `&.` exists; `try` variant for nilable types.
+|Ranges (`..`, `...`) |Crystal ranges |Yes |Semantics align for numeric ranges.
+|Lambdas (`->`) |Crystal `->` |Mostly |Type inference differs; annotate if needed.
+|Method defs (`def`) |Crystal `def` |Mostly |Crystal requires type resolution for some overloads.
+|Constants |Crystal constants |Yes |Namespace and visibility rules differ in some cases.
+|Mixins (`include`, `extend`) |Crystal `include`, `extend` |Mostly |Crystal `extend` limited to modules.
+|Refinements |No direct Crystal equivalent |No |Emit warning and preserve via comments.
+|Metaprogramming (`define_method`) |Crystal macros or generated code |No |Requires macro generation or tool-side transforms.
+|`method_missing` |Crystal `method_missing` |Mostly |Type info may be required to retain behavior.
+|`eval` |Not supported (Crystal) |No |Emit warning and preserve in comments.
+|Structs |Crystal `struct` |Mostly |Field initialization and visibility differ.
+|Open classes |Crystal reopens classes |Mostly |Crystal is more restrictive; note conflicts.
+|Visibility (`private`, `protected`) |Crystal visibility |Mostly |Scope rules differ (e.g., nested defs).
+|Exceptions |Crystal `raise`, `rescue` |Yes |Syntax compatible; hierarchy differs.
+|Fibers |Crystal `Fiber` |Mostly |Scheduling semantics differ.
+|=== 
+
+=== Inline Sorbet Annotations
+* Emit Sorbet `sig` blocks from Crystal type info (or inferred types).
+* Attach annotations as CST trivia nodes that can be rendered inline
+  while retaining the original Ruby code for round-trip fidelity.
+* When round-tripping, preserve annotations as their own trivia tokens
+  so they can be removed or re-applied deterministically.
+
+== Evaluation Plan
+* Parsing correctness: corpus-based coverage for Ruby/Crystal.
+* CST round-trip: byte-for-byte equality on parse -> emit.
+* Tape formatting throughput: tape vs CST vs AST.
+* Transpiler reversibility: Ruby -> Crystal -> Ruby diff tests.
+* Sorbet quality: annotation coverage and compatibility checks.
+
+== Risks and Mitigations
+* **Grammar divergence**: isolate language-specific nodes and map via adapters.
+* **Lossless constraints**: keep CST as the canonical source and avoid
+  destructive AST rewrites.
+* **Performance regression**: use tape for hot paths and SoA views for scans.
+
+== Library and Macro Mapping
+=== Library and Class/Module Name Mapping
+* Maintain a mapping registry for core and standard library names.
+* Prefer explicit namespace translation tables (e.g., `FileUtils` -> `FileUtils`,
+  `OpenStruct` -> `OpenStruct?` with compatibility shims).
+* Generate adapter modules when APIs diverge to preserve call sites.
+* Provide a project-level override file to pin custom mappings.
+
+=== Inline Assembler and Compile-Time Macros
+* Ruby inline assembly has no direct equivalent; emit a warning and preserve
+  the original snippet as CST trivia for round-trip fidelity.
+* Crystal macros can be mapped to Ruby DSL stubs with comments indicating
+  compile-time behavior; keep macro bodies in sidecar files to avoid loss.
+* For Crystal `{{ }}` macro expansions, record expansion metadata so the
+  reverse transpiler can reconstruct the original macro invocation.
+
+== Conclusion
+Warp can support full Ruby and Crystal parsing by centering the CST as the lossless ground truth, deriving a tape IR for fast formatting, and using AST for semantic analysis. A reversible transpiler becomes feasible with CST-preserving transforms and explicit lossiness tags, while inline Sorbet annotations can be emitted as trivia without breaking round-trip fidelity.
+
+== Project Configuration (Draft)
+Warp supports a project-level configuration file (`warp.yaml`) to control
+language targets, formatting, linting, and transpiler rules. Example schema:
+
+[source,yaml]
+----
+version: 1
+language:
+  source: ruby
+  target: crystal
+  ruby_version: "3.4"
+  crystal_version: "1.9"
+formatter:
+  mode: preserve
+  indent: 2
+  newline: "\n"
+linter:
+  enable: true
+  rules:
+    - name: "layout/spacing"
+      enabled: true
+transpiler:
+  reversible: true
+  lossy_rules: ["eval", "refinements"]
+  sorbet:
+    inline: true
+mappings:
+  libraries:
+    FileUtils: FileUtils
+  namespaces:
+    Net::HTTP: HTTP::Client
+----
