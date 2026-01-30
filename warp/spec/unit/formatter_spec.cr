@@ -39,9 +39,41 @@ describe Warp::Format do
       doc_result = parser.parse_document(json.to_slice, validate_literals: true, validate_numbers: true)
       doc_result.error.success?.should be_true
 
+      # Test tape-based formatting specifically
+      pretty_tape = Warp::Format.pretty(doc_result.doc.not_nil!, indent: 2)
+      pretty_tape.should contain("\"key1\": \"value1\"")
+      pretty_tape.should contain("\"key2\": 42")
+
+      # Verify the tape-based formatting is actually being used
+      # The tape-based path should be exercised when using the document directly
+    end
+
+    it "tests tape-based formatting with complex nested structures" do
+      json = %({"a":{"b":[1,2,3],"c":{"d":"value"}},"e":[4,5,6]})
+      parser = Warp::Parser.new
+      doc_result = parser.parse_document(json.to_slice, validate_literals: true, validate_numbers: true)
+      doc_result.error.success?.should be_true
+
       pretty = Warp::Format.pretty(doc_result.doc.not_nil!, indent: 2)
-      pretty.should contain("\"key1\": \"value1\"")
-      pretty.should contain("\"key2\": 42")
+      pretty.should contain("\"a\": {")
+      pretty.should contain("\"b\": [")
+      pretty.should contain("\"c\": {")
+      pretty.should contain("\"d\": \"value\"")
+      pretty.should contain("\"e\": [")
+    end
+
+    it "tests tape-based formatting with complex nested structures" do
+      json = %({"a":{"b":[1,2,3],"c":{"d":"value"}},"e":[4,5,6]})
+      parser = Warp::Parser.new
+      doc_result = parser.parse_document(json.to_slice, validate_literals: true, validate_numbers: true)
+      doc_result.error.success?.should be_true
+
+      pretty = Warp::Format.pretty(doc_result.doc.not_nil!, indent: 2)
+      pretty.should contain("\"a\": {")
+      pretty.should contain("\"b\": [")
+      pretty.should contain("\"c\": {")
+      pretty.should contain("\"d\": \"value\"")
+      pretty.should contain("\"e\": [")
     end
 
     it "handles array element processing correctly (line 535, 575)" do

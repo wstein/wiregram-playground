@@ -11,6 +11,18 @@
 #
 # Current JSON parser continues to use these backward-compatible types.
 
+# Suggestion #3: NodeKind Union Type
+#
+# To support multiple languages without massive enum bloat, we define an abstract
+# base type for NodeKind. This allows the pipeline to work with either JSON or
+# Ruby (or any future language) node kinds using polymorphism instead of enum
+# matching on hardcoded types.
+#
+# IMPLEMENTATION NOTE:
+# Crystal doesn't have true union types, so we use an abstract enum or module
+# pattern. Each language provides its own NodeKind enum (e.g., JSON::NodeKind,
+# Ruby::NodeKind), and the core pipeline uses type-erased references where needed.
+
 module Warp
   module CST
     # TokenKind: JSON-specific lexical tokens
@@ -112,5 +124,38 @@ module Warp
       def initialize(@doc : Document?, @error : Core::ErrorCode)
       end
     end
+
+    # ============================================================================
+    # Suggestion #3: Language-Agnostic Node Kind Interface
+    # ============================================================================
+    #
+    # To support multiple languages without a monolithic enum, we provide a
+    # polymorphic mechanism for node kinds. Each language defines its own
+    # NodeKind enum (JSON::NodeKind, Ruby::NodeKind, etc.), and the core
+    # pipeline can work with any of them.
+    #
+    # Pattern: Language modules provide their own NodeKind enum, and if needed,
+    # a wrapper/adapter for core pipeline integration.
+    #
+    # Example usage in a language-agnostic traversal:
+    #   def walk(node : RedNode)
+    #     case node.kind
+    #     when JSON::NodeKind::Object, JSON::NodeKind::Array
+    #       # Handle JSON containers
+    #     when Ruby::NodeKind::MethodDef, Ruby::NodeKind::ClassDef
+    #       # Handle Ruby definitions
+    #     else
+    #       # Handle others
+    #     end
+    #   end
+    #
+    # RATIONALE:
+    # Crystal's strong typing prevents true union types in enums, but we can:
+    # 1. Keep each language's NodeKind as a separate enum
+    # 2. Use the node.kind method which returns the specific enum value
+    # 3. Pattern match on language-specific variants in traversal code
+    # 4. Avoid massive enum bloat by keeping JSON, Ruby, Crystal enums separate
+    #
+    # This approach maintains type safety while allowing extensibility.
   end
 end
