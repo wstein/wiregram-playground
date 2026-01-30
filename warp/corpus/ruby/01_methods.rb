@@ -1,8 +1,11 @@
+# typed: strict
 # Methods with various signatures
+sig { params(a: Integer, b: Integer).returns(Integer) }
 def add(a, b)
   a + b
 end
 
+sig { params(name: String).returns(String) }
 def greet(name = "World")
   "Hello, #{name}!"
 end

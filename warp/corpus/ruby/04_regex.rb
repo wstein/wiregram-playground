@@ -1,7 +1,8 @@
+# typed: strict
 # Regular expressions
-pattern1 = /\d+/
-pattern2 = %r{/path/to/file}
-pattern3 = /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/
+pattern1 = T.let(/\d+/, Regexp)
+pattern2 = T.let(%r{/path/to/file}, Regexp)
+pattern3 = T.let(/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/, Regexp)
 
 def match_test(string)
   if string =~ /[0-9]+/

@@ -1,14 +1,17 @@
+# typed: strict
 # Class definitions
 class Person
   attr_accessor :name
   attr_reader :age
   attr_writer :email
 
+  sig { params(name: String, age: Integer).void }
   def initialize(name, age)
     @name = name
     @age = age
   end
 
+  sig { returns(String) }
   def greet
     "Hello, I'm #{@name}"
   end

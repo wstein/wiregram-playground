@@ -1,8 +1,9 @@
+# typed: strict
 # String literals and interpolation
-single_quoted = 'single quoted string'
-double_quoted = "double quoted string"
-interpolated = "Value: #{1 + 2}"
-escaped = "Escaped: \n\t\""
+single_quoted = T.let('single quoted string', String)
+double_quoted = T.let("double quoted string", String)
+interpolated = T.let("Value: #{1 + 2}", String)
+escaped = T.let("Escaped: \n\t\"", String)
 
 percent_string = %q(percent quoted)
 percent_interpolated = %Q(percent #{1 + 1})
