@@ -1,16 +1,18 @@
-= simdjson SIMD Implementation Architecture (ADR)
+= Warp SIMD Implementation Architecture (ADR)
 :doctype: article
 :toc: left
 :toclevels: 3
 :sectnums:
-:author: simdjson Crystal maintainers
+:author: Warp Crystal maintainers
 :revdate: 2026-01-28
 :revnumber: 1.0
 
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 [abstract]
 == Abstract
 
-This Architecture Decision Record (ADR) defines the target architecture for multi-platform SIMD support in the simdjson Crystal implementation, focusing on Stage 1 (structural index scanning). The decision is to adopt the *Hybrid Approach* (Alternative 4): *backend selection* combined with *compile-time constant block sizes inside each backend*.
+This Architecture Decision Record (ADR) defines the target architecture for multi-platform SIMD support in the Warp (Crystal) implementation, focusing on Stage 1 (structural index scanning). The decision is to adopt the *Hybrid Approach* (Alternative 4): *backend selection* combined with *compile-time constant block sizes inside each backend*.
 
 == Status
 
@@ -111,8 +113,8 @@ The current implementation effectively uses a *64-byte mask window* and builds i
 Backend selection happens once and is cached:
 
 - Default: pick a compile-time default (AArch64 → NEON, otherwise scalar).
-- Override: allow forcing a backend via environment variable (e.g., `SIMDJSON_BACKEND=scalar|sse2|avx|avx2|avx512|neon`) for testing and debugging.
-- Verification: retain a verification mode where the chosen backend is cross-checked against a scalar path on small inputs (existing `SIMDJSON_VERIFY_NEON` becomes a generalized “verify SIMD backend” mechanism).
+- Override: allow forcing a backend via environment variable (e.g., `WARP_BACKEND=scalar|sse2|avx|avx2|avx512|neon`) for testing and debugging.
+- Verification: retain a verification mode where the chosen backend is cross-checked against a scalar path on small inputs (existing `WARP_VERIFY_NEON` becomes a generalized “verify SIMD backend” mechanism).
 
 Future selection should consider:
 

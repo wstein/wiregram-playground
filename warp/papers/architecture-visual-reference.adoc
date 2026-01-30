@@ -1,8 +1,10 @@
-= SIMD Architecture - Visual Reference
+= Warp SIMD Architecture - Visual Reference
 :doctype: article
 :toc: left
 :toclevels: 3
 
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 == Architecture Comparison Diagrams
 
 === Alternative 1: Monolithic Backend Approach
@@ -94,31 +96,31 @@ Cons: More complex, slight runtime overhead
     │     │     │        │        │
     ▼     ▼     ▼        ▼        ▼
 ┌────────────────────────────────────────────┐
-│ Binary 1: simdjson-avx512 (Ice Lake+)      │
+│ Binary 1: warp-avx512 (Ice Lake+)      │
 │   Pure AVX512, no runtime checks           │
 │   64-byte blocks only                      │
 └────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────┐
-│ Binary 2: simdjson-avx2 (Haswell+)         │
+│ Binary 2: warp-avx2 (Haswell+)         │
 │   Pure AVX2, no runtime checks             │
 │   32-byte blocks only                      │
 └────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────┐
-│ Binary 3: simdjson-sse2 (x86_64 baseline)  │
+│ Binary 3: warp-sse2 (x86_64 baseline)  │
 │   Pure SSE2, no runtime checks             │
 │   16-byte blocks only                      │
 └────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────┐
-│ Binary 4: simdjson-neon (ARM64)            │
+│ Binary 4: warp-neon (ARM64)            │
 │   Pure NEON, no runtime checks             │
 │   8-byte blocks only                       │
 └────────────────────────────────────────────┘
 
 ┌────────────────────────────────────────────┐
-│ Binary 5: simdjson-scalar (fallback)       │
+│ Binary 5: warp-scalar (fallback)       │
 │   Pure Crystal, no SIMD                    │
 │   1-byte processing                        │
 └────────────────────────────────────────────┘

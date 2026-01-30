@@ -1,12 +1,14 @@
-= SIMD Architecture Alternatives - Summary & Ratings
+= Warp SIMD Architecture Alternatives - Summary & Ratings
 :doctype: article
 :toc: left
 :toclevels: 3
 :sectnums:
 
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 == Quick Reference Guide
 
-This document provides a quick-reference summary of the four architectural alternatives evaluated for the simdjson Crystal SIMD implementation.
+This document provides a quick-reference summary of the four architectural alternatives evaluated for the Warp (Crystal) SIMD implementation.
 
 == Alternative Ratings Overview
 
@@ -195,11 +197,11 @@ Layer 3: Block Size Optimization
 [source,text]
 ----
 Build System
-  ├─ Build 1: simdjson-avx512 (for newest Intel/AMD)
-  ├─ Build 2: simdjson-avx2 (for modern Intel/AMD)
-  ├─ Build 3: simdjson-sse2 (for older x86)
-  ├─ Build 4: simdjson-neon (for ARM)
-  └─ Build 5: simdjson-scalar (for others)
+  ├─ Build 1: warp-avx512 (for newest Intel/AMD)
+  ├─ Build 2: warp-avx2 (for modern Intel/AMD)
+  ├─ Build 3: warp-sse2 (for older x86)
+  ├─ Build 4: warp-neon (for ARM)
+  └─ Build 5: warp-scalar (for others)
 
 Each build: Pure specialized code (no runtime checks)
 ----

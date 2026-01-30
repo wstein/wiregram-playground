@@ -1,8 +1,9 @@
-# warp (Crystal)
+# Warp (Crystal)
 
-ARM64-focused JSON parsing scaffolding for Apple Silicon (M-series).
+Working-title PoC for an ARM64-focused JSON parsing stack on Apple Silicon (M-series).
 
 This project provides:
+
 - A zero-copy, slice-based token iterator in Crystal.
 - SIMD-accelerated stage1 on AArch64 via NEON
 
@@ -10,10 +11,12 @@ This project provides:
 
 Warp follows a lexer + IR parsing pipeline optimized for performance while maintaining zero-copy semantics.
 
-### Stage 1: Lexer (Structural Scanning)
-**Purpose**: Acts as a high-performance lexer that identifies all structural JSON tokens.
+### Stage 1a: SIMD Scan (Structural Scanning)
+
+**Purpose**: Acts as a high-performance scan that identifies structural JSON characters and validates UTF-8/escapes.
 
 **What it does**:
+
 - Scans input bytes to locate structural characters (`{`, `}`, `[`, `]`, `:`, `,`)
 - Performs UTF-8 validation and escape sequence detection
 - Produces structural indices (positions of all structural tokens)
@@ -21,10 +24,23 @@ Warp follows a lexer + IR parsing pipeline optimized for performance while maint
 
 **Output**: Array of byte positions pointing to structural tokens in the original JSON
 
+### Stage 1b: Lexer Assembly
+
+**Purpose**: Converts scan artifacts into a token stream with spans and trivia metadata.
+
+**What it does**:
+- Converts structural indices into a token stream (strings, numbers, literals, separators)
+- Attaches spans and trivia (whitespace/newlines)
+- Prepares tokens for Stage 2 parsing
+
+**Output**: Token stream with spans into the original JSON
+
 ### Stage 2: Parser (Tape Building)
+
 **Purpose**: Acts as a traditional parser that builds a structured representation from the lexer's output.
 
 **What it does**:
+
 - Consumes structural indices from Stage 1
 - Builds a compact "tape" representation with typed entries
 - Links containers (objects/arrays) with their contents
@@ -36,46 +52,160 @@ Warp follows a lexer + IR parsing pipeline optimized for performance while maint
 
 ```mermaid
 graph LR
-    A[JSON Bytes] --> B[Stage1: Structural Scanning]
-    B --> C[Structural Indices]
-    C --> D[Stage2: Tape Building]
-    D --> E[Document: Tape + Original Bytes]
-    E --> F[Parser API]
-    F --> G[Token Iterator]
-    F --> H[Document Iterator]
-    
-    B --> I[UTF-8 Validation]
-    B --> J[Escape Sequence Detection]
-    D --> K[Container Linking]
-    D --> L[Scalar Validation]
+    A[JSON Bytes] --> B[Stage1a: SIMD Scan]
+    B --> C[Scan Artifacts]
+    C --> D[Stage1b: Lexer Assembly]
+    D --> E[Token Stream]
+    E --> F[Stage2: Tape Building]
+    F --> G[Document: Tape + Original Bytes]
+    G --> H[Parser API]
+    H --> I[Token Iterator]
+    H --> J[Document Iterator]
+
+    B --> K[UTF-8 Validation]
+    B --> L[Escape Sequence Detection]
+    D --> M[Trivia/Span Tracking]
+    F --> N[Container Linking]
+    F --> O[Scalar Validation]
 ```
 
 ### Component Architecture
 
 ```mermaid
 graph TB
-    subgraph "Stage 1: SIMD-Accelerated Scanning"
+    subgraph "Stage 1a: SIMD-Accelerated Scan"
         S1[Neon Module] --> S2[Scanner]
         S3[Utf8Validator] --> S2
         S4[EscapeScanner] --> S2
         S5[StringScanner] --> S2
-        S2 --> S6[Structural Indices]
+        S2 --> S6[Scan Artifacts]
+    end
+
+    subgraph "Stage 1b: Lexer Assembly"
+        S6 --> S7[Token Assembler]
+        S7 --> S8[Token Stream]
     end
 
     subgraph "Stage 2: Tape Building"
-        S7[Builder] --> S8[Document]
-        S9[TapeIterator] --> S8
-        S8 --> S10[Zero-Copy Slices]
+        S9[Builder] --> S10[Document]
+        S11[TapeIterator] --> S10
+        S10 --> S12[Zero-Copy Slices]
     end
 
     subgraph "Parser API"
-        S11[Parser] --> S12[Token Iterator]
-        S11 --> S13[Document Parser]
-        S12 --> S14[Token Stream]
-        S13 --> S8
+        S13[Parser] --> S14[Token Iterator]
+        S13 --> S15[Document Parser]
+        S14 --> S8
+        S15 --> S10
     end
-    
-    S6 --> S7
+
+    S8 --> S9
+```
+
+## Scenarios and Tooling
+
+The parser is a low-level primitive that can be embedded in higher-level tools. The scenarios below highlight common workflows and where Warp's zero-copy scanning is helpful.
+
+### Formatter (Pretty Printer / Minifier)
+
+**Scenario**: Read JSON, validate/parse, then emit a canonical layout (compact or pretty).
+
+```mermaid
+flowchart LR
+  A[JSON Input] --> B[Stage1a/1b]
+  B --> C[Stage2: Tape Building]
+  C --> D[Formatter]
+  D --> E[JSON Output]
+```
+
+### Linter (Schema/Style Rules)
+
+**Scenario**: Parse once, then apply rule checks such as duplicate keys, ordering, schema constraints, or style rules.
+
+```mermaid
+flowchart LR
+  A[JSON Input] --> B[Stage1a/1b + Stage2]
+  B --> C[Rule Engine]
+  C --> D[Diagnostics]
+```
+
+### jq-like Tool (Selector + Transformation)
+
+**Scenario**: Traverse the tape to run selections, filters, and transformations similar to jq.
+
+```mermaid
+flowchart LR
+  A[JSON Input] --> B[Parser]
+  B --> C[Query Engine]
+  C --> D[Filtered/Transformed JSON]
+```
+
+### Evaluation Engine (Calculator / Query Execution)
+
+**Scenario**: Build evaluator instructions from a query script file, then run expressions against JSON values. This can be simple arithmetic (calculator) or a richer query language.
+
+```mermaid
+flowchart LR
+  A[Query Script] --> B[Compiler]
+  B --> C[Evaluator]
+  D[JSON Input] --> E[Parser]
+  E --> C
+  C --> F[Result Value]
+```
+
+### Converter (YAML => JSON)
+
+**Scenario**: Parse YAML, emit JSON; use Warp for fast validation and reformatting of the JSON output.
+
+```mermaid
+flowchart LR
+  A[YAML Input] --> B[YAML Parser]
+  B --> C[JSON Builder]
+  C --> D[Warp Formatter/Validator]
+  D --> E[JSON Output]
+```
+
+### Translator / Transpiler (Ruby => Crystal)
+
+**Scenario**: Convert source trees; JSON often appears as configuration or embedded data that must be validated or transformed.
+
+```mermaid
+flowchart LR
+  A[Ruby Source] --> B[Parser/AST]
+  B --> C[Transpiler]
+  C --> D[Crystal Source]
+  D --> E[JSON Assets]
+  E --> F[Warp Validator/Formatter]
+```
+
+### MCP (Model Context Protocol) Integration
+
+**Scenario**: An MCP server exposes JSON resources; Warp accelerates parsing/validation for large payloads.
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant MCPServer
+  participant Warp
+  Client->>MCPServer: Request resource
+  MCPServer->>Warp: Parse/validate JSON
+  Warp-->>MCPServer: Document or error
+  MCPServer-->>Client: JSON payload
+```
+
+### LSP (Language Server Protocol) Integration
+
+**Scenario**: LSP servers often handle JSON config or schema files; Warp can power fast parsing with diagnostics.
+
+```mermaid
+sequenceDiagram
+  participant Editor
+  participant LSP
+  participant Warp
+  Editor->>LSP: didOpen / didChange (JSON)
+  LSP->>Warp: Parse/validate
+  Warp-->>LSP: Tokens + errors
+  LSP-->>Editor: Diagnostics
 ```
 
 ## Build
@@ -91,7 +221,9 @@ Run the benchmark (build with `crystal --release` for higher throughput):
 ```
 ./bin/bench [options] <json file> [json file...]
 ```
+
 Options:
+
 - `--backend <name>`: force backend selection (`scalar`, `neon`, `sse2`, `avx`, `avx2`, `avx512`).
 - `--profile`: report stage1/stage2 timings (runs both stages). When passed, `bin/bench` will attempt to enable compile-time LLVM instrumentation and set `LLVM_PROFILE_FILE=bench-%p.profraw` so an `.profraw` file is generated; processing requires `llvm-profdata`/`llvm-cov` (toolchain support may be needed).
 
@@ -122,7 +254,6 @@ Crystal 1.19 does not expose built-in coverage in `crystal spec`. Use kcov:
 ```
 ./scripts/coverage_kcov
 ```
-
 
 ## Newline Handling
 
@@ -185,23 +316,50 @@ if doc_result.error.success?
     # entry.type and iter.slice(entry) for zero-copy access
   end
 end
+
+dom_result = parser.parse_dom(bytes)
+if dom_result.error.success?
+  dom = dom_result.value
+  pretty = Warp::Format.pretty(dom)
+  minified = Warp::Format.minify(dom)
+end
 ```
 
+### DOM and Formatter Usage
+
+`parse_dom` builds a bare JSON DOM with unescaped strings, and `Warp::Format` can emit pretty or minified JSON from that DOM.
+
+```crystal
+parser = Warp::Parser.new
+dom_result = parser.parse_dom(bytes)
+if dom_result.error.success?
+  dom = dom_result.value.not_nil!
+  puts Warp::Format.pretty(dom, indent: 2)
+  puts Warp::Format.minify(dom)
+end
+```
+
+Number typing caveat: numbers that fit in `Int64` are stored as integers, otherwise they are stored as `Float64`. If you need exact numeric fidelity (e.g., big integers or decimal precision), keep using tape slices.
+
 Notes:
+
 - The current Crystal parser is a zero-copy token iterator. It does not build a DOM.
+- The tape IR can drive an optional DOM or a richer AST; an AST typically carries more semantic information than a minimal DOM, so it should not be modeled as "DOM -> AST".
+- A bare DOM builder and simple formatter (pretty/minified) are available for convenience.
 - String values are returned as raw JSON slices (quotes stripped) without unescaping.
-- Stage1 uses Crystal NEON asm on AArch64 with a scalar fallback for non-AArch64 builds.
-- UTF-8 is validated during stage1; set `SIMDJSON_VERIFY_NEON=1` to cross-check SIMD masks with scalar for debugging (slower).
+- Stage1a uses Crystal NEON asm on AArch64 with a scalar fallback for non-AArch64 builds.
+- UTF-8 is validated during stage1; set `WARP_VERIFY_NEON=1` to cross-check SIMD masks with scalar for debugging (slower).
 - Stage2 builds a zero-copy tape without unescaping or number conversion.
 - Literal/number validation is optional and can be enabled per-parse without copying.
 
 ## Components and Interoperability
 
-### Stage 1: SIMD-Accelerated Structural Scanning
+### Stage 1a: SIMD-Accelerated Scan
 
 **Purpose**: Locate structural JSON characters and perform UTF-8 validation.
 
 **Key Components**:
+
 - **Neon Module**: ARM64 SIMD implementation using NEON intrinsics for 8-byte mask scanning
 - **Scanner**: Orchestrates string, escape, and character scanning
 - **Utf8Validator**: Stateful UTF-8 validation across block boundaries
@@ -210,7 +368,8 @@ Notes:
 
 **Output**: `Array(UInt32)` of structural indices pointing to JSON structural characters.
 
-**Interoperability**: Stage1 produces the `Stage1Buffer` that Stage2 consumes. The buffer contains:
+**Interoperability**: Stage1a produces the `Stage1Buffer` that Stage1b consumes. The buffer contains:
+
 ```crystal
 struct Stage1Buffer
   ptr : Pointer(UInt32)  # Pointer to structural indices
@@ -219,28 +378,42 @@ struct Stage1Buffer
 end
 ```
 
+### Stage 1b: Lexer Assembly
+
+**Purpose**: Convert scan artifacts into a token stream suitable for parsing.
+
+**Key Components**:
+
+- **TokenAssembler**: Converts structural indices into a typed token stream
+- **Token**: Kind + span into original bytes + trivia metadata
+
+**Output**: Stream of tokens with spans into the original input.
+
 ### Stage 2: Tape Building and Document Representation
 
 **Purpose**: Convert structural indices into a compact tape representation for efficient traversal.
 
 **Key Components**:
+
 - **Builder**: Incrementally constructs the tape from structural indices
 - **Document**: Wraps original bytes + tape for zero-copy access
 - **TapeIterator**: Provides sequential access to tape entries
 - **Entry**: Individual tape entries with type and offset/length information
 
 **Tape Structure**:
+
 ```crystal
-struct Entry
+struct Entry # Tape record
   type : TapeType  # StartObject, EndObject, String, Number, etc.
   a : Int32       # Start offset or count
   b : Int32       # Length or end index
 end
 ```
 
-**Interoperability**: Stage2 consumes `Stage1Buffer` and produces `Stage2::Document`:
+**Interoperability**: Stage2 consumes the Stage1b token stream (assembled from `Stage1Buffer`) and produces `IR::Document`:
+
 ```crystal
-def self.parse(bytes : Bytes, buffer : Stage1Buffer, max_depth : Int32) : Stage2::Result
+def self.parse_tokens(bytes : Bytes, tokens : Array(Token), max_depth : Int32) : IR::Result
 ```
 
 ### Parser: High-Level API
@@ -248,8 +421,10 @@ def self.parse(bytes : Bytes, buffer : Stage1Buffer, max_depth : Int32) : Stage2
 **Purpose**: Provides convenient front-end to the two-stage pipeline.
 
 **Key Methods**:
+
 - `each_token(bytes, &block)` - Iterate tokens with zero-copy slices
 - `parse_document(bytes, validate_literals, validate_numbers)` - Build complete document
+- `parse_dom(bytes)` - Build a bare DOM with unescaped strings
 
 **Error Handling**: Returns `ErrorCode` enums for various failure modes (UTF-8 errors, unclosed strings, etc.)
 
@@ -259,20 +434,21 @@ def self.parse(bytes : Bytes, buffer : Stage1Buffer, max_depth : Int32) : Stage2
 sequenceDiagram
     participant User
     participant Parser
-    participant Stage1
+    participant Stage1a
+    participant Stage1b
     participant Stage2
     participant Document
 
     User->>Parser: each_token(bytes)
-    Parser->>Stage1: index(bytes)
-    Stage1-->>Parser: Stage1Result{buffer, error}
-    Parser->>Stage1: iterate_tokens(buffer)
-    Stage1-->>Parser: Token stream
+    Parser->>Stage1a: index(bytes)
+    Stage1a-->>Parser: Stage1Result{buffer, error}
+    Parser->>Stage1b: assemble_tokens(buffer)
+    Stage1b-->>Parser: Token stream
     Parser-->>User: Yield tokens
 
     User->>Parser: parse_document(bytes)
-    Parser->>Stage1: index(bytes)
-    Stage1-->>Parser: Stage1Result{buffer, error}
+    Parser->>Stage1a: index(bytes)
+    Stage1a-->>Parser: Stage1Result{buffer, error}
     Parser->>Stage2: parse(bytes, buffer)
     Stage2-->>Parser: Stage2::Result{document, error}
     Parser-->>User: Document or error
@@ -281,6 +457,7 @@ sequenceDiagram
 ### Zero-Copy Design
 
 All components maintain references to the original `Bytes` buffer:
+
 - **No data copying**: All slices reference original memory
 - **No string unescaping**: Raw JSON preserved
 - **No number conversion**: Numbers stored as byte ranges
@@ -288,7 +465,8 @@ All components maintain references to the original `Bytes` buffer:
 
 ### Performance Characteristics
 
-- **Stage1**: SIMD-accelerated on ARM64, scalar fallback elsewhere
+- **Stage1a**: SIMD-accelerated on ARM64, scalar fallback elsewhere
+- **Stage1b**: Linear pass to assemble tokens and spans
 - **Stage2**: Linear scan through structural indices
 - **Memory**: O(structural_count) metadata, O(1) per token access
 - **Cache**: Good locality due to sequential processing
@@ -297,7 +475,7 @@ All components maintain references to the original `Bytes` buffer:
 
 ### 1. No UTF-8 Normalization
 
-**Current State**: Stage1 only validates UTF-8, doesn't normalize it.
+**Current State**: Stage1a only validates UTF-8, doesn't normalize it.
 
 **Architectural Decision**: UTF-8 normalization should be handled in **Stage 2**, not Stage 1, for these reasons:
 
@@ -307,6 +485,7 @@ All components maintain references to the original `Bytes` buffer:
 4. **Memory Efficiency**: Normalization can be done lazily in Stage 2 when strings are actually accessed
 
 **Suggested Implementation**:
+
 ```crystal
 # Add to Stage2::Builder
 def normalize_utf8(slice : Bytes) : Bytes
@@ -329,60 +508,18 @@ end
 
 **Location**: Implement in `src/warp/ir/tape_builder.cr` in the `Builder` class.
 
-### 2. No String Unescaping
+### 2. String Unescaping
 
-**Current State**: String values are raw JSON slices with quotes stripped but not unescaped.
+**Current State**: Tape entries keep raw JSON slices (quotes stripped) for zero-copy access. The DOM builder unescapes strings when constructing the data model.
 
-**Suggested Implementation**:
-```crystal
-# Add to Stage2::Builder
-def unescape_string(escaped_slice : Bytes) : Bytes
-  result = Bytes.new(escaped_slice.size) # Conservative allocation
-  src = escaped_slice.to_unsafe
-  dst = result.to_unsafe
-  i = 0
-  j = 0
-  
-  while i < escaped_slice.size
-    c = src[i]
-    if c == '\\'.ord && i + 1 < escaped_slice.size
-      case src[i + 1]
-      when '"'.ord; dst[j] = '"'.ord; i += 1
-      when '\\'.ord; dst[j] = '\\'.ord; i += 1
-      when '/'.ord; dst[j] = '/'.ord; i += 1
-      when 'b'.ord; dst[j] = '\b'.ord; i += 1
-      when 'f'.ord; dst[j] = '\f'.ord; i += 1
-      when 'n'.ord; dst[j] = '\n'.ord; i += 1
-      when 'r'.ord; dst[j] = '\r'.ord; i += 1
-      when 't'.ord; dst[j] = '\t'.ord; i += 1
-      when 'u'.ord
-        # Handle Unicode escapes \uXXXX
-        if i + 5 < escaped_slice.size
-          codepoint = parse_unicode_escape(src + i + 2)
-          j += write_utf8_codepoint(dst + j, codepoint)
-          i += 5
-        end
-      else
-        dst[j] = c
-      end
-    else
-      dst[j] = c
-    end
-    i += 1
-    j += 1
-  end
-  
-  result[0, j] # Return actual used portion
-end
-```
-
-**Location**: Add to `src/warp/ir/tape_builder.cr` and modify `string_entry` method.
+**Notes**: If you need unescaped strings without building a DOM, add a small string decoding utility that operates on tape slices.
 
 ### 3. No Character Set Conversion
 
 **Current State**: UTF-8 is validated but not converted to other encodings.
 
 **Suggested Implementation**:
+
 ```crystal
 # Add conversion module
 module Warp::Conversion
@@ -415,12 +552,14 @@ end
 3. **Implement character set conversion** - For interoperability needs
 
 **Performance Considerations**:
+
 - Make features optional via parser flags
 - Cache converted results when possible
 - Use zero-copy when feasible (e.g., ASCII strings don't need conversion)
 - Consider lazy evaluation for expensive operations
 
 **API Design**:
+
 ```crystal
 # Extended parser options
 parser.parse_document(bytes,
@@ -780,5 +919,6 @@ end
 ```
 
 Limitations:
-- No string unescape yet.
-- No DOM builder yet; you get a token stream based on structural indexes.
+
+- Tape slices remain raw; DOM builder provides unescaped strings.
+- Token stream and tape are built from structural indexes; DOM builder and formatter are optional layers.

@@ -1,0 +1,88 @@
+= Proposal: Non-Destructive Bidirectional Crystal <=> Ruby Transpiler
+Werner Stein
+
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
+== Abstract
+This proposal outlines a non-destructive, bidirectional transpiler between Crystal and Ruby. The design prioritizes round-trip fidelity, preserving formatting, comments, and ambiguous constructs by using a lossless CST plus a language-neutral semantic IR with explicit fallback nodes.
+
+== Goals
+* Bidirectional translation: Crystal -> Ruby and Ruby -> Crystal.
+* Non-destructive round-tripping for supported constructs.
+* Preserve formatting, comments, and trivia where possible.
+* Produce stable, predictable output with minimal stylistic drift.
+* Provide explicit warnings when lossy conversions are unavoidable.
+
+== Non-Goals
+* Perfect semantic equivalence for all language features.
+* Automatic optimization or idiomatic rewrites beyond a minimal safe baseline.
+* Full macro expansion or metaprogramming parity.
+
+== Definition of "Non-Destructive"
+* Source fidelity: retain original tokens and trivia in a lossless CST.
+* Reversibility: every emitted node has a stable mapping back to the origin.
+* Opaque fallback: unsupported constructs are preserved as verbatim blocks.
+* Controlled formatting: a formatter can reflow output, but defaults to conservative layout.
+
+== Architecture Overview
+=== Pipeline
+1. Parse source into a lossless CST (including comments, whitespace, and delimiters).
+2. Build a typed semantic IR (SIR) with references to CST spans.
+3. Translate SIR into target language SIR, using explicit mapping rules.
+4. Rehydrate the target CST from SIR, preserving trivia from the origin where possible.
+5. Format using stable, minimal-diff rules (pretty/minified modes).
+
+=== Key Data Structures
+* CST (lossless): Green/Red tree with full trivia.
+* SIR (semantic IR): language-neutral nodes with typed fields.
+* OpaqueNode: verbatim fallback for unmapped constructs.
+* Mapping table: origin span -> target span for round-trip reconciliation.
+
+== Translation Strategy
+=== Syntax Mapping
+* Direct mappings for literals, arrays, hashes, method calls, and blocks.
+* Explicit node mapping for class/module definitions and visibility.
+* Default to OpaqueNode for macros or Ruby metaprogramming that lacks parity.
+
+=== Type and Semantics
+* Preserve Ruby dynamic behavior by emitting Crystal with explicit `Nil` handling and union types.
+* Preserve Crystal static hints by emitting Ruby comments/annotations (e.g., `# : Int32`).
+* Keep constant semantics and module/class scoping aligned with closest equivalents.
+
+=== Control Flow
+* Map `if`, `unless`, `case`, loops, and iterators with structural equivalence.
+* Preserve postfix conditionals by default; allow optional normalization.
+
+== Lossy Edge Cases and Fallbacks
+* Crystal macros -> OpaqueNode in Ruby (verbatim macro block).
+* Ruby `method_missing` / `define_method` -> OpaqueNode in Crystal.
+* Metaprogramming: preserve the original source snippet as a protected region.
+* Unsupported literals: emit as quoted strings with a diagnostic.
+
+== Diagnostics and Reporting
+* Emit per-node warnings when a mapping is lossy.
+* Provide a summary report with counts for:
+  - Exact mappings
+  - Normalized mappings
+  - Opaque fallbacks
+
+== Testing and Validation
+* Golden round-trip tests: A -> B -> A yields identical CST.
+* Property tests for parser/formatter stability.
+* Diff-based tests to detect style drift.
+* Corpus tests across real-world Ruby and Crystal projects.
+
+== Phased Plan
+1. CST parsers and trivia preservation for both languages.
+2. Core SIR schema + mappings for literals/collections/calls.
+3. Control-flow, class/module, and method definitions.
+4. Diagnostics, warnings, and opaque fallback strategy.
+5. Formatters and round-trip validation tooling.
+
+== Open Questions
+* How to model macros and Ruby's metaprogramming in a shared SIR?
+* Preferred default formatting profile for each direction?
+* Maximum acceptable verbosity for warnings in CI?
+
+== Conclusion
+The proposed transpiler prioritizes round-trip safety by centering on a lossless CST and a typed semantic IR, with explicit fallback nodes for unsupported constructs. This approach delivers practical, non-destructive translation while keeping room for future semantic parity improvements.
