@@ -268,6 +268,25 @@ include::reference-architecture.adoc[tag=scenarios]
 
 ---
 
+=== Ruby/Crystal Language Pipeline
+**File**: [ruby-crystal-language-pipeline.adoc](ruby-crystal-language-pipeline.adoc)
+
+**Length**: ~8 pages
+
+**Purpose**: Unified parsing/CST/AST/tape architecture and lossless transpilation
+
+**Contents**:
+- Green/red CST design
+- Tape IR for formatter and scanners
+- Linter design and inline Sorbet annotation strategy
+- Lossless Ruby <-> Crystal transpiler plan
+
+**Audience**: Language tooling engineers, compiler architects
+
+**Reading Time**: 10-15 minutes
+
+---
+
 === JSONC Support Notes
 **File**: [jsonc-support-notes.adoc](jsonc-support-notes.adoc)
 
