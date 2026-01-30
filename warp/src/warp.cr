@@ -1,8 +1,8 @@
 # Warp: a small, high-performance JSON parser exposed as a Crystal module.
 #
 # This module provides a staged JSON parser that first locates structural
-# characters (stage1) and then builds a compact "tape" representation
-# (stage2). The API is intentionally low-level and focuses on zero-copy
+# characters (stage1a), assembles tokens (stage1b), and then builds a
+# compact "tape" representation (stage2). The API is intentionally low-level and focuses on zero-copy
 # slicing of the input `Bytes` together with fast validation options.
 #
 # Usage notes:
@@ -29,5 +29,9 @@ require "./warp/backend/scalar_backend"
 require "./warp/backend/selector"
 require "./warp/input/padded_buffer"
 require "./warp/lexer/structural_scan"
+require "./warp/lexer/token_assembler"
 require "./warp/ir/tape_builder"
+require "./warp/dom/value"
+require "./warp/dom/builder"
+require "./warp/format/formatter"
 require "./warp/parser"
