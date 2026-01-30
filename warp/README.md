@@ -308,7 +308,7 @@ parser.each_token(bytes) do |tok|
   # tok.slice(bytes) returns a zero-copy slice
 end
 
-doc_result = parser.parse_document(bytes, validate_literals: true, validate_numbers: true)
+    doc_result = parser.parse_document(bytes, validate_literals: true, validate_numbers: true)
 if doc_result.error.success?
   doc = doc_result.doc
   iter = doc.not_nil!.iterator
@@ -340,6 +340,21 @@ end
 ```
 
 Number typing caveat: numbers that fit in `Int64` are stored as integers, otherwise they are stored as `Float64`. If you need exact numeric fidelity (e.g., big integers or decimal precision), keep using tape slices.
+
+### JSONC Support
+
+JSONC (JSON with comments) is supported via the CST parser. Use `jsonc: true` to allow `//` and `/* */` comments, then format with CST or parse into tape/DOM if you want comments stripped.
+
+```crystal
+parser = Warp::Parser.new
+bytes = File.read("data.jsonc").to_slice
+
+cst = parser.parse_cst(bytes, jsonc: true).doc.not_nil!
+puts Warp::Format.pretty(cst)
+
+doc = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: true).doc.not_nil!
+dom = parser.parse_dom(bytes, jsonc: true).value.not_nil!
+```
 
 Notes:
 
