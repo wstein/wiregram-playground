@@ -1,0 +1,211 @@
+= Multi-Language Warp: Developer Quick Reference
+
+== Architecture Overview
+
+Warp now supports multiple languages through a unified pipeline:
+
+```
+[Source Code]
+    ↓
+[Language-Specific Lexer] → Token stream
+    ↓
+[Parser] → Green CST (lossless, immutable)
+    ↓
+[Red CST] → Navigation view (with parent pointers)
+    ↓
+[Tape Builder] → Tape IR (linear, formatted)
+    ↓
+[Formatter/Linter/Transpiler]
+```
+
+Each language (JSON, Ruby, Crystal) defines its own types in `src/warp/lang/{language}/`:
+- `types.cr` - TokenKind and NodeKind enums
+- `lexer.cr` - Language-specific tokenizer
+- `parser.cr` - Language-specific parser
+- `tape_builder.cr` - Language-specific tape IR generation
+
+The CST infrastructure (`Token`, `GreenNode`, `RedNode`, `Document`) is shared across languages.
+
+== Adding a New Language
+
+1. **Create language directory**: `mkdir -p src/warp/lang/{language_name}`
+
+2. **Define types** in `src/warp/lang/{language_name}/types.cr`:
+   ```crystal
+   module Warp
+     module Lang
+       module LANGUAGE
+         # Define language-specific tokens
+         enum TokenKind
+           # List tokens...
+         end
+         
+         # Define language-specific nodes
+         enum NodeKind
+           # List nodes...
+         end
+       end
+     end
+   end
+   ```
+
+3. **Implement lexer** in `src/warp/lang/{language_name}/lexer.cr`:
+   - Tokenize source code into `Array(CST::Token)` (reuse common Token struct)
+   - Preserve trivia (comments, whitespace)
+   - Return token array and `ErrorCode`
+
+4. **Implement parser** in `src/warp/lang/{language_name}/parser.cr`:
+   - Convert tokens to Green CST
+   - Track trivia in leading_trivia fields
+   - Return `CST::Result` (or language-specific variant)
+
+5. **Implement tape builder** in `src/warp/lang/{language_name}/tape_builder.cr`:
+   - Convert CST to tape entries (define language-specific TapeType enum if needed)
+   - Optimize for formatting/scanning
+   - Return `IR::Document` or language-specific variant
+
+6. **Update `src/warp.cr`**:
+   ```crystal
+   require "./warp/lang/{language_name}/types"
+   ```
+
+7. **Create namespace convenience module** (optional):
+   ```crystal
+   # In src/warp/lang/{language_name}/types.cr
+   module Warp
+     module Lang
+       module LANGUAGE
+         # ...types...
+         
+         # Parser class and utilities
+         class Parser
+           # ...implement parsing...
+         end
+       end
+     end
+   end
+   ```
+
+== JSON Backward Compatibility
+
+Existing JSON code continues to work unchanged:
+
+```crystal
+# Old code using CST::Token, CST::GreenNode, etc.
+# automatically resolves to JSON types since the CST module
+# defines these types directly
+```
+
+The JSON types are now explicitly available as:
+- `Warp::CST::Token` - JSON-specific token
+- `Warp::CST::GreenNode` - JSON-specific green node
+- `Warp::CST::RedNode` - JSON-specific red node
+- `Warp::CST::Document` - JSON-specific document
+
+And also accessible through the language module:
+- `Warp::Lang::JSON::TokenKind` - JSON token kinds
+
+== Ruby Support Status
+
+**Completed**:
+✓ Token and node kind definitions (71 token types, 54 node types) in `src/warp/lang/ruby/types.cr`
+✓ Tape prototype with scope tracking in `src/warp/lang/ruby/tape_prototype.cr`
+✓ Feasibility study (see `src/warp/lang/ruby/tape_prototype.cr`)
+
+**In Progress**:
+- Lexer implementation
+- Parser implementation
+- Tape builder implementation
+
+**Examples**:
+See `src/warp/lang/ruby/tape_prototype.cr` for prototype tape construction and SimplifiedRubyTapeBuilder class.
+
+== Testing Guidelines
+
+=== Per-Language Corpus
+
+Create `corpus/{language}/` with test files:
+
+```
+corpus/
+├── ruby/
+│   ├── simple.rb
+│   ├── complex.rb
+│   ├── heredocs.rb
+│   ├── string_interpolation.rb
+│   └── regex.rb
+├── crystal/
+│   └── (similar structure)
+└── json/
+    └── (existing)
+```
+
+=== Round-Trip Validation
+
+```crystal
+def test_round_trip(source : String)
+  doc = Parser.parse(source)
+  output = Formatter.format(doc, mode: :preserve)
+  
+  # Byte-for-byte equality (for preserve mode)
+  assert output == source
+end
+```
+
+=== CST Navigation
+
+```crystal
+doc = Parser.parse(source)
+root = doc.root
+
+# Traverse Red CST
+root.children.each do |child|
+  puts "Node: #{child.kind}"
+  child.children.each do |grandchild|
+    puts "  Child: #{grandchild.kind}"
+  end
+end
+```
+
+== Performance Considerations
+
+- **Tape scanning**: O(n) with language-specific constants
+- **CST construction**: May require lookahead for indentation-sensitive languages
+- **Trivia preservation**: Adds overhead; use atomic tape entries for complex strings
+
+== Common Pitfalls
+
+1. **Forgetting trivia**: Always preserve comments and whitespace in token stream
+2. **Hardcoding JSON types**: Use language module namespaces instead
+3. **Scope tracking in tape**: Include scope_depth in tape entries for indentation-sensitive languages
+4. **Complex strings**: Use atomic tape entries for heredocs, regex, etc.
+
+== Debugging
+
+Print the CST:
+```crystal
+def print_cst(node, depth = 0)
+  puts "  " * depth + node.kind.to_s
+  node.children.each { |child| print_cst(child, depth + 1) }
+end
+
+doc = Parser.parse(source)
+print_cst(doc.root)
+```
+
+Print the tape:
+```crystal
+doc = Parser.parse(source)
+doc.each_entry do |entry|
+  puts "#{entry.type}: a=#{entry.a}, b=#{entry.b}"
+end
+```
+
+== References
+
+- [Implementation Plan](implementation-plan.adoc) - Detailed multi-phase roadmap
+- [Ruby-Crystal Language Pipeline](ruby-crystal-language-pipeline.adoc) - High-level vision
+- `src/warp/cst/types.cr` - Core CST types (JSON-based, shared across languages)
+- `src/warp/lang/json/types.cr` - JSON-specific type definitions
+- `src/warp/lang/ruby/types.cr` - Ruby-specific type definitions
+- `src/warp/lang/ruby/tape_prototype.cr` - Ruby tape prototype and feasibility study

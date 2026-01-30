@@ -1,9 +1,15 @@
-# Warp: a small, high-performance JSON parser exposed as a Crystal module.
+# Warp: a high-performance language pipeline with JSON, Ruby, and Crystal support.
 #
-# This module provides a staged JSON parser that first locates structural
-# characters (stage1a), assembles tokens (stage1b), and then builds a
-# compact "tape" representation (stage2). The API is intentionally low-level and focuses on zero-copy
-# slicing of the input `Bytes` together with fast validation options.
+# This module provides a staged language parser that:
+# 1. Lexes input into tokens (language-specific)
+# 2. Builds a Green/Red CST for lossless source preservation
+# 3. Generates a compact Tape IR for high-throughput formatting
+# 4. Optionally builds a semantic AST for linting/transpilation
+#
+# Currently supported languages:
+# - JSON (fully implemented)
+# - Ruby (prototype/WIP - see papers/ruby-crystal-language-pipeline.adoc)
+# - Crystal (planned)
 #
 # Usage notes:
 # - Use `Warp::Parser` to iterate tokens (`each_token`) or parse a
@@ -16,27 +22,32 @@ module Warp
   alias Token = Core::Token
 end
 
-require "./warp/core/types"
-require "./warp/backend/backend"
-require "./warp/backend/x86_masks"
-require "./warp/backend/neon_masks"
-require "./warp/backend/sse2_backend"
+require "./warp/ast/types"
 require "./warp/backend/avx_backend"
 require "./warp/backend/avx2_backend"
 require "./warp/backend/avx512_backend"
+require "./warp/backend/backend"
 require "./warp/backend/neon_backend"
+require "./warp/backend/neon_masks"
 require "./warp/backend/scalar_backend"
 require "./warp/backend/selector"
+require "./warp/backend/sse2_backend"
+require "./warp/backend/x86_masks"
+require "./warp/core/types"
+require "./warp/cst/parser"
+require "./warp/cst/types"
+require "./warp/dom/builder"
+require "./warp/dom/value"
+require "./warp/format/formatter"
 require "./warp/input/padded_buffer"
+require "./warp/ir/soa_view"
+require "./warp/ir/tape_builder"
 require "./warp/lexer/structural_scan"
 require "./warp/lexer/token_assembler"
 require "./warp/lexer/token_scanner"
-require "./warp/ir/tape_builder"
-require "./warp/ir/soa_view"
-require "./warp/dom/value"
-require "./warp/dom/builder"
-require "./warp/cst/types"
-require "./warp/cst/parser"
-require "./warp/ast/types"
-require "./warp/format/formatter"
 require "./warp/parser"
+
+# Language support modules (for future extensibility)
+require "./warp/lang/json/types"
+require "./warp/lang/ruby/types"
+require "./warp/lang/ruby/tape_prototype"
