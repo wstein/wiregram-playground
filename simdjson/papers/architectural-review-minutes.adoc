@@ -1,4 +1,4 @@
-= SIMD Architecture Review - Meeting Minutes
+= Warp SIMD Architecture Review - Meeting Minutes
 :doctype: article
 :toc: left
 :toclevels: 4
@@ -9,6 +9,8 @@
 :revdate: January 28, 2026
 :revnumber: 1.0
 
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 == Meeting Information
 
 [cols="1,3"]
@@ -16,13 +18,13 @@
 |Date |January 28, 2026
 |Duration |2 hours
 |Attendees |Senior Software Architect, Computer Science Professor, Ruby/Crystal Developer, Assembly Programmer
-|Purpose |Review SIMD Architecture proposals for simdjson Crystal implementation
+|Purpose |Review Warp SIMD architecture proposals for Warp (Crystal) implementation
 |Status |Completed - Recommendations Issued
 |===
 
 == Executive Summary
 
-The board reviewed four architectural alternatives for implementing a multi-platform SIMD (Single Instruction Multiple Data) abstraction layer in the simdjson Crystal library. After thorough analysis of the current codebase, RFC documentation, and ADR proposals, we provide detailed ratings and recommendations for the path forward.
+The board reviewed four architectural alternatives for implementing a multi-platform SIMD (Single Instruction Multiple Data) abstraction layer in the Warp (Crystal) library. After thorough analysis of the current codebase, RFC documentation, and ADR proposals, we provide detailed ratings and recommendations for the path forward.
 
 **Key Recommendation**: Implement *Alternative 4 (Hybrid Approach)* with specific modifications based on Crystal's compile-time capabilities and runtime performance characteristics.
 
@@ -40,7 +42,7 @@ The board reviewed four architectural alternatives for implementing a multi-plat
 **Strengths Identified**:
 
 1. ✅ *Clean Assembly Implementation*: The NEON assembly in `neon.cr` is well-crafted, using efficient vector operations
-2. ✅ *Verification Path*: `VERIFY_NEON` environment variable enables scalar verification - excellent for debugging
+2. ✅ *Verification Path*: `WARP_VERIFY_NEON` environment variable enables scalar verification - excellent for debugging
 3. ✅ *Minimal Overhead*: Direct assembly integration with zero abstraction cost
 4. ✅ *Crystal Idioms*: Uses Crystal's compile-time macros effectively
 
@@ -236,11 +238,11 @@ Multiple specialized builds with compile-time feature detection:
 [source,crystal]
 ----
 # Build system generates:
-# - simdjson-avx512 (for newest Intel/AMD)
-# - simdjson-avx2 (for modern Intel/AMD)
-# - simdjson-sse2 (for older x86)
-# - simdjson-neon (for ARM)
-# - simdjson-scalar (for others)
+# - warp-avx512 (for newest Intel/AMD)
+# - warp-avx2 (for modern Intel/AMD)
+# - warp-sse2 (for older x86)
+# - warp-neon (for ARM)
+# - warp-scalar (for others)
 
 # Each build has fully specialized code paths
 {% if flag?(:avx512) %}
@@ -273,7 +275,7 @@ Multiple specialized builds with compile-time feature detection:
 > "Crystal shards don't have a standard mechanism for multi-architecture builds like this. We'd be inventing a custom build system. That's a maintenance burden."
 
 *Senior Architect*:
-> "This is what Linux distributions do for system libraries. But simdjson is not a system library - it's an application dependency. The deployment complexity outweighs the performance benefit."
+> "This is what Linux distributions do for system libraries. But Warp is not a system library - it's an application dependency. The deployment complexity outweighs the performance benefit."
 
 **Use Case**: HPC environments with homogeneous clusters, embedded systems where binary size is critical.
 
@@ -333,7 +335,7 @@ end
 *Senior Architect*:
 > "This is the pragmatic choice. It delivers 90% of Alternative 2's flexibility with 80% of Alternative 3's performance. In engineering, that's usually the sweet spot."
 
-**Use Case**: Production libraries requiring both performance and broad compatibility (recommended for simdjson).
+**Use Case**: Production libraries requiring both performance and broad compatibility (recommended for Warp).
 
 ==== Implementation Strategy
 
@@ -581,7 +583,7 @@ end
 **Mitigation**:
 1. Test feature detection on multiple platforms
 2. Add runtime verification (try AVX512, catch illegal instruction)
-3. Provide manual backend override (`SIMDJSON_BACKEND=sse2`)
+3. Provide manual backend override (`WARP_BACKEND=sse2`)
 4. Extensive logging in debug mode
 
 **Status**: Mitigated
@@ -596,7 +598,7 @@ end
 
 **Mitigation**:
 1. Benchmark ARM continuously during development
-2. Keep verification mode (`VERIFY_NEON`) for testing
+2. Keep verification mode (`WARP_VERIFY_NEON`) for testing
 3. Profile with `perf` to identify hotspots
 4. Be willing to maintain separate ARM fast path if needed
 
@@ -614,7 +616,7 @@ end
 
 **Mitigation**:
 1. Use QEMU for cross-platform testing
-2. Force backend selection in tests (`SIMDJSON_BACKEND=avx512`)
+2. Force backend selection in tests (`WARP_BACKEND=avx512`)
 3. Implement comprehensive verification mode
 4. Use CI matrix: x86 (SSE2, AVX2, AVX512), ARM (NEON), RISC-V (Scalar)
 

@@ -1,11 +1,13 @@
-= SIMD Architecture Review - Executive Summary
+= Warp SIMD Architecture Review - Executive Summary
 :doctype: article
 :toc: macro
 
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 [abstract]
 == Abstract
 
-The simdjson Crystal implementation architectural review evaluated four approaches for multi-platform SIMD support. After comprehensive analysis by a panel of experts (Senior Architect, CS Professor, Crystal Developer, Assembly Programmer), **Alternative 4 (Hybrid Approach)** is unanimously recommended for implementation.
+The Warp (Crystal) implementation architectural review evaluated four approaches for multi-platform SIMD support. After comprehensive analysis by a panel of experts (Senior Architect, CS Professor, Crystal Developer, Assembly Programmer), **Alternative 4 (Hybrid Approach)** is unanimously recommended for implementation.
 
 toc::[]
 

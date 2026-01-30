@@ -1,17 +1,21 @@
-= SIMD Architecture Review - Documentation Index
+= Warp SIMD Architecture Review - Documentation Index
 :doctype: article
 :toc: left
 :toclevels: 2
 
 == Overview
 
-This index provides a guide to the comprehensive SIMD architecture review documentation. The review evaluated four architectural alternatives for implementing multi-platform SIMD support in the simdjson Crystal library.
+This index provides a guide to the comprehensive SIMD architecture review documentation. The review evaluated four architectural alternatives for implementing multi-platform SIMD support in the Warp (Crystal) library.
 
 **Review Date**: January 28, 2026
 
 **Participants**: Senior Software Architect, Computer Science Professor, Ruby/Crystal Developer, Assembly Programmer
 
 **Decision**: Implement Alternative 4 (Hybrid Approach) - Unanimous approval (4/4)
+
+== Architecture Alignment
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 
 == Quick Start
 
@@ -164,7 +168,7 @@ This index provides a guide to the comprehensive SIMD architecture review docume
 
 ---
 
-=== SIMD Architecture RFC (Original)
+=== Warp SIMD Architecture RFC (Original)
 **File**: [simd-architecture-rfc.adoc](simd-architecture-rfc.adoc)
 
 **Length**: ~30 pages
@@ -187,7 +191,7 @@ This index provides a guide to the comprehensive SIMD architecture review docume
 
 ---
 
-=== SIMD Architecture ADR (Original)
+=== Warp SIMD Architecture ADR (Original)
 **File**: [simd-architecture-adr.adoc](simd-architecture-adr.adoc)
 
 **Length**: ~10 pages
@@ -206,6 +210,25 @@ This index provides a guide to the comprehensive SIMD architecture review docume
 **Audience**: Architecture decision history, context for reviewers
 
 **Reading Time**: 15-20 minutes
+
+---
+
+=== Crystal <=> Ruby Transpiler Proposal
+**File**: [crystal-ruby-transpiler-proposal.adoc](crystal-ruby-transpiler-proposal.adoc)
+
+**Length**: ~6 pages
+
+**Purpose**: Non-destructive bidirectional transpiler proposal
+
+**Contents**:
+- Goals and non-goals
+- Lossless CST + semantic IR architecture
+- Translation strategy and fallbacks
+- Diagnostics and testing plan
+
+**Audience**: Language tooling engineers, compiler/tooling architects
+
+**Reading Time**: 10-15 minutes
 
 ---
 
@@ -391,7 +414,7 @@ For students, researchers, or those interested in the theory:
 == Related Files
 
 === Source Code
-- [src/warp/lexer/structural_scan.cr](../src/warp/lexer/structural_scan.cr) - Structural scanning (Stage1)
+- [src/warp/lexer/structural_scan.cr](../src/warp/lexer/structural_scan.cr) - Structural scanning (Stage1a)
 - [src/warp/backend/neon_masks.cr](../src/warp/backend/neon_masks.cr) - NEON mask builder
 - [src/warp/ir/tape_builder.cr](../src/warp/ir/tape_builder.cr) - Tape building (Stage2)
 - [src/warp/core/types.cr](../src/warp/core/types.cr) - Type definitions

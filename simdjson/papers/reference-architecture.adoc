@@ -1,0 +1,184 @@
+= Reference Architecture Agreement
+
+This document captures the agreed reference architecture for the parser pipeline
+prior to refactoring.
+
+== Goals
+* Keep the core fast and zero-copy (tape-first).
+* Allow optional DOM/AST layers without impacting the core.
+* Support multiple languages (JSON, TOML, UCL, XML, Ruby, Python, Lisp, etc) via
+  pluggable lexer/parser/tape schemas.
+
+// tag::pipeline[]
+== Pipeline Overview (Tape-First)
+Input Bytes -> Stage1a SIMD Scan -> Stage1b Lexer Assembly -> Stage2 Parser -> Tape (IR)
+-> Optional DOM
+-> Optional AST/CST (not derived from DOM; AST carries additional semantic context)
+
+=== Diagrams
+
+[source,text]
+----
+Input Bytes
+   │
+   ▼
+Stage1a SIMD Scan (structural indices, escape/UTF-8 flags)
+   │
+   ▼
+Stage1b Lexer Assembly (token stream + spans + trivia)
+   │
+   ▼
+Stage2 Parser (grammar validation)
+   │
+   ▼
+Tape (IR, typed records + links)
+   ├──► Optional DOM (data model)
+   └──► Optional AST/CST (syntax/semantic tree)
+----
+// end::pipeline[]
+
+// tag::scenarios[]
+== Scenarios and Tooling
+The tape-first pipeline is intentionally low-level and reusable across higher-level tools.
+
+Formatter (pretty/minified)
+[source,text]
+----
+JSON Input -> Parser -> Formatter -> JSON Output
+----
+
+Linter (schema/style rules)
+[source,text]
+----
+JSON Input -> Parser -> Rule Engine -> Diagnostics
+----
+
+jq-like Tool (selector + transform)
+[source,text]
+----
+JSON Input -> Parser -> Query Engine -> Filtered/Transformed JSON
+----
+
+Evaluation Engine (calculator / query execution)
+[source,text]
+----
+Query Script -> Compiler -> Evaluator
+JSON Input -> Parser -> Evaluator -> Result Value
+----
+
+Converter (YAML => JSON)
+[source,text]
+----
+YAML Input -> YAML Parser -> JSON Builder -> Warp Validator/Formatter -> JSON Output
+----
+
+Translator/Transpiler (Ruby => Crystal)
+[source,text]
+----
+Ruby Source -> Parser/AST -> Transpiler -> Crystal Source
+JSON Assets -> Warp Validator/Formatter
+----
+
+MCP Integration
+[source,text]
+----
+Client -> MCP Server -> Warp Parser -> JSON Payload
+----
+
+LSP Integration
+[source,text]
+----
+Editor -> LSP Server -> Warp Parser -> Diagnostics
+----
+// end::scenarios[]
+
+=== Stage1a: SIMD Scan (implementation detail)
+Purpose: High-throughput structural scanning and validation.
+
+Outputs (scan artifacts):
+* Structural indices (positions of delimiters and separators)
+* String boundary/escape flags
+* UTF-8 validation status
+
+Notes:
+* SIMD is an optimization, not a semantic stage. If SIMD is unavailable, a
+  scalar scan provides the same outputs.
+
+=== Stage1b: Lexer Assembly
+Purpose: Convert scan artifacts into a token stream suitable for parsing.
+
+Outputs (token stream):
+* Token kind (e.g., braces, brackets, separators, strings, numbers, literals)
+* Token spans into the original input
+* Lexer metadata (e.g., newline type, escape presence)
+
+Ownership note:
+* Stage1b token assembly lives in the lexer layer (e.g., `Warp::Lexer::TokenAssembler`) and remains independent of Stage2 parsing and IR building.
+
+=== Stage2: Parser (Tape Builder)
+Purpose: Consume tokens, validate grammar, and emit a compact tape (IR).
+
+Outputs (tape):
+* Typed entries with offsets/lengths into the original input
+* Container linkage (object/array boundaries)
+* Parse status (errors, max depth, etc.)
+
+== Token vs Tape
+* Tokens are the lexer output; they represent lexical units.
+* Tape is the parser IR; it encodes structure and enables fast traversal.
+* Tape records are typed IR records (scalars, container markers, and links),
+  not lexer tokens. They can look token-like but carry parser-validated
+  structure.
+* Token payload for advanced tooling should include: kind, span, lexeme slice,
+  and leading trivia. Trailing trivia can be attached to the EOF token.
+
+== Optional Layers
+* DOM (Data Object Model): Bare language data model without overhead,
+  suitable for serialization and business logic. Built from tape on demand.
+* AST (Abstract Syntax Tree): Classical syntax tree; built from tape or tokens, not from the DOM.
+* CST (Concrete Syntax Tree): Full-fidelity syntax tree including trivia for
+  formatting and refactoring tools.
+* Green/Red Trees: Optional representation for formatting tools. Green nodes are
+  immutable and trivia-preserving; red nodes add parent pointers and offsets.
+
+== Error Model
+Errors are reported with consistent metadata across stages.
+
+* Common fields: stage, code, message, byte offset, and context (token index or
+  tape index when available).
+* Stage1a errors: invalid UTF-8, unterminated string, invalid escape sequence,
+  or structural scan failure.
+* Stage1b errors: malformed tokenization (e.g., invalid literal structure).
+* Stage2 errors: grammar violations, unexpected token, mismatched containers,
+  or depth limit exceeded.
+* Optional location: line/column is best-effort and may be computed lazily.
+
+== Language Extensibility
+The pipeline stays the same; language differences are isolated to:
+* Lexer rules and token kinds
+* Parser grammar and validation rules
+* Tape schema extensions (base types + language-specific entries)
+
+This allows a shared core while supporting JSON, TOML, UCL, XML, Ruby, Python,
+and Lisp.
+
+== Glossary
+* AST: Abstract Syntax Tree; syntax-oriented tree.
+* CST: Concrete Syntax Tree; syntax tree that preserves all trivia.
+* DOM (Data Object Model): Source-free data model for serialization and logic.
+* Green/Red Trees: Two-level CST model used by formatters; green is immutable and
+  trivia-preserving, red adds navigation and offsets.
+* Lexeme: Exact input slice backing a token.
+* Span: Byte range or offset+length in the input.
+* Trivia: Non-semantic tokens (whitespace/comments); leading-only, trivia on the end of the file is taken by EOF.
+* Lexer Assembly: Converts scan artifacts into a token stream.
+* SIMD Scan: Structural scan using SIMD (or scalar fallback) to detect
+  boundaries and validate UTF-8/escapes.
+* Tape: Compact parser IR with typed entries and container linkage.
+* Tape Entry: A typed IR record (scalar, container marker, link metadata).
+* Token: Lexer output representing a lexical unit with a span into input.
+
+== Non-Goals (for this agreement)
+* Streaming/chunked parsing design
+* Schema validation frameworks
+* Memory pool/allocator strategy

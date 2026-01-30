@@ -1,8 +1,10 @@
-= Testing Strategy and Coverage Constraints for simdjson (Crystal)
+= Testing Strategy and Coverage Constraints for Warp (Crystal)
 Werner Stein
 
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
 == Abstract
-This paper defines a testing strategy for the simdjson (Crystal) codebase under strict coverage constraints (98% line coverage, 95% branch coverage). It emphasizes integration tests as the primary driver of coverage, followed by focused unit tests to close residual gaps. The approach is grounded in Crystal 1.19 testing conventions and aims to preserve correctness while enabling performance-focused evolution of the parser.
+This paper defines a testing strategy for the Warp (Crystal) codebase under strict coverage constraints (98% line coverage, 95% branch coverage). It emphasizes integration tests as the primary driver of coverage, followed by focused unit tests to close residual gaps. The approach is grounded in Crystal 1.19 testing conventions and aims to preserve correctness while enabling performance-focused evolution of the parser.
 
 == Constraints and Assumptions
 - **Coverage targets**: 98% line coverage, 95% branch coverage.
@@ -22,7 +24,7 @@ These tests maximize realistic coverage of hot paths and reduce the need for exc
 Unit tests address specific residual gaps:
 - Boundary checks (`scan_scalar_end`, `scan_string_end`).
 - Validation helpers (`valid_number?`, `valid_true?`, etc.).
-- Stage1 error conditions (UTF-8 invalid, unclosed strings, control chars).
+- Stage1a error conditions (UTF-8 invalid, unclosed strings, control chars).
 These tests are designed to be minimal and deterministic, focusing on missed lines rather than replicating integration coverage.
 
 == Coverage Guidance
