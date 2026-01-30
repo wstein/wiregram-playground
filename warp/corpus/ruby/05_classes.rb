@@ -20,3 +20,6 @@ class Employee < Person
     @salary = salary
   end
 end
+
+# Ruby 3.4: Reserved Constants Warning
+module Ruby; end  # Emits warning in 3.4

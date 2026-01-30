@@ -12,3 +12,7 @@ end
 def gsub_example(text)
   text.gsub(/\s+/, '_')
 end
+
+# Ruby 3.4: Byte-based MatchData
+match = "foo".match(/o/)
+match.bytebegin(0) #=> 1

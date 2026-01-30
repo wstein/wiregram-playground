@@ -15,6 +15,7 @@ This directory contains Ruby source files to test the Warp Ruby lexer, parser, a
 - **08_operators.rb** - Operators and expressions
 - **09_comments.rb** - Single-line and multi-line comments
 - **10_complex.rb** - Real-world module with classes and methods
+- **11_ruby34_features.rb** - Ruby 3.4 specific features
 
 ## Edge Cases Covered
 
@@ -29,6 +30,18 @@ This directory contains Ruby source files to test the Warp Ruby lexer, parser, a
 ✓ Safe navigation operator (`&.`)  
 ✓ Range literals  
 ✓ Symbol literals  
+✓ Chilled strings (Ruby 3.4)  
+✓ The `it` parameter (Ruby 3.4)  
+✓ Relaxed float parsing (Ruby 3.4)  
+✓ Large integer exponents (Ruby 3.4)  
+✓ Byte-based string operations (Ruby 3.4)  
+✓ Method forwarding (Ruby 3.4)  
+✓ Endless methods (Ruby 3.4)  
+✓ Complex ranges (Ruby 3.4)  
+✓ Incomplete flip-flops (Ruby 3.4)  
+✓ Complex rescue targets (Ruby 3.4)  
+✓ Ambiguous syntax (Ruby 3.4)  
+✓ Reserved constants (Ruby 3.4)  
 
 ## Testing Strategy
 

@@ -37,3 +37,10 @@ module DataProcessor
     pipeline.process(data)
   end
 end
+
+# Ruby 3.4: Ambiguous Syntax
+# 'a' is a local variable, so 'puts a' is variable access
+a = 0; puts a
+
+# 'a' is unknown, parsed as method call `self.a`
+puts a

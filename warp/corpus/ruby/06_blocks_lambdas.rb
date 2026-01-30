@@ -13,3 +13,13 @@ def yield_example
 end
 
 yield_example { |a, b| puts a + b }
+
+# Ruby 3.4: The 'it' Parameter
+['a', 'b'].map { it.upcase }
+
+# Ruby 3.4: Relaxed Float Parsing
+val1 = 1.        #=> 1.0
+val2 = 1.E-1     #=> 0.1
+
+# Ruby 3.4: Large Integer Exponents
+big_num = 10**10_000_000

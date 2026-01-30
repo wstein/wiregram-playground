@@ -21,3 +21,10 @@ range_inclusive = 1..10
 range_exclusive = 1...10
 
 safe_nav = obj&.method_name
+
+# Ruby 3.4: Complex Ranges
+# Range from 1 to ..2
+r1 = 1.....2
+
+# Range with float-like syntax
+r2 = 1... .2

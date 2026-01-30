@@ -14,3 +14,12 @@ end
 def process(**kwargs)
   kwargs.each { |k, v| puts "#{k}: #{v}" }
 end
+
+# Ruby 3.4: Method Forwarding (including leading args)
+def delegate(...)
+  other_method(...)
+end
+
+def wrapper(leading, ...)
+  delegate(...)
+end

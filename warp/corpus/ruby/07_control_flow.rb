@@ -26,3 +26,6 @@ end
 
 x = 0
 x += 1 until x == 10
+
+# Ruby 3.4: Endless Methods
+def square(x) = x * x

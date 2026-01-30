@@ -17,3 +17,10 @@ def process
   value = 42  # Answer to everything
   value
 end
+
+# Ruby 3.4: Incomplete Flip-Flops
+if (1..) # Left side only
+end
+
+if (..1) # Right side only
+end

@@ -24,3 +24,18 @@ def heredoc_squiggly
     automatically
   HEREDOC
 end
+
+# Ruby 3.4: Complex Rescue Targets
+# Rescue into an array index
+begin
+  raise
+rescue => array
+end
+
+# Rescue into a zero-arity method call on an object
+obj = Object.new
+def obj.[]=(val); end
+begin
+  raise
+rescue => obj[]
+end
