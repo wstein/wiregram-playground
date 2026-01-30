@@ -1,0 +1,27 @@
+= Warp JSONC Support Notes (PoC)
+Werner Stein
+
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
+== Abstract
+This note summarizes JSONC support in Warp, focusing on comment-preserving CST parsing and how JSONC flows map into tape/DOM pipelines.
+
+== Current Behavior
+* CST parsing supports `//` and `/* */` comments and preserves trivia.
+* CST formatting preserves raw tokens and comment text.
+* Tape/DOM parsing can accept JSONC when `jsonc: true`, but comments are discarded.
+
+== Suggestions and Ratings
+[cols="3,5,1,1",options="header"]
+|===
+|Suggestion |Rationale |Impact |Rating
+|Keep CST as the JSONC source of truth |Comments/trivia require CST; tape/DOM cannot preserve them |High |5/5
+|Expose `jsonc: true` for tape/DOM parsing |Allows JSONC inputs in existing tooling pipelines |Medium |4/5
+|Add JSONC validation tests in CI |Prevents regressions in comment handling |Medium |4/5
+|Add JSONC minifier using CST |Preserves comment placement when desired |Medium |3/5
+|Document JSONC output semantics |Clarifies that tape/DOM formatting strips comments |Low |3/5
+|Use a realistic JSONC fixture |Ensures coverage of trailing commas, nested objects, and URLs |Medium |4/5
+|===
+
+== Conclusion
+JSONC support in Warp is centered around the CST path. This keeps comment preservation and trivia handling explicit while still enabling JSONC inputs to flow through tape/DOM pipelines when comment loss is acceptable.

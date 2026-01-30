@@ -16,6 +16,7 @@ The project delivers a zero-copy JSON token iterator and a tape-building stage2 
 - Structural-index–driven stage2: Parsing reuses stage1 indexes to avoid rescanning the byte buffer.
 - Preallocation: Tape and context stack are sized from the structural count to reduce allocations and bounds checks.
 - Parallel benchmarks: `bin/bench` runs per-file benchmarks concurrently to saturate cores during measurement.
+- Formatter paths: Tape-based formatting avoids DOM/CST allocation; CST formatting is reserved for JSONC comment preservation.
 
 == Measured Throughput
 In our local measurements on Apple Silicon (release builds), the current implementation reaches about 1 GB/s of parsed throughput when processing a single large file with the shipped `bin/bench` harness (built via `crystal build bin/bench.cr --release -O3` and using a tuned `CRYSTAL_CACHE_DIR`).
