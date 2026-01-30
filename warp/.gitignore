@@ -10,6 +10,7 @@
 /tmp/
 /bin/bench
 /bin/ameba
+/ports/
 
 # Libraries don't need dependency lock
 # Dependencies will be locked in application that uses them
