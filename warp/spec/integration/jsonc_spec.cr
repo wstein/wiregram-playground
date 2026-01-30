@@ -33,4 +33,15 @@ describe "Warp JSONC CST/AST" do
     dom_result = parser.parse_dom(bytes, jsonc: true)
     dom_result.error.success?.should be_true
   end
+
+  it "accepts trailing commas in JSONC and rejects them in JSON" do
+    bytes = %({"a":1,}).to_slice
+    parser = Warp::Parser.new
+
+    ok = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: true)
+    ok.error.success?.should be_true
+
+    bad = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: false)
+    bad.error.success?.should be_false
+  end
 end
