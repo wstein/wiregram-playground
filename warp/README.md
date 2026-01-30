@@ -29,6 +29,7 @@ Warp follows a lexer + IR parsing pipeline optimized for performance while maint
 **Purpose**: Converts scan artifacts into a token stream with spans and trivia metadata.
 
 **What it does**:
+
 - Converts structural indices into a token stream (strings, numbers, literals, separators)
 - Attaches spans and trivia (whitespace/newlines)
 - Prepares tokens for Stage 2 parsing
@@ -178,6 +179,47 @@ flowchart LR
   E --> F[Warp Validator/Formatter]
 ```
 
+#### `rtc` — Ruby → Crystal CLI
+
+A small CLI for parsing and transpiling Ruby sources into Crystal. Useful for inspection and quick conversions.
+
+Examples:
+
+- Transpile a Ruby file (default `--emit crystal`):
+
+```bash
+crystal run bin/rtc.cr -- my_script.rb
+```
+
+- Emit the parser AST:
+
+```bash
+crystal run bin/rtc.cr -- --emit ast my_script.rb
+```
+
+- Emit a short IR summary:
+
+```bash
+crystal run bin/rtc.cr -- --emit ir my_script.rb
+```
+
+- Dry-run parse/validate without emitting code:
+
+```bash
+crystal run bin/rtc.cr -- --dry-run my_script.rb
+```
+
+- Transpile and print diagnostics to STDERR:
+
+```bash
+crystal run bin/rtc.cr -- --diagnostics my_script.rb > out.cr
+```
+
+Notes:
+
+- If no `file` is provided and stdin is not a TTY, `rtc` reads source from STDIN.
+- Exit status is `0` for success and `1` for parse or transpiler errors.
+
 ### MCP (Model Context Protocol) Integration
 
 **Scenario**: An MCP server exposes JSON resources; Warp accelerates parsing/validation for large payloads.
@@ -212,13 +254,13 @@ sequenceDiagram
 
 Build the Crystal side:
 
-```
+```bash
 crystal build bin/bench.cr
 ```
 
 Run the benchmark (build with `crystal --release` for higher throughput):
 
-```
+```bash
 ./bin/bench [options] <json file> [json file...]
 ```
 
@@ -242,7 +284,7 @@ Note: the CLI no longer displays an interactive progress bar during parallel run
 
 Example:
 
-```
+```bash
 crystal build bin/bench.cr -o bin/bench --release
 ./bin/bench --backend scalar ~/Downloads/twitter.json big.json big2.json
 ```
@@ -251,7 +293,7 @@ crystal build bin/bench.cr -o bin/bench --release
 
 Crystal 1.19 does not expose built-in coverage in `crystal spec`. Use kcov:
 
-```
+```bash
 ./scripts/coverage_kcov
 ```
 
@@ -393,7 +435,7 @@ struct Stage1Buffer
 end
 ```
 
-### Stage 1b: Lexer Assembly
+### Stage 1b: Lexer Assembly — Details
 
 **Purpose**: Convert scan artifacts into a token stream suitable for parsing.
 
