@@ -1,0 +1,96 @@
+= Warp Formatting Performance Study (PoC)
+Werner Stein
+
+include::reference-architecture.adoc[tag=pipeline]
+include::reference-architecture.adoc[tag=scenarios]
+== Abstract
+This paper evaluates four formatting paths in the Warp PoC: tape-based, DOM-based, CST-based, and AST-based pretty printers. Benchmarks are run with max optimization on two JSON datasets. The results show that tape-based formatting provides the highest throughput and lowest latency, especially in the parse+format path.
+
+== Implementation Variants
+* Tape-based pretty printer: `Warp::Format.pretty(doc : IR::Document)`
+* DOM-based pretty printer: `Warp::Format.pretty(dom : DOM::Value)` via `Parser#parse_dom`
+* CST-based pretty printer: `Warp::Format.pretty(doc : CST::Document)` via `Parser#parse_cst`
+* AST-based pretty printer: `Warp::Format.pretty(node : AST::Node)` via `Parser#parse_ast`
+
+== Methodology
+* Bench harness: `scripts/benchmark_format.cr` (run with `--release -O3`)
+* Warmup: optional CPU stress prelude (no per-case warmups)
+* Timed iterations: 5 per case
+* Metrics: average ms/iteration, throughput MB/s, output bytes
+* Host: local Apple Silicon development machine (PoC environment)
+
+== Datasets
+* `spec/fixtures/jsonc_example.jsonc` (100,653 bytes)
+* `spec/fixtures/rcl_test.json` (19,001,368 bytes)
+* `spec/fixtures/twitter.json` (631,515 bytes)
+
+=== Dataset Characteristics
+* `jsonc_example.jsonc`: medium JSONC with line/block comments, trailing commas, mixed language strings, and emoji escapes. CST output grows because it preserves comments/trivia, while DOM output shrinks due to normalized string escapes and comment removal.
+* `twitter.json`: smaller but string-heavy, with high escape density and many short keys/values. This inflates pretty output size (indentation + escaped content) and emphasizes string processing cost.
+* `rcl_test.json`: large, mixed arrays/objects with more numbers and long lists; lower relative string escape density. This shifts the bottleneck toward structural formatting and traversal overhead.
+
+These differences explain why output sizes and throughput diverge across datasets. DOM formatting expands normalized string escapes, while tape/CST preserve raw slices when possible, so string-heavy inputs show larger size deltas.
+
+== Results
+=== jsonc_example.jsonc
+[cols="2,1,1,1",options="header"]
+|===
+|Variant |Avg ms |Throughput (MB/s) |Output bytes
+|Tape + pretty (parse+format) |0.74 |26.11 |492,375
+|DOM + pretty (parse+format)  |1.50 |12.76 |379,830
+|CST + pretty (parse+format)  |1.02 |18.78 |564,470
+|AST + pretty (parse+format)  |1.08 |17.77 |525,455
+|Tape pretty only             |0.09 |217.71 |492,375
+|DOM pretty only              |0.36 |53.11 |379,830
+|CST pretty only              |0.20 |95.61 |564,470
+|AST pretty only              |0.08 |239.20 |525,455
+|===
+
+=== twitter.json
+[cols="2,1,1,1",options="header"]
+|===
+|Variant |Avg ms |Throughput (MB/s) |Output bytes
+|Tape + pretty (parse+format) |1.53 |78.81 |3,157,570
+|DOM + pretty (parse+format)  |4.15 |29.01 |3,312,185
+|CST + pretty (parse+format)  |3.70 |32.52 |3,527,690
+|AST + pretty (parse+format)  |4.68 |25.71 |3,527,690
+|Tape pretty only             |0.56 |214.44 |3,157,570
+|DOM pretty only              |2.31 |52.22 |3,312,185
+|CST pretty only              |1.94 |62.14 |3,527,690
+|AST pretty only              |1.36 |88.86 |3,527,690
+|===
+
+=== rcl_test.json
+[cols="2,1,1,1",options="header"]
+|===
+|Variant |Avg ms |Throughput (MB/s) |Output bytes
+|Tape + pretty (parse+format) |75.19 |48.20 |71,133,395
+|DOM + pretty (parse+format)  |177.71 |20.39 |71,133,395
+|CST + pretty (parse+format)  |215.02 |16.86 |77,951,315
+|AST + pretty (parse+format)  |361.57 |10.02 |77,951,315
+|Tape pretty only             |17.47 |207.48 |71,133,395
+|DOM pretty only              |49.32 |73.48 |71,133,395
+|CST pretty only              |67.91 |53.36 |77,951,315
+|AST pretty only              |33.22 |109.09 |77,951,315
+|===
+
+== Discussion
+* Tape-based formatting is consistently faster than DOM formatting in end-to-end parse+format across all datasets.
+* CST parsing adds overhead for comment-aware tokenization; AST costs are higher due to CST construction plus AST allocation.
+* Tape-only formatting is fastest overall; CST/AST output sizes are larger because the CST formatter preserves trivia when present.
+* DOM output size differs when unescaping/re-escaping string escapes; tape and CST preserve raw slices, which is more visible in string-heavy inputs like `twitter.json` and JSONC fixtures.
+
+== Recommendations and Ratings
+[cols="3,5,1,1",options="header"]
+|===
+|Suggestion |Rationale |Impact |Rating
+|Prefer tape-based formatter for tooling |Highest throughput and lowest latency without CST/DOM allocation |High |5/5
+|Use CST formatting for JSONC |Preserves comments and trivia in JSONC |High |5/5
+|Expose minify overload for `IR::Document` |Completes tape-based formatting path for CLI tools |Medium |4/5
+|Document escape behavior differences |Avoids surprises when tape/CST output preserves raw slices |Medium |4/5
+|Add optional unescape mode for tape formatter |Gives predictable output when required |Medium |3/5
+|Add streaming-friendly formatting API |Supports large files with lower peak memory |Medium |3/5
+|===
+
+== Conclusion
+In the PoC state, tape-based pretty printing materially outperforms DOM-based formatting. The tape path is the recommended default for high-throughput formatting tools, while DOM formatting remains valuable for workflows that require materialized data structures.

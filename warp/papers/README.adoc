@@ -232,6 +232,42 @@ include::reference-architecture.adoc[tag=scenarios]
 
 ---
 
+=== Formatting Performance Study
+**File**: [formatting-performance-study.adoc](formatting-performance-study.adoc)
+
+**Length**: ~6 pages
+
+**Purpose**: Tape vs DOM vs CST vs AST formatting performance comparison (PoC)
+
+**Contents**:
+- Benchmark methodology
+- Results on two datasets
+- Recommendations with ratings
+
+**Audience**: Performance engineers, tooling developers
+
+**Reading Time**: 10-15 minutes
+
+---
+
+=== JSONC Support Notes
+**File**: [jsonc-support-notes.adoc](jsonc-support-notes.adoc)
+
+**Length**: ~3 pages
+
+**Purpose**: JSONC support guidance and ratings (PoC)
+
+**Contents**:
+- CST vs tape/DOM behavior
+- Comment preservation notes
+- Suggestions with ratings
+
+**Audience**: Tooling engineers, formatter authors
+
+**Reading Time**: 5-10 minutes
+
+---
+
 == Reading Paths
 
 === Path 1: Executive Quick Read (15 minutes)
