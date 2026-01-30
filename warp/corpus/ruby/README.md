@@ -16,6 +16,7 @@ This directory contains Ruby source files to test the Warp Ruby lexer, parser, a
 - **09_comments.rb** - Single-line and multi-line comments
 - **10_complex.rb** - Real-world module with classes and methods
 - **11_ruby34_features.rb** - Ruby 3.4 specific features
+- **11_sorbet_annotations.rb** - Sorbet type annotations and signatures
 
 ## Edge Cases Covered
 
