@@ -1,3 +1,5 @@
+require "../backend"
+
 module Warp
   module Backend
     class AvxBackend < Base

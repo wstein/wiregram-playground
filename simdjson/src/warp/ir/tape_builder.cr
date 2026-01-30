@@ -14,6 +14,60 @@
 # - Scope and context information not preserved in tape
 # - Ruby heredocs, string interpolation, and regex would need special handling
 #
+# ============================================================================
+# Suggestion #4: Lossless Trivia Handling in Tape
+# ============================================================================
+#
+# PROBLEM: The paper claims "Tape avoids AST allocations when formatting only"
+# but currently the tape doesn't preserve trivia (comments/whitespace). To
+# format from tape alone without destroying formatting, trivia MUST be
+# integrated into the tape IR.
+#
+# CURRENT STATE:
+# - Trivia (whitespace, comments) is collected in CST (GreenNode.leading_trivia)
+# - Tape entries only store offsets/links, no trivia reference
+# - Formatter must look back at source to reconstruct formatting
+# - This negates tape's speed advantage for formatting
+#
+# SOLUTION OPTIONS:
+# 1. Add Trivia entries to the tape (simpler, more storage)
+# 2. Store trivia_start/trivia_end indices in each Entry (compact)
+# 3. Require formatter to always reference source (limits optimization)
+#
+# RECOMMENDATION: Option 1 (Trivia entries)
+# - Add TapeType::Trivia entries that record comments/whitespace slices
+# - Formatter can stream tape entries and interleave trivia without source lookups
+# - Slight overhead (more tape entries) but enables true tape-based formatting
+#
+# DESIGN (Proposed):
+#   enum TapeType
+#     Root
+#     StartObject
+#     EndObject
+#     # ... existing types ...
+#     Trivia          # NEW: Comment or whitespace region
+#   end
+#
+#   When parsing, insert Trivia entries into tape:
+#     tape << Entry.new(TapeType::Trivia, start, length)  # Whitespace
+#     tape << Entry.new(TapeType::String, ...)           # Actual content
+#
+#   Formatter streams tape and outputs trivia slices directly:
+#     case entry.type
+#     when TapeType::Trivia
+#       output << bytes[entry.a, entry.b]  # Copy whitespace/comment
+#     when TapeType::String
+#       output << process(bytes[entry.a, entry.b])
+#     end
+#
+# IMPACT:
+# - ✓ Enables tape-only formatting without source lookups
+# - ✓ Preserves exact formatting (round-trip fidelity)
+# - ✓ Scales to Ruby/Crystal with language-specific Trivia handling
+# - ✗ Slightly larger tape (more entries)
+#
+# NEXT STEP: When implementing Ruby tape builder, use Trivia entries
+#
 module Warp
   module IR
     alias ErrorCode = Core::ErrorCode
