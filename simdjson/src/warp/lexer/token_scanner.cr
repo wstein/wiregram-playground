@@ -49,7 +49,6 @@ module Warp
               end
             else
               tokens << Token.new(TokenKind::Unknown, i, 1)
-              i += 1
             end
           when '{'.ord
             tokens << Token.new(TokenKind::LBrace, i, 1)
@@ -156,6 +155,7 @@ module Warp
         while i < len
           block_len = len - i
           block_len = 64 if block_len > 64
+          break if block_len < 64
           mask = backend.newline_mask(ptr + i, block_len)
           if mask == 0
             i += block_len
