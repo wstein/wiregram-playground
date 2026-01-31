@@ -15,7 +15,7 @@
 | 08_operators.rb | ❌ Failing | Complex operator expressions with << and >> cause unterminated calls |
 | 09_comments.rb | ❌ Failing | Comments with special tokens break parsing |
 | 10_complex.rb | ❌ Failing | require with parens not handled |
-| 11_sorbet_annotations.rb | ⚠️ Partial | sig blocks work for simple cases; complex signatures need refinement |
+| 11_sorbet_annotations.rb | ✅ Partial | Class methods, namespace resolution (T::Sig) now working; range operators, pattern matching still failing |
 
 ## Completed Features
 
