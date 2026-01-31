@@ -14,7 +14,26 @@ module Warp::Lang::Crystal
         end
       when CST::NodeKind::RawText
         io << (node.text || "")
+      when CST::NodeKind::MethodDef
+        payload = node.method_payload
+        if payload
+          io << build_method_header(payload)
+          io << payload.body
+        end
       end
+    end
+
+    private def self.build_method_header(payload : CST::MethodDefPayload) : String
+      parts = payload.params.map do |param|
+        param.type ? "#{param.name} : #{param.type}" : param.name
+      end
+
+      header = "def #{payload.name}"
+      if payload.had_parens || parts.size > 0
+        header += "(#{parts.join(", ")})"
+      end
+      header += " : #{payload.return_type}" if payload.return_type
+      header + "\n"
     end
   end
 end

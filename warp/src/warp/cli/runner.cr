@@ -2,20 +2,53 @@ require "option_parser"
 require "file_utils"
 
 module Warp::CLI
-  enum AnnotationMode
-    None
-    SorbetInline
-    SorbetFile
-    RbsInline
-    RbsFile
+  enum TranspileTarget
+    Crystal
+    Rbs
+    Rbi
+    InjectRbs
   end
 
   class Runner
     def self.run(args : Array(String)) : Int32
-      return run_transpile(args) if args.first? == "transpile"
-      return run_init(args) if args.first? == "init"
-      puts "Usage: warp <transpile|init> [options]"
+      return run_init(args[1..]) if args.first? == "init"
+      return run_transpile(args[1..]) if args.first? == "transpile"
+      if args.first? == "help" || args.first? == "-h" || args.first? == "--help"
+        puts usage
+        return 0
+      end
+      puts usage
       1
+    end
+
+    private def self.usage : String
+      <<-TXT
+Usage:
+  warp init
+  warp transpile [target] [options]
+
+Targets:
+  crystal       Ruby -> Crystal (default)
+  rbs           Generate .rbs files from Sorbet sigs
+  rbi           Generate .rbi files from Sorbet sigs
+  inject-rbs    Inject inline # @rbs comments into Ruby source
+TXT
+    end
+
+    private def self.transpile_usage : String
+      <<-TXT
+Usage:
+  warp transpile [crystal|rbs|rbi|inject-rbs] [options]
+
+Options:
+  -s, --source=PATH       Source file or directory
+  -c, --config=PATH       Config file (default .warp.yaml or warp.yaml)
+  -o, --out=DIR           Output directory
+  --rbs=PATH              RBS file to load (repeatable)
+  --rbi=PATH              RBI file to load (repeatable)
+  --inline-rbs=BOOL       Parse inline # @rbs comments (default true)
+  --stdout                Write output to stdout
+TXT
     end
 
     private def self.run_init(args : Array(String)) : Int32
@@ -44,37 +77,47 @@ YAML
     end
 
     private def self.run_transpile(args : Array(String)) : Int32
-      mode = AnnotationMode::None
+      args = args || [] of String
+      target_name = "crystal"
+      if args.size > 0 && !args[0].starts_with?("-")
+        target_name = args[0]
+        args = args[1..]
+      end
+
+      target = case target_name
+               when "crystal", "cr" then TranspileTarget::Crystal
+               when "rbs"           then TranspileTarget::Rbs
+               when "rbi"           then TranspileTarget::Rbi
+               when "inject-rbs"    then TranspileTarget::InjectRbs
+               else
+                 puts "Unknown transpile target: #{target_name}"
+                 puts transpile_usage
+                 return 1
+               end
+
       source_path = "."
       config_path : String? = nil
       out_dir : String? = nil
       extra_rbs = [] of String
       extra_rbi = [] of String
       inline_rbs = true
+      stdout = false
 
       parser = OptionParser.new do |p|
-        p.banner = "Usage: warp transpile [options]"
+        p.banner = transpile_usage
         p.on("-s PATH", "--source=PATH", "Source file or directory") { |v| source_path = v }
         p.on("-c PATH", "--config=PATH", "Config file (default .warp.yaml or warp.yaml)") { |v| config_path = v }
         p.on("-o DIR", "--out=DIR", "Output directory") { |v| out_dir = v }
-        p.on("--annotations=MODE", "Annotation mode: none|sorbet-inline|sorbet-file|rbs-inline|rbs-file") do |v|
-          mode = case v
-                 when "sorbet-inline" then AnnotationMode::SorbetInline
-                 when "sorbet-file" then AnnotationMode::SorbetFile
-                 when "rbs-inline" then AnnotationMode::RbsInline
-                 when "rbs-file" then AnnotationMode::RbsFile
-                 else AnnotationMode::None
-                 end
-        end
-              p.on("--rbs=PATH", "RBS file to load (repeatable)") { |v| extra_rbs << v }
-              p.on("--rbi=PATH", "RBI file to load (repeatable)") { |v| extra_rbi << v }
-              p.on("--inline-rbs=BOOL", "Parse inline # @rbs comments (default true)") { |v| inline_rbs = (v != "false") }
+        p.on("--rbs=PATH", "RBS file to load (repeatable)") { |v| extra_rbs << v }
+        p.on("--rbi=PATH", "RBI file to load (repeatable)") { |v| extra_rbi << v }
+        p.on("--inline-rbs=BOOL", "Parse inline # @rbs comments (default true)") { |v| inline_rbs = (v != "false") }
+        p.on("--stdout", "Write output to stdout") { stdout = true }
       end
 
-      parser.parse(args[1..-1] || [] of String)
+      parser.parse(args || [] of String)
 
       config = ConfigLoader.load(config_path)
-      output_root = out_dir || config.output_dir
+      output_root = (out_dir || config.output_dir).not_nil!
 
       files = collect_files(source_path, config)
       if files.empty?
@@ -83,7 +126,7 @@ YAML
       end
 
       files.each do |path|
-        process_file(path, output_root, mode, config, extra_rbs, extra_rbi, inline_rbs)
+        process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, stdout)
       end
 
       0
@@ -97,44 +140,53 @@ YAML
       includes = config.include
       excludes = config.exclude
       files = includes.flat_map { |g| Dir.glob(g) }.select { |f| f.ends_with?(".rb") }
-      files = files.reject { |f| excludes.any? { |ex| File.fnmatch(ex, f) } }
+      files = files.reject { |f| excludes.any? { |ex| File.match?(ex, f) } }
       files
     end
 
     private def self.process_file(
       path : String,
       output_root : String,
-      mode : AnnotationMode,
+      target : TranspileTarget,
       config : ProjectConfig,
       extra_rbs : Array(String),
       extra_rbi : Array(String),
       inline_rbs : Bool,
+      stdout : Bool,
     )
       source = File.read(path)
       bytes = source.to_slice
       tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(bytes)
       return unless lex_error == Warp::Core::ErrorCode::Success
 
-      extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(bytes, tokens)
-      sigs = extractor.extract
+      case target
+      when TranspileTarget::Rbs, TranspileTarget::Rbi, TranspileTarget::InjectRbs
+        extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(bytes, tokens)
+        sigs = extractor.extract
 
-      case mode
-      when AnnotationMode::SorbetInline
-        write_output(path, output_root, source, ".rb")
-      when AnnotationMode::SorbetFile
-        rbi = build_rbi(sigs)
-        write_output(path, output_root, rbi, ".rbi")
-      when AnnotationMode::RbsInline
-        output = Warp::Lang::Ruby::Annotations::InlineRbsInjector.inject(source, sigs)
-        write_output(path, output_root, output, ".rb")
-      when AnnotationMode::RbsFile
-        rbs = build_rbs(sigs)
-        write_output(path, output_root, rbs, ".rbs")
+        content = case target
+                  when TranspileTarget::Rbs
+                    build_rbs(sigs)
+                  when TranspileTarget::Rbi
+                    build_rbi(sigs)
+                  else
+                    Warp::Lang::Ruby::Annotations::InlineRbsInjector.inject(source, sigs)
+                  end
+
+        ext = target == TranspileTarget::Rbs ? ".rbs" : (target == TranspileTarget::Rbi ? ".rbi" : ".rb")
+        write_or_print(path, output_root, content, ext, stdout)
       else
-        # Phase 1 CST-to-CST (no-op) as default
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
         result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations)
-        write_output(path, output_root, result.output, ".cr")
+        write_or_print(path, output_root, result.output, ".cr", stdout)
+      end
+    end
+
+    private def self.write_or_print(source_path : String, output_root : String, content : String, ext : String, stdout : Bool)
+      if stdout
+        puts content
+      else
+        write_output(source_path, output_root, content, ext)
       end
     end
 

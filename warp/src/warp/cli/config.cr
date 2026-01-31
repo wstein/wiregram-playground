@@ -25,24 +25,32 @@ module Warp::CLI
       config_path = path || ".warp.yaml"
       if File.exists?(config_path)
         data = YAML.parse(File.read(config_path))
-        include_globs = data["transpiler"]?["include"]?.try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb"]
-        exclude_globs = data["transpiler"]?["exclude"]?.try(&.as_a?).try(&.map(&.as_s)) || [] of String
-        output_dir = data["output"]?["directory"]?.try(&.as_s) || "out"
-        rbs_paths = data["annotations"]?["rbs_paths"]?.try(&.as_a?).try(&.map(&.as_s)) || [] of String
-        rbi_paths = data["annotations"]?["rbi_paths"]?.try(&.as_a?).try(&.map(&.as_s)) || [] of String
-        inline_rbs = data["annotations"]?["inline_rbs"]?.try(&.as_bool) || true
+        transpiler = data["transpiler"]?.try(&.as_h?)
+        output = data["output"]?.try(&.as_h?)
+        annotations = data["annotations"]?.try(&.as_h?)
+
+        include_globs = transpiler.try(&.["include"]?).try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb"]
+        exclude_globs = transpiler.try(&.["exclude"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
+        output_dir = output.try(&.["directory"]?).try(&.as_s) || "out"
+        rbs_paths = annotations.try(&.["rbs_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
+        rbi_paths = annotations.try(&.["rbi_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
+        inline_rbs = annotations.try(&.["inline_rbs"]?).try(&.as_bool) || true
         return ProjectConfig.new(include_globs, exclude_globs, output_dir, rbs_paths, rbi_paths, inline_rbs)
       end
 
       # fallback to warp.yaml if present
       if File.exists?("warp.yaml")
         data = YAML.parse(File.read("warp.yaml"))
-        include_globs = data["transpiler"]?["include"]?.try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb"]
-        exclude_globs = data["transpiler"]?["exclude"]?.try(&.as_a?).try(&.map(&.as_s)) || [] of String
-        output_dir = data["output"]?["directory"]?.try(&.as_s) || "out"
-        rbs_paths = data["annotations"]?["rbs_paths"]?.try(&.as_a?).try(&.map(&.as_s)) || [] of String
-        rbi_paths = data["annotations"]?["rbi_paths"]?.try(&.as_a?).try(&.map(&.as_s)) || [] of String
-        inline_rbs = data["annotations"]?["inline_rbs"]?.try(&.as_bool) || true
+        transpiler = data["transpiler"]?.try(&.as_h?)
+        output = data["output"]?.try(&.as_h?)
+        annotations = data["annotations"]?.try(&.as_h?)
+
+        include_globs = transpiler.try(&.["include"]?).try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb"]
+        exclude_globs = transpiler.try(&.["exclude"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
+        output_dir = output.try(&.["directory"]?).try(&.as_s) || "out"
+        rbs_paths = annotations.try(&.["rbs_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
+        rbi_paths = annotations.try(&.["rbi_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
+        inline_rbs = annotations.try(&.["inline_rbs"]?).try(&.as_bool) || true
         return ProjectConfig.new(include_globs, exclude_globs, output_dir, rbs_paths, rbi_paths, inline_rbs)
       end
 
