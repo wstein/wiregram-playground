@@ -69,39 +69,32 @@ module WireGram
             ushr v0.16b, v2.16b, 7
             movi v1.16b, 1
             and v0.16b, v0.16b, v1.16b
-            mov w2, 1
-            mov v1.b[0], w2
-            mov w2, 2
-            mov v1.b[1], w2
-            mov w2, 4
-            mov v1.b[2], w2
-            mov w2, 8
-            mov v1.b[3], w2
-            mov w2, 16
-            mov v1.b[4], w2
-            mov w2, 32
-            mov v1.b[5], w2
-            mov w2, 64
-            mov v1.b[6], w2
-            mov w2, 128
-            mov v1.b[7], w2
-            mov w2, 1
-            mov v1.b[8], w2
-            mov w2, 2
-            mov v1.b[9], w2
-            mov w2, 4
-            mov v1.b[10], w2
-            mov w2, 8
-            mov v1.b[11], w2
-            mov w2, 16
-            mov v1.b[12], w2
-            mov w2, 32
-            mov v1.b[13], w2
-            mov w2, 64
-            mov v1.b[14], w2
-            mov w2, 128
-            mov v1.b[15], w2
+
+            # Prepare power-of-2 weights for each byte in the 16-byte block
+            # This constant can be moved out of the loop in a more advanced implementation,
+            # but for now, we keep it here for simplicity and to stay within a single asm block.
+            mov w2, 0x0201
+            mov v1.h[0], w2
+            mov w2, 0x0804
+            mov v1.h[1], w2
+            mov w2, 0x2010
+            mov v1.h[2], w2
+            mov w2, 0x8040
+            mov v1.h[3], w2
+            mov w2, 0x0201
+            mov v1.h[4], w2
+            mov w2, 0x0804
+            mov v1.h[5], w2
+            mov w2, 0x2010
+            mov v1.h[6], w2
+            mov w2, 0x8040
+            mov v1.h[7], w2
+
             mul v0.16b, v0.16b, v1.16b
+
+            # Sum up the bits to get a single 16-bit mask
+            # Lower 8 bits in v0[0..7], Upper 8 bits in v1[0..7]
+            # We use addv to sum across the 8-byte lanes.
             ext v1.16b, v0.16b, v0.16b, 8
             addv b2, v0.8b
             addv b3, v1.8b
@@ -109,6 +102,8 @@ module WireGram
             umov w3, v3.b[0]
             orr w2, w2, w3, lsl 8
             mov $0, x2
+
+            # ASCII check: find max byte in preserved v5
             umaxv b2, v5.16b
             umov w3, v2.b[0]
             mov $1, x3"

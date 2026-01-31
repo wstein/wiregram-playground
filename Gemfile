@@ -28,3 +28,5 @@ group :development, :test do
   # Docs
   gem 'yard', '~> 0.9.38'
 end
+
+gem "prism", "~> 1.8"

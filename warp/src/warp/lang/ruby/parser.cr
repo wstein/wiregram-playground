@@ -49,9 +49,34 @@ module Warp
           tok = current
           return nil unless tok
 
+          # Check for Sorbet sig blocks before def
+          # Only parse sig if it's immediately followed by def (with optional trivia)
+          sig_meta = nil
+          if tok.kind == TokenKind::Identifier && token_text(tok) == "sig"
+            # Lookahead to check if this sig is for a def
+            save_index = @index
+            parse_sorbet_sig
+            skip_trivia
+            tok = current
+
+            # Only keep the sig if def follows
+            if tok && tok.kind == TokenKind::Def
+              # Reparse sig to extract metadata
+              @index = save_index
+              sig_meta = parse_sorbet_sig
+              skip_trivia
+              tok = current
+            else
+              # Not a sig-def pair, reset and parse as normal expression
+              @index = save_index
+              return parse_expression
+            end
+            return nil unless tok
+          end
+
           case tok.kind
           when TokenKind::Def
-            parse_def
+            parse_def(sig_meta)
           when TokenKind::Class
             parse_class
           when TokenKind::Module
@@ -69,17 +94,114 @@ module Warp
           end
         end
 
-        private def parse_def : AstNode
+        private def parse_sorbet_sig : Hash(String, String)?
+          # Consume 'sig'
+          advance
+          skip_trivia
+
+          # Look for { } or do/end block
+          block_start = current
+          is_brace = match(TokenKind::LBrace)
+          is_do = !is_brace && match(TokenKind::Do)
+
+          if !is_brace && !is_do
+            return nil
+          end
+
+          # Extract type information from sig block
+          params_types = {} of String => String
+          return_type = nil
+          depth = 1
+
+          while depth > 0 && (tok = current)
+            case tok.kind
+            when TokenKind::RBrace
+              if is_brace
+                depth -= 1
+                advance
+                break if depth == 0
+              else
+                advance
+              end
+            when TokenKind::End
+              if is_do
+                depth -= 1
+                advance
+                break if depth == 0
+              else
+                advance
+              end
+            when TokenKind::LBrace
+              if is_brace
+                depth += 1
+              end
+              advance
+            when TokenKind::Do
+              if is_do
+                depth += 1
+              end
+              advance
+            when TokenKind::Identifier
+              text = token_text(tok)
+              if text == "returns"
+                advance
+                skip_trivia
+                if match(TokenKind::LParen)
+                  skip_trivia
+                  if (type_tok = current) && type_tok.kind == TokenKind::Constant
+                    return_type = token_text(type_tok)
+                    advance
+                  end
+                  consume(TokenKind::RParen)
+                end
+              elsif text == "void"
+                # void is a return type indicator (no return value)
+                return_type = "Nil"
+                advance
+              elsif text == "params"
+                # Skip params parsing for now, just consume the block
+                advance
+              else
+                advance
+              end
+            else
+              advance
+            end
+          end
+
+          meta = {} of String => String
+          meta["return_type"] = return_type if return_type
+          meta.empty? ? nil : meta
+        end
+
+        private def parse_def(sig_meta : Hash(String, String)? = nil) : AstNode
           def_tok = consume(TokenKind::Def)
           skip_trivia
+          
+          # Handle class methods: def self.method_name or def ClassName.method_name
+          receiver = nil
           name_tok = consume_identifier
           name_node = name_tok ? node_from_token(NodeKind::Identifier, name_tok) : node_unknown("<anonymous>")
+          
+          # Check if followed by dot (class method syntax)
+          skip_trivia
+          if match(TokenKind::Dot)
+            # match already consumed the dot
+            receiver = name_node.value
+            skip_trivia
+            name_tok = consume_identifier
+            name_node = name_tok ? node_from_token(NodeKind::Identifier, name_tok) : node_unknown("<anonymous>")
+          end
+          
           params_node = parse_param_list
           body_node = parse_block_until(TokenKind::End)
           end_tok = consume(TokenKind::End)
           span_start = def_tok ? def_tok.start : name_node.start
           span_end = end_tok ? end_tok.start + end_tok.length : body_node.span_end
-          AstNode.new(NodeKind::MethodDef, [params_node, body_node], name_node.value, span_start, span_end - span_start)
+          # Merge sig metadata with method node
+          meta = sig_meta || {} of String => String
+          meta["receiver"] = receiver if receiver
+          AstNode.new(NodeKind::MethodDef, [params_node, body_node], name_node.value, span_start, span_end - span_start, meta.empty? ? nil : meta)
         end
 
         private def parse_class : AstNode
@@ -87,11 +209,20 @@ module Warp
           skip_trivia
           name_tok = consume_identifier
           name_node = name_tok ? node_from_token(NodeKind::Constant, name_tok) : node_unknown("<anon_class>")
+          # optional inheritance
+          parent_name = nil
+          skip_trivia
+          if match(TokenKind::LessThan)
+            skip_trivia
+            parent_tok = consume_identifier
+            parent_name = parent_tok ? token_text(parent_tok) : nil
+          end
           body_node = parse_block_until(TokenKind::End)
           end_tok = consume(TokenKind::End)
           span_start = class_tok ? class_tok.start : name_node.start
           span_end = end_tok ? end_tok.start + end_tok.length : body_node.span_end
-          AstNode.new(NodeKind::ClassDef, [body_node], name_node.value, span_start, span_end - span_start)
+          meta = parent_name ? {"parent" => parent_name} : nil
+          AstNode.new(NodeKind::ClassDef, [body_node], name_node.value, span_start, span_end - span_start, meta)
         end
 
         private def parse_module : AstNode
@@ -210,9 +341,34 @@ module Warp
         private def parse_postfix : AstNode
           node = parse_primary
           loop do
-            skip_trivia
+            # Skip only whitespace, not newlines, to check for statement boundaries
+            while (tok = current) && tok.kind == TokenKind::Whitespace
+              advance
+            end
             tok = current
             break unless tok
+
+            # Newlines terminate postfix expressions (except after . or ( or { or do or ::)
+            if tok.kind == TokenKind::Newline
+              break
+            end
+
+            # Handle double-colon (namespace resolution): T::Sig, Module::Class
+            if tok.kind == TokenKind::DoubleColon
+              advance
+              skip_trivia
+              next_tok = current
+              unless next_tok && (next_tok.kind == TokenKind::Constant || next_tok.kind == TokenKind::Identifier)
+                break
+              end
+              right_tok = advance
+              right_name = right_tok ? token_text(right_tok) : "<missing>"
+              # Build namespaced constant: node::right_name
+              combined_name = "#{node.value}::#{right_name}"
+              span_end = right_tok ? right_tok.start + right_tok.length : node.span_end
+              node = AstNode.new(NodeKind::Constant, [] of AstNode, combined_name, node.start, span_end - node.start)
+              next
+            end
 
             if tok.kind == TokenKind::Dot
               advance
@@ -387,10 +543,56 @@ module Warp
         private def parse_bare_args : Array(AstNode)
           args = [] of AstNode
           while (tok = current) && bare_arg_start?(tok.kind)
-            args << parse_expression
-            skip_trivia
+            # Save position in case parse_expression moves past a newline
+            saved_index = @index
+            parse_expr_result = parse_expression
+            args << parse_expr_result
+
+            # Check if parse_expression skipped over a newline
+            # If so, we should stop parsing bare args
+            found_newline = false
+            temp_idx = saved_index
+            while temp_idx < @index
+              tok_at_temp = @tokens[temp_idx]?
+              if tok_at_temp && tok_at_temp.kind == TokenKind::Newline
+                found_newline = true
+                break
+              end
+              temp_idx += 1
+            end
+
+            if found_newline
+              # Reset to just after the expression but before the newline
+              # We need to find where the newline is and position before it
+              temp_idx = saved_index
+              while temp_idx < @index
+                tok_at_temp = @tokens[temp_idx]?
+                if tok_at_temp && tok_at_temp.kind == TokenKind::Newline
+                  @index = temp_idx
+                  break
+                end
+                temp_idx += 1
+              end
+              break
+            end
+
+            # Skip whitespace but not newlines
+            while (t = current) && t.kind == TokenKind::Whitespace
+              advance
+            end
+            # Break if we hit a newline
+            if current && current.not_nil!.kind == TokenKind::Newline
+              break
+            end
             match(TokenKind::Comma)
-            skip_trivia
+            # Skip whitespace but not newlines after comma
+            while (t = current) && t.kind == TokenKind::Whitespace
+              advance
+            end
+            # If newline after comma, stop parsing args
+            if current && current.not_nil!.kind == TokenKind::Newline
+              break
+            end
           end
           args
         end
@@ -440,9 +642,9 @@ module Warp
 
         private def bare_arg_start?(kind : TokenKind) : Bool
           case kind
-          when TokenKind::Identifier, TokenKind::String, TokenKind::Number, TokenKind::Float,
+          when TokenKind::Identifier, TokenKind::Constant, TokenKind::String, TokenKind::Number, TokenKind::Float,
                TokenKind::Symbol, TokenKind::Regex, TokenKind::Heredoc, TokenKind::LParen,
-               TokenKind::LBracket, TokenKind::LBrace, TokenKind::True, TokenKind::False, TokenKind::Nil
+               TokenKind::LBracket, TokenKind::True, TokenKind::False, TokenKind::Nil
             true
           else
             false

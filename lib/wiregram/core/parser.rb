@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 # typed: false
 
+begin
+  require 'sorbet-runtime'
+rescue LoadError
+end
+
 module WireGram
   module Core
     # Base Parser - Foundation for parsing

@@ -48,27 +48,27 @@ module WireGram
           case byte
           when 0x7b # '{'
             add_token(WireGram::Core::TokenType::LBrace, "{")
-            advance
+            @position += 1
             true
           when 0x7d # '}'
             add_token(WireGram::Core::TokenType::RBrace, "}")
-            advance
+            @position += 1
             true
           when 0x5b # '['
             add_token(WireGram::Core::TokenType::LBracket, "[")
-            advance
+            @position += 1
             true
           when 0x5d # ']'
             add_token(WireGram::Core::TokenType::RBracket, "]")
-            advance
+            @position += 1
             true
           when 0x3a # ':'
             add_token(WireGram::Core::TokenType::Colon, ":")
-            advance
+            @position += 1
             true
           when 0x2c # ','
             add_token(WireGram::Core::TokenType::Comma, ",")
-            advance
+            @position += 1
             true
           when 0x22 # '"'
             tokenize_string

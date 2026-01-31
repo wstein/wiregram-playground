@@ -262,12 +262,31 @@ module WireGram
 
         case bench_type
         when "tokenize"
-          tokenize_stream(language, input) do |_token|
-            # discard
+          lang_module = Languages.module_for(language)
+          if language == "json"
+            WireGram::Languages::Json.tokenize(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose)
+          elsif language == "ucl"
+            WireGram::Languages::Ucl.tokenize(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose)
+          else
+            tokenize_stream(language, input) do |_token|
+              # fallback
+            end
           end
+        when "count"
+          count = 0
+          tokenize_stream(language, input) do |_token|
+            count += 1
+          end
+          STDERR.puts "[Benchmark] Total tokens: #{count}" if @verbose
         when "parse"
-          parse_stream(language, input) do |_node|
-            # discard
+          if language == "json"
+            WireGram::Languages::Json.parse(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose)
+          elsif language == "ucl"
+            WireGram::Languages::Ucl.parse(input, use_simd: @simd, use_symbolic_utf8: @symbolic_utf8, use_upfront_rules: @upfront_rules, use_branchless: @branchless, use_brzozowski: @brzozowski, use_gpu: @gpu, verbose: @verbose)
+          else
+            parse_stream(language, input) do |_node|
+              # discard
+            end
           end
         when "process"
           process_language(language, input, false)

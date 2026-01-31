@@ -27,6 +27,7 @@ describe "Ruby Corpus" do
     "corpus/ruby/08_operators.rb",
     "corpus/ruby/09_comments.rb",
     "corpus/ruby/10_complex.rb",
+    "corpus/ruby/11_sorbet_annotations.rb",
   ]
 
   describe "Parsing" do

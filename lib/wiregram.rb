@@ -1,5 +1,38 @@
 # frozen_string_literal: true
 
+# Prefer loading Sorbet runtime for runtime helpers and T namespace. If it isn't
+# available (e.g., in minimal installs), provide a tiny fallback so the library
+# can still be used without hard-failing at require time.
+begin
+  require 'sorbet-runtime'
+rescue LoadError
+  # Minimal no-op implementations to avoid NameError for `T`/`T::Sig` when
+  # `sorbet-runtime` is not present. These emulate just enough so `extend
+  # T::Sig`, `sig { ... }` and `T.let` are callable at runtime.
+  module T
+    module Sig
+      def self.extended(base) # no-op
+      end
+
+      # Runtime `sig` is called inside class bodies; make it a no-op here.
+      def self.sig(_); end
+    end
+
+    # Allow `T.let(value, type)` to be used at runtime (returns the value).
+    def self.let(value, _type)
+      value
+    end
+
+    def self.nilable(type)
+      type
+    end
+
+    def self.any(*args)
+      args.first
+    end
+  end
+end
+
 # WireGram - A universal, declarative framework for code analysis and transformation
 #
 # WireGram treats source code as a reversible digital fabric, providing a high-fidelity

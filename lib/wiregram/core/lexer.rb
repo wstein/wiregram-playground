@@ -1,6 +1,13 @@
 # frozen_string_literal: true
 # typed: false
 
+# Ensure Sorbet runtime is available at load time to provide `T` and `T::Sig`.
+begin
+  require 'sorbet-runtime'
+rescue LoadError
+  # no-op: runtime not installed; runtime-only annotations will be no-ops
+end
+
 module WireGram
   module Core
     # Base Lexer - Foundation for tokenization

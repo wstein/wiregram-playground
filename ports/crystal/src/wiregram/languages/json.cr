@@ -60,8 +60,7 @@ module WireGram
       # Tokenize input
       def self.tokenize(input, use_simd = false, use_symbolic_utf8 = false, use_upfront_rules = false, use_branchless = false, use_brzozowski = false, use_gpu = false, verbose = false)
         lexer = WireGram::Languages::Json::Lexer.new(input, use_simd: use_simd, use_symbolic_utf8: use_symbolic_utf8, use_upfront_rules: use_upfront_rules, use_branchless: use_branchless, use_brzozowski: use_brzozowski, use_gpu: use_gpu, verbose: verbose)
-        token_stream = WireGram::Core::TokenStream.new(lexer)
-        token_stream.tokens
+        lexer.tokenize
       end
 
       # Stream tokens one-by-one (memory efficient for large files)

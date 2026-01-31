@@ -4,6 +4,7 @@
 require "fileutils"
 require "json"
 require "optparse"
+require "rbconfig"
 
 root = File.expand_path("..", __dir__)
 out_dir = File.join(root, "coverage")
@@ -24,6 +25,27 @@ end.parse!(ARGV)
 verbose = options[:verbose]
 mono = options[:mono]
 
+backend_override = ENV["WARP_BACKEND"] || ENV["SIMDJSON_BACKEND"]
+if backend_override
+  cpu = RbConfig::CONFIG["host_cpu"]
+  arch = cpu.to_s.downcase
+  supported =
+    case backend_override.downcase
+    when "scalar"
+      true
+    when "neon"
+      arch.include?("arm") || arch.include?("aarch64")
+    when "sse2", "avx", "avx2", "avx512"
+      arch.include?("x86_64") || arch.include?("amd64")
+    else
+      false
+    end
+  unless supported
+    warn "Backend '#{backend_override}' unavailable on #{cpu}; skipping coverage."
+    exit 0
+  end
+end
+
 FileUtils.mkdir_p(out_dir)
 FileUtils.mkdir_p(bin_dir)
 
@@ -39,6 +61,27 @@ kcov_cmd = [
   out_dir,
   spec_bin
 ]
+cpu = RbConfig::CONFIG["host_cpu"].to_s.downcase
+backend_excludes = []
+if cpu.include?("arm") || cpu.include?("aarch64")
+  backend_excludes += [
+    "backend/avx_backend\\.cr",
+    "backend/avx2_backend\\.cr",
+    "backend/avx512_backend\\.cr",
+    "backend/sse2_backend\\.cr",
+    "backend/x86_masks\\.cr"
+  ]
+else
+  backend_excludes += [
+    "backend/neon_backend\\.cr",
+    "backend/neon_masks\\.cr"
+  ]
+end
+
+backend_excludes.each do |pattern|
+  kcov_cmd.insert(3, "--exclude-pattern=#{pattern}")
+end
+
 system(*kcov_cmd) || abort("kcov failed. Ensure it is installed and codesigned.")
 
 report_dirs = Dir.glob(File.join(out_dir, "spec_runner.*")).sort_by { |d| File.mtime(d) }.reverse
@@ -54,6 +97,20 @@ end
 
 data = JSON.parse(File.read(codecov))
 coverage = data["coverage"] || {}
+backend_filters = []
+if cpu.include?("arm") || cpu.include?("aarch64")
+  backend_filters = [
+    %r{backend/avx.*\.cr},
+    %r{backend/sse2_backend\.cr},
+    %r{backend/x86_masks\.cr}
+  ]
+else
+  backend_filters = [
+    %r{backend/neon_backend\.cr},
+    %r{backend/neon_masks\.cr}
+  ]
+end
+coverage = coverage.reject { |path, _| backend_filters.any? { |re| re.match?(path) } }
 
 # Interactive color helpers (only when stdout is a TTY)
 interactive = STDOUT.isatty

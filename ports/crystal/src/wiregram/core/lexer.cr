@@ -40,30 +40,43 @@ module WireGram
     def build_structural_index!
       return unless @use_upfront_rules
       STDERR.puts "[Lexer] Building structural index (Stage 1)..." if @verbose
-      # Pre-allocate to reduce reallocations for large files
-      indices = Array(Int32).new(@bytes.size // 10)
-      types = Array(UInt8).new(@bytes.size // 10) if @use_branchless
-      ptr = @bytes.to_unsafe
       size = @bytes.size
+      # Pre-calculate capacity to avoid many reallocations
+      # A rough estimate for JSON/UCL is 1 structural char per 10 bytes
+      indices = Array(Int32).new(size // 8)
+      types = Array(UInt8).new(size // 8) if @use_branchless
+      ptr = @bytes.to_unsafe
       i = 0
 
       # Parallel indexing if requested (Experimental)
       if @use_upfront_rules && ENV["WIREGRAM_PARALLEL_INDEXING"]? == "1"
         STDERR.puts "[Lexer] Using parallel indexing (4 fibers)..." if @verbose
-        return parallel_build_structural_index!
+        parallel_build_structural_index!
+        return
       end
 
       # Use SIMD for Stage 1 if enabled
       if @use_simd
         STDERR.puts "[Lexer] Using SIMD for Stage 1..." if @verbose
+        # Hot loop optimization: local references
+        bytes = @bytes
+        idx = indices
+        typ = types
+
         while i + 15 < size
           mask, _ = SimdAccelerator.find_structural_bits(ptr + i)
-          while mask > 0
-            tz = mask.trailing_zeros_count
-            pos = i + tz
-            indices << pos
-            types << @bytes[pos] if types
-            mask &= (mask - 1)
+          if mask > 0
+            m = mask
+            while m > 0
+              tz = m.trailing_zeros_count
+              pos = i + tz
+              idx << pos
+              # Branchless path requires character types to avoid dispatch overhead in Stage 2
+              if typ
+                typ << bytes[pos]
+              end
+              m &= (m - 1)
+            end
           end
           i += 16
         end
@@ -166,12 +179,17 @@ module WireGram
       protected def teleport_to_next
         return advance unless @use_upfront_rules && (indices = @structural_indices)
 
-        while @current_structural_ptr < indices.size && indices[@current_structural_ptr] <= @position
-          @current_structural_ptr += 1
-        end
+        idx_size = indices.size
+        cur_ptr = @current_structural_ptr
+        pos = @position
 
-        if @current_structural_ptr < indices.size
-          @position = indices[@current_structural_ptr]
+        while cur_ptr < idx_size && indices[cur_ptr] <= pos
+          cur_ptr += 1
+        end
+        @current_structural_ptr = cur_ptr
+
+        if cur_ptr < idx_size
+          @position = indices[cur_ptr]
         else
           @position = @bytes.size
         end
@@ -195,10 +213,14 @@ module WireGram
         @position = 0
         @streaming = false
 
+        t1 = Time.instant
         loop do
           token = next_token
           break if token.type == TokenType::Eof
         end
+        t2 = Time.instant
+        STDERR.puts "[Lexer] Stage 2 took #{(t2 - t1).to_f * 1000} ms" if @verbose
+        STDERR.puts "[Lexer] Total tokens: #{@tokens.size}" if @verbose
 
         @tokens
       end
@@ -210,53 +232,106 @@ module WireGram
           # Branchless Stage 2 path
           loop do
             # Skip whitespace using index
-            while @current_structural_ptr < indices.size && types[@current_structural_ptr] <= 0x20
-              @current_structural_ptr += 1
+            # This is a hot loop. We pre-fetch variables to avoid repeated property access.
+            idx_size = indices.size
+            cur_ptr = @current_structural_ptr
+
+            # Inlined whitespace skipping
+            unsafe_types = types.to_unsafe
+            unsafe_indices = indices.to_unsafe
+            while cur_ptr < idx_size
+              b = unsafe_types[cur_ptr]
+              if b > 0x20
+                @current_structural_ptr = cur_ptr
+                @position = unsafe_indices[cur_ptr]
+
+                # FAST PATH: Structural tokens
+                if b == 0x2c # ','
+                  add_token(TokenType::Comma, ",")
+                  @position += 1
+                  @current_structural_ptr = cur_ptr + 1
+                  return @streaming ? @last_token.not_nil! : @tokens.last
+                elsif b == 0x3a # ':'
+                  add_token(TokenType::Colon, ":")
+                  @position += 1
+                  @current_structural_ptr = cur_ptr + 1
+                  return @streaming ? @last_token.not_nil! : @tokens.last
+                elsif b == 0x7d # '}'
+                  add_token(TokenType::RBrace, "}")
+                  @position += 1
+                  @current_structural_ptr = cur_ptr + 1
+                  return @streaming ? @last_token.not_nil! : @tokens.last
+                elsif b == 0x7b # '{'
+                  add_token(TokenType::LBrace, "{")
+                  @position += 1
+                  @current_structural_ptr = cur_ptr + 1
+                  return @streaming ? @last_token.not_nil! : @tokens.last
+                elsif b == 0x5d # ']'
+                  add_token(TokenType::RBracket, "]")
+                  @position += 1
+                  @current_structural_ptr = cur_ptr + 1
+                  return @streaming ? @last_token.not_nil! : @tokens.last
+                elsif b == 0x5b # '['
+                  add_token(TokenType::LBracket, "[")
+                  @position += 1
+                  @current_structural_ptr = cur_ptr + 1
+                  return @streaming ? @last_token.not_nil! : @tokens.last
+                end
+
+                prev_len = @tokens.size
+                @last_token = nil if @streaming
+
+                if try_tokenize_next
+                  # Sync @current_structural_ptr with the new @position after tokenization
+                  pos = @position
+                  cur_ptr = @current_structural_ptr
+                  while cur_ptr < idx_size && unsafe_indices[cur_ptr] < pos
+                    cur_ptr += 1
+                  end
+                  @current_structural_ptr = cur_ptr
+
+                  if @streaming
+                    return @last_token.not_nil! if @last_token
+                  elsif @tokens.size > prev_len
+                    return @tokens.last
+                  end
+                  # If try_tokenize_next returned true but didn't add a token (e.g. comment skip),
+                  # continue loop with updated cur_ptr
+                  break
+                else
+                  # Error recovery: skip character and report unknown
+                  error = {} of Symbol => String | Int32 | TokenType | Symbol | Nil
+                  error[:type] = "unknown_character"
+                  error[:char] = current_char
+                  error[:position] = @position
+                  @errors << error
+                  token = Token.new(TokenType::Unknown, current_char, @position)
+                  advance
+                  # Sync @current_structural_ptr after advance
+                  cur_ptr = @current_structural_ptr
+                  while cur_ptr < idx_size && unsafe_indices[cur_ptr] < @position
+                    cur_ptr += 1
+                  end
+                  @current_structural_ptr = cur_ptr
+                  if @streaming
+                    @last_token = token
+                  else
+                    @tokens << token
+                  end
+                  return token
+                end
+              end
+              cur_ptr += 1
             end
 
-            if @current_structural_ptr >= indices.size
+            if cur_ptr >= idx_size
+              @current_structural_ptr = cur_ptr
               @position = @bytes.size
               token = Token.new(TokenType::Eof, nil, @position)
               if @streaming
                 @last_token = token
               else
                 @tokens << token unless @tokens.last? && @tokens.last.type == TokenType::Eof
-              end
-              return token
-            end
-
-            @position = indices[@current_structural_ptr]
-            prev_len = @tokens.size
-            @last_token = nil if @streaming
-
-            if try_tokenize_next
-              # Sync @current_structural_ptr with the new @position after tokenization
-              while @current_structural_ptr < indices.size && indices[@current_structural_ptr] < @position
-                @current_structural_ptr += 1
-              end
-
-              if @streaming
-                return @last_token.not_nil! if @last_token
-              elsif @tokens.size > prev_len
-                return @tokens.last
-              end
-            else
-              # Error recovery: skip character and report unknown
-              error = {} of Symbol => String | Int32 | TokenType | Symbol | Nil
-              error[:type] = "unknown_character"
-              error[:char] = current_char
-              error[:position] = @position
-              @errors << error
-              token = Token.new(TokenType::Unknown, current_char, @position)
-              advance
-              # Sync @current_structural_ptr after advance
-              while @current_structural_ptr < indices.size && indices[@current_structural_ptr] < @position
-                @current_structural_ptr += 1
-              end
-              if @streaming
-                @last_token = token
-              else
-                @tokens << token
               end
               return token
             end

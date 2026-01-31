@@ -1,0 +1,24 @@
+--dir
+lib
+
+# Exclude test/dev code
+--ignore
+spec
+--ignore
+test
+--ignore
+features
+
+# Ignore RBIs generated for dev/test gems and generation tools
+--ignore
+sorbet/rbi/tapioca
+--ignore
+sorbet/rbi/gems/rspec
+--ignore
+sorbet/rbi/gems/cucumber
+--ignore
+sorbet/rbi/gems/webrick
+--ignore
+sorbet/rbi/gems/tapioca
+--ignore
+sorbet/rbi/gems/prism

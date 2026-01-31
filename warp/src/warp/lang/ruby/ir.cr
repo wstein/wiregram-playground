@@ -53,11 +53,11 @@ module Warp
             when NodeKind::Program
               Node.new(Kind::Program, node.children.map { |c| from_ast(c) }, nil, node.start, node.length)
             when NodeKind::MethodDef
-              Node.new(Kind::Def, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length)
+              Node.new(Kind::Def, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length, node.meta)
             when NodeKind::ClassDef
-              Node.new(Kind::Class, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length)
+              Node.new(Kind::Class, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length, node.meta)
             when NodeKind::ModuleDef
-              Node.new(Kind::Module, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length)
+              Node.new(Kind::Module, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length, node.meta)
             when NodeKind::Call
               Node.new(Kind::Call, node.children.map { |c| from_ast(c) }, node.value, node.start, node.length, node.meta)
             when NodeKind::Block

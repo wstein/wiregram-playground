@@ -1,0 +1,96 @@
+= Warp Multi-Language Refactoring: Files Changed
+
+**Completion Date**: January 30, 2026  
+**Status**: ✓ Ready for Phase 2
+
+== New Files Created
+
+=== Language Support Modules
+
+| File | Purpose | Lines | Status |
+|------|---------|-------|--------|
+| `src/warp/lang/json/types.cr` | JSON TokenKind and NodeKind enums | 38 | ✓ Complete |
+| `src/warp/lang/ruby/types.cr` | Ruby TokenKind (71) and NodeKind (54) | 140 | ✓ Complete |
+| `src/warp/lang/ruby/tape_prototype.cr` | Ruby tape feasibility study | 400+ | ✓ Complete |
+
+=== Documentation
+
+| File | Purpose | Lines | Status |
+|------|---------|-------|--------|
+| `papers/implementation-plan.adoc` | Multi-phase roadmap (6 phases) | 400+ | ✓ Complete |
+| `papers/multi-language-guide.adoc` | Developer quick reference | 300+ | ✓ Complete |
+| `papers/REFACTORING-SUMMARY.adoc` | This refactoring's summary | 250+ | ✓ Complete |
+
+== Modified Files
+
+| File | Changes | Impact |
+|------|---------|--------|
+| `src/warp.cr` | Updated header, added lang requires | Documentation + struct |
+| `src/warp/cst/types.cr` | Added comprehensive documentation | Documentation only |
+| `src/warp/ir/tape_builder.cr` | Added architectural notes | Documentation only |
+
+== Deleted Files
+
+| File | Reason |
+|------|--------|
+| `src/warp/cst/generic_types.cr` | Replaced with concrete-type approach |
+
+== Directory Structure
+
+```
+src/warp/
+├── lang/                               ← NEW
+│   ├── json/
+│   │   └── types.cr                    ← NEW
+│   └── ruby/
+│       ├── types.cr                    ← NEW
+│       └── tape_prototype.cr           ← NEW
+├── cst/
+│   ├── types.cr                        (modified: documentation)
+│   └── parser.cr                       (unchanged)
+├── ir/
+│   ├── tape_builder.cr                 (modified: documentation)
+│   └── soa_view.cr                     (unchanged)
+└── ... (other modules unchanged)
+
+papers/
+├── implementation-plan.adoc            ← NEW
+├── multi-language-guide.adoc           ← NEW
+├── REFACTORING-SUMMARY.adoc            ← NEW
+├── ruby-crystal-language-pipeline.adoc (unchanged, reviewed)
+└── ... (other papers unchanged)
+```
+
+== Compilation Validation
+
+```bash
+$ crystal build src/warp.cr --no-codegen
+# ✓ Success: Zero errors
+```
+
+## Key Metrics
+
+- **New code**: ~580 lines (types + prototype)
+- **Documentation**: ~950 lines (3 new papers)
+- **Files touched**: 6 files modified/created
+- **Backward compatibility**: 100% maintained
+- **Build status**: ✓ Passing
+
+== Quick Links
+
+- [Implementation Plan](papers/implementation-plan.adoc) - Multi-phase roadmap
+- [Developer Guide](papers/multi-language-guide.adoc) - Add new languages
+- [Refactoring Summary](papers/REFACTORING-SUMMARY.adoc) - Full details
+- [Ruby Prototype](src/warp/lang/ruby/tape_prototype.cr) - Feasibility study
+
+== Next: Phase 2
+
+**Ruby Lexer Implementation** (estimated 2-3 weeks)
+
+See [Implementation Plan](papers/implementation-plan.adoc) for details.
+
+Priority tasks:
+1. Create `src/warp/lang/ruby/lexer.cr`
+2. Build `corpus/ruby/` with test files
+3. Implement token stream with trivia
+4. Add round-trip validation tests

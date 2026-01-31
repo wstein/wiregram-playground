@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 # typed: false
 
+begin
+  require 'sorbet-runtime'
+rescue LoadError
+end
+
 require_relative 'node'
 
 module WireGram

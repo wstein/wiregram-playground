@@ -46,23 +46,43 @@ module Warp
               node.children.map { |c| render(c, indent) }.reject(&.empty?).join("\n")
             when Kind::Class
               name = node.value || "Anonymous"
+              parent = node.meta ? node.meta.not_nil!["parent"]? : nil
               body = render_block(node.children, indent + 2)
-              "#{indent_str(indent)}class #{name}\n#{body}\n#{indent_str(indent)}end"
+              head = parent ? "class #{name} < #{parent}" : "class #{name}"
+              "#{indent_str(indent)}#{head}\n#{body}\n#{indent_str(indent)}end"
             when Kind::Module
               name = node.value || "Anonymous"
               body = render_block(node.children, indent + 2)
               "#{indent_str(indent)}module #{name}\n#{body}\n#{indent_str(indent)}end"
             when Kind::Def
               name = node.value || "anonymous"
-              params = extract_params(node.children)
+              params_node = node.children[0]?
+              # Determine if params are simple identifiers; otherwise avoid emitting them in the signature
+              simple_params = params_node && params_node.children.all? { |c| c.kind == Kind::Identifier }
+              params = simple_params ? (params_node ? params_node.children.map { |c| render(c, 0) }.join(", ") : "") : ""
+              params_comment = simple_params ? nil : (params_node ? "# WARP_OPAQUE: complex parameters" : nil)
               body_nodes = extract_body(node.children)
-              return_type = node.meta ? node.meta.not_nil!["return_type"]? : nil
+              return_type_raw = node.meta ? node.meta.not_nil!["return_type"]? : nil
+              return_type = return_type_raw ? convert_ruby_type_to_crystal(return_type_raw) : nil
+              
+              # Handle class methods (def self.method_name or def ClassName.method_name)
+              receiver = node.meta ? node.meta.not_nil!["receiver"]? : nil
+              method_name = receiver ? "#{receiver}.#{name}" : name
+              
               signature = if params.empty?
-                            return_type ? "def #{name} : #{return_type}" : "def #{name}"
+                            return_type ? "def #{method_name} : #{return_type}" : "def #{method_name}"
                           else
-                            return_type ? "def #{name}(#{params}) : #{return_type}" : "def #{name}(#{params})"
+                            return_type ? "def #{method_name}(#{params}) : #{return_type}" : "def #{method_name}(#{params})"
                           end
               body = render_block(body_nodes, indent + 2)
+              # If params were complex, emit an inline comment and proceed
+              if params_comment
+                body = "#{indent_str(indent + 2)}#{params_comment}\n" + (body.empty? ? "" : body)
+              end
+              # Sanity check: if body looks malformed (leftovers like '<missing>' or embedded defs), omit it
+              if body.includes?("<missing>") || body.includes?("), end") || body.includes?(", end") || body.includes?("WARP_OPAQUE:") || body.scan("def ").size > 1
+                body = "#{indent_str(indent + 2)}# WARP_OPAQUE: omitted method body"
+              end
               "#{indent_str(indent)}#{signature}\n#{body}\n#{indent_str(indent)}end"
             when Kind::Call
               render_call(node, indent)
@@ -95,7 +115,35 @@ module Warp
             when Kind::Identifier
               node.value.to_s
             when Kind::Literal
-              node.value.to_s
+              lit_kind = node.meta ? node.meta.not_nil!["literal_kind"]? : nil
+              if lit_kind == "String"
+                val = node.value.to_s
+                # Handle heredoc-like values (starting with <<)
+                if val.starts_with?("<<")
+                  lines = val.split("\n")
+                  if lines.size >= 2
+                    content_lines = lines[1..-2]
+                    content = content_lines.join("\n")
+                    # Escape double quotes and backslashes
+                    escaped = content.gsub("\\", "\\\\").gsub("\"", "\\\"")
+                    "\"#{escaped}\""
+                  else
+                    # fallback: quote entire value
+                    "\"#{val}\""
+                  end
+                else
+                  # Normalize single-quoted strings to double-quoted for Crystal
+                  if val.starts_with?("'") && val.ends_with?("'")
+                    inner = val[1...-1]
+                    escaped = inner.gsub("\\", "\\\\").gsub("\"", "\\\"")
+                    "\"#{escaped}\""
+                  else
+                    val
+                  end
+                end
+              else
+                node.value.to_s
+              end
             when Kind::Assignment
               left = node.children[0]?
               right = node.children[1]?
@@ -114,7 +162,12 @@ module Warp
               op = node.value || "+"
               left_str = left ? render(left, 0) : ""
               right_str = right ? render(right, 0) : ""
-              "#{left_str} #{op} #{right_str}"
+              # If operator is malformed (e.g., contains <missing>) avoid emitting it raw
+              if op.includes?("<missing>") || op.includes?("\n")
+                left_str
+              else
+                "#{left_str} #{op} #{right_str}"
+              end
             when Kind::Opaque
               "#{indent_str(indent)}# WARP_OPAQUE: #{node.value || "unhandled"}"
             else
@@ -137,8 +190,19 @@ module Warp
               receiver = children.shift?
             end
 
-            args = children.map { |c| render(c, 0) }.join(", ")
+            # Handle T.let() specially - convert to plain assignment
             name = node.value || (receiver ? "call" : "call")
+            if receiver && name == "let"
+              receiver_str = render(receiver, 0)
+              if receiver_str == "T"
+                # T.let(value, Type) -> just return the value
+                if children.size > 0
+                  return render(children[0], indent)
+                end
+              end
+            end
+
+            args = children.map { |c| render(c, 0) }.join(", ")
             call_head = receiver ? "#{render(receiver, 0)}.#{name}" : name
             call_str = args.empty? ? call_head : "#{call_head}(#{args})"
 
@@ -155,7 +219,11 @@ module Warp
             body_node = node.children[1]?
             params = params_node ? params_node.children.map { |c| render(c, 0) }.join(", ") : ""
             body = body_node ? render_block(body_node.children, indent + 2) : ""
-            "do |#{params}|\n#{body}\n#{indent_str(indent)}end"
+            if params.empty?
+              "do\n#{body}\n#{indent_str(indent)}end"
+            else
+              "do |#{params}|\n#{body}\n#{indent_str(indent)}end"
+            end
           end
 
           private def render_block(nodes : Array(Node), indent : Int32) : String
@@ -172,6 +240,31 @@ module Warp
           private def extract_body(children : Array(Node)) : Array(Node)
             body = children[1]?
             body ? body.children : [] of Node
+          end
+
+          private def convert_ruby_type_to_crystal(ruby_type : String) : String
+            case ruby_type
+            when "Integer"
+              "Int32"
+            when "String"
+              "String"
+            when "Float"
+              "Float64"
+            when "Boolean", "TrueClass", "FalseClass"
+              "Bool"
+            when "Array"
+              "Array"
+            when "Hash"
+              "Hash"
+            when "Symbol"
+              "Symbol"
+            when "Nil"
+              "Nil"
+            when "void"
+              "Nil"
+            else
+              ruby_type
+            end
           end
 
           private def indent_str(indent : Int32) : String
@@ -275,10 +368,14 @@ module Warp
           if ir.kind == IR::Kind::Program
             ir.children.each do |child|
               if child.kind == IR::Kind::Def
-                type = infer_method_return(child, inferencer)
-                if type
-                  child.meta = child.meta || {} of String => String
-                  child.meta.not_nil!["return_type"] = type
+                # Only infer return type if there's no explicit annotation
+                existing_type = child.meta ? child.meta.not_nil!["return_type"]? : nil
+                unless existing_type
+                  type = infer_method_return(child, inferencer)
+                  if type
+                    child.meta = child.meta || {} of String => String
+                    child.meta.not_nil!["return_type"] = type
+                  end
                 end
               end
             end

@@ -102,6 +102,12 @@ describe "Ruby Lexer" do
       tokens, error = Warp::Lang::Ruby::Lexer.scan(source.to_slice)
       error.should eq(Warp::Core::ErrorCode::Success)
     end
+
+    it "lexes 11_sorbet_annotations.rb" do
+      source = File.read("corpus/ruby/11_sorbet_annotations.rb")
+      tokens, error = Warp::Lang::Ruby::Lexer.scan(source.to_slice)
+      error.should eq(Warp::Core::ErrorCode::Success)
+    end
   end
 
   describe "Edge cases" do
@@ -303,6 +309,7 @@ describe "Ruby Lexer" do
         "corpus/ruby/08_operators.rb",
         "corpus/ruby/09_comments.rb",
         "corpus/ruby/10_complex.rb",
+        "corpus/ruby/11_sorbet_annotations.rb",
       ]
 
       corpus_files.each do |file|

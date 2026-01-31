@@ -17,7 +17,10 @@
         "ms-azuretools.vscode-containers",
         "redhat.vscode-yaml",
         "saoudrizwan.claude-dev",
-        "Shopify.ruby-lsp"
+        "Shopify.ruby-lsp",
+        "crystal-lang-tools.crystal-lang",
+        "MermaidChart.vscode-mermaid-chart",
+        "bpruitt-goddard.mermaid-markdown-syntax-highlighting"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "fish",

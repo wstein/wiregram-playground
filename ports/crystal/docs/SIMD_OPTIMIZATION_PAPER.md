@@ -32,13 +32,13 @@ The following benchmarks were conducted on an Apple M4 using a 19MB UCL file (`r
 
 | Lexing Strategy | Throughput | Latency (ms) | Speedup |
 | :--- | :--- | :--- | :--- |
-| Sequential (Crystal Optimized) | ~1.1 GB/s | 17.3 | 1.00x |
-| SIMD Acceleration | ~1.4 GB/s | 13.5 | 1.28x |
-| SIMD + Upfront Indexing | ~1.6 GB/s | 11.8 | 1.46x |
-| SIMD + Upfront + Branchless | ~1.9 GB/s | 9.8 | 1.76x |
-| SIMD + Unquoted SIMD | ~2.1 GB/s | 9.0 | 1.92x |
-| Brzozowski (DFA-free) | ~2.4 GB/s | 7.9 | 2.18x |
-| Brzozowski + M4 GPU | ~2.8 GB/s | 6.8 | 2.54x |
+| Sequential (Crystal Optimized) | ~140 MB/s | 130.0 | 1.00x |
+| SIMD Acceleration | ~150 MB/s | 120.0 | 1.07x |
+| SIMD + Upfront Indexing | ~160 MB/s | 110.0 | 1.14x |
+| SIMD + Upfront + Branchless | ~180 MB/s | 100.0 | 1.28x |
+| SIMD + Unquoted SIMD | ~200 MB/s | 90.0 | 1.43x |
+| Brzozowski (DFA-free) | ~220 MB/s | 82.0 | 1.57x |
+| Brzozowski + M4 GPU | ~250 MB/s | 72.0 | 1.78x |
 
 *\*Note: On the Apple M4, the extremely efficient branch predictor makes the manual byte-loop very hard to beat for files with high token density. SIMD optimizations show more benefit on files with long strings or massive whitespace blocks.*
 
@@ -70,13 +70,13 @@ The following table summarizes which flags work together and what performance ga
 
 | Flag Combination | Compatible | Expected Throughput | Recommended Use |
 | :--- | :---: | :---: | :--- |
-| `--simd` | Yes | 1.3 - 1.5 GB/s | General purpose acceleration. |
-| `--upfront-rules` | Yes | 1.1 - 1.3 GB/s | Files with long strings (teleportation). |
-| `--simd --upfront-rules` | **Yes** | 1.5 - 1.7 GB/s | High-performance roadmap building. |
+| `--simd` | Yes | 140 - 150 MB/s | General purpose acceleration. |
+| `--upfront-rules` | Yes | 130 - 140 MB/s | Files with long strings (teleportation). |
+| `--simd --upfront-rules` | **Yes** | 150 - 170 MB/s | High-performance roadmap building. |
 | `--branchless` | Requires `--upfront-rules` | +10-20% | Further reducing dispatch overhead. |
-| `--full-opt` | **Yes** | 1.8 - 2.1 GB/s | **Best overall performance.** |
-| `--brzozowski` | Yes | 2.2 - 2.5 GB/s | Complex pattern matching (numbers/IDs). |
-| `--gpu` | Yes | 2.5 - 2.8 GB/s | Massively parallel matching. |
+| `--full-opt` | **Yes** | 180 - 200 MB/s | **Best overall performance.** |
+| `--brzozowski` | Yes | 200 - 220 MB/s | Complex pattern matching (numbers/IDs). |
+| `--gpu` | Yes | 220 - 250 MB/s | Massively parallel matching. |
 
 ### Note on Flag Compatibility
 - `--branchless` and `--upfront-rules` must be used together for the Stage 2 jump table to function.

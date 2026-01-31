@@ -1,0 +1,39 @@
+# Warp project configuration (schema draft)
+version: 1
+
+language:
+  source: ruby
+  target: crystal
+  ruby_version: "3.4"
+  crystal_version: "1.9"
+
+formatter:
+  mode: preserve # preserve | normalize
+  indent: 2
+  newline: "\n"
+
+linter:
+  enable: true
+  rules:
+    - name: "layout/spacing"
+      enabled: true
+    - name: "style/naming"
+      enabled: true
+
+transpiler:
+  reversible: true
+  lossy_rules:
+    - "eval"
+    - "refinements"
+  sorbet:
+    inline: true
+    sigils: true
+
+mappings:
+  libraries:
+    FileUtils: FileUtils
+    JSON: JSON
+  namespaces:
+    Net::HTTP: HTTP::Client
+  classes:
+    OpenStruct: OpenStruct

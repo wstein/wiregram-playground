@@ -1,8 +1,16 @@
 # typed: strict
 # Simple Ruby file: basic structure
-sig { returns(String) }
+sig { params().returns(String) }
 def hello
-  puts "Hello, World!"
+  "Hello, World!"
 end
 
-hello
+puts hello
+
+
+sig { params(x: Integer).returns(Integer) }
+def square(x)
+  x * x
+end
+
+puts square(5)

@@ -161,6 +161,7 @@ PLATFORMS
 DEPENDENCIES
   cucumber (~> 10.2)
   drb
+  prism (~> 1.8)
   rake (~> 13.0)
   rbs (~> 3.10)
   rspec (~> 3.13)

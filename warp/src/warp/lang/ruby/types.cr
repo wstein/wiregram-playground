@@ -176,6 +176,10 @@ module Warp
         Self
         Super
 
+        # Sorbet / Type Annotations
+        SorbetSig
+        TypeAnnotation
+
         # Trivia markers
         Comment
         Whitespace

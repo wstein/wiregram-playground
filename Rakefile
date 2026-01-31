@@ -304,53 +304,6 @@ namespace :utils do
   end
 end
 
-# Sorbet tasks
-namespace :sorbet do
-  desc 'Initialize Tapioca + Sorbet (runs `tapioca init`)'
-  task :init do
-    puts 'Initializing Tapioca + Sorbet...'
-    sh 'bundle exec tapioca init'
-    puts '✓ Tapioca initialized (check sorbet/tapioca/config.yml, sorbet/tapioca/require.rb and sorbet/rbi/)'
-  end
-
-  desc 'Run Sorbet static type check'
-  task :check do
-    puts 'Running Sorbet typecheck...'
-    sh 'srb tc'
-    puts '✓ Sorbet typecheck passed'
-  end
-
-  desc 'Generate RBI prototypes using Tapioca (gems + dsl)'
-  task :generate, [:mode] do |t, args|
-    puts 'Generating RBI prototypes using Tapioca...'
-
-    mode = args[:mode] || ENV['MODE'] || (ENV['DRY'] ? 'dry' : 'replace')
-
-    # Prepare require.rb to load optional gem parts
-    if mode == 'dry'
-      puts "  [dry] Would run: bundle exec tapioca require && bundle exec tapioca gems #{mode == 'replace' ? '--all' : ''} && bundle exec tapioca dsl"
-      puts "✓ Dry run complete (mode=#{mode})"
-      next
-    end
-
-    puts '  Running tapioca require (generates sorbet/tapioca/require.rb)'
-    sh 'bundle exec tapioca require'
-
-    gem_cmd = mode == 'replace' ? '--all' : ''
-    puts "  Running tapioca gems #{gem_cmd} (generates sorbet/rbi/gems/)"
-    sh "bundle exec tapioca gems #{gem_cmd}".strip
-
-    puts '  Running tapioca dsl (generates sorbet/rbi/dsl/)'
-    sh 'bundle exec tapioca dsl'
-
-    puts "  Checking shims and duplicates (tapioca check-shims)"
-    sh 'bundle exec tapioca check-shims'
-
-    puts "✓ RBI prototypes processed (mode=#{mode})"
-    puts 'Note: Review and refine generated RBIs for accuracy'
-  end
-end
-
 # Development tasks
 namespace :dev do
   desc 'Run interactive console with project loaded'
@@ -488,8 +441,6 @@ task :help do
   puts '  rake dev:console              - Run interactive console'
   puts '  rake dev:check                - Run development checks'
   puts '  rake dev:profile              - Profile performance'
-  puts '  rake sorbet:check             - Run Sorbet typecheck (in Sorbet tasks)'
-  puts '  rake sorbet:generate[mode]    - Generate RBI prototypes (mode: replace, update, dry)'
   puts
   puts 'Other Tasks:'
   puts '  rake clean                    - Clean build artifacts'

@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 # typed: false
 
+begin
+  require 'sorbet-runtime'
+rescue LoadError
+end
+
 module WireGram
   module Core
     # TokenStream provides lazy access to tokens produced by a lexer
