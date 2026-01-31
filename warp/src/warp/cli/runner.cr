@@ -4,9 +4,11 @@ require "file_utils"
 module Warp::CLI
   enum TranspileTarget
     Crystal
+    Ruby
     Rbs
     Rbi
     InjectRbs
+    RoundTrip
   end
 
   class Runner
@@ -29,16 +31,18 @@ Usage:
 
 Targets:
   crystal       Ruby -> Crystal (default)
+  ruby          Crystal -> Ruby
   rbs           Generate .rbs files from Sorbet sigs
   rbi           Generate .rbi files from Sorbet sigs
   inject-rbs    Inject inline # @rbs comments into Ruby source
+  round-trip    Validate round-trip (Ruby <-> Crystal)
 TXT
     end
 
     private def self.transpile_usage : String
       <<-TXT
 Usage:
-  warp transpile [crystal|rbs|rbi|inject-rbs] [options]
+  warp transpile [crystal|ruby|rbs|rbi|inject-rbs|round-trip] [options]
 
 Options:
   -s, --source=PATH       Source file or directory
@@ -57,6 +61,7 @@ TXT
 transpiler:
   include:
     - "**/*.rb"
+    - "**/*.cr"
   exclude:
     - "spec/**"
     - "vendor/**"
@@ -66,6 +71,8 @@ annotations:
   inline_rbs: true
 output:
   directory: "out"
+  ruby_directory: "out/ruby"
+  crystal_directory: "out/crystal"
 YAML
       if File.exists?(config_path)
         puts "Config already exists: #{config_path}"
@@ -85,10 +92,12 @@ YAML
       end
 
       target = case target_name
-               when "crystal", "cr" then TranspileTarget::Crystal
-               when "rbs"           then TranspileTarget::Rbs
-               when "rbi"           then TranspileTarget::Rbi
-               when "inject-rbs"    then TranspileTarget::InjectRbs
+               when "crystal", "cr"   then TranspileTarget::Crystal
+               when "ruby", "rb"      then TranspileTarget::Ruby
+               when "rbs"             then TranspileTarget::Rbs
+               when "rbi"             then TranspileTarget::Rbi
+               when "inject-rbs"      then TranspileTarget::InjectRbs
+               when "round-trip", "rt" then TranspileTarget::RoundTrip
                else
                  puts "Unknown transpile target: #{target_name}"
                  puts transpile_usage
@@ -118,10 +127,20 @@ YAML
 
       config = ConfigLoader.load(config_path)
       output_root = (out_dir || config.output_dir).not_nil!
+      if out_dir.nil?
+        output_root = case target
+                      when TranspileTarget::Ruby
+                        config.ruby_output_dir
+                      when TranspileTarget::Crystal
+                        config.crystal_output_dir
+                      else
+                        config.output_dir
+                      end
+      end
 
-      files = collect_files(source_path, config)
+      files = collect_files(source_path, config, target)
       if files.empty?
-        puts "No Ruby files found."
+        puts "No source files found."
         return 1
       end
 
@@ -132,14 +151,22 @@ YAML
       0
     end
 
-    private def self.collect_files(source_path : String, config : ProjectConfig) : Array(String)
+    private def self.collect_files(source_path : String, config : ProjectConfig, target : TranspileTarget) : Array(String)
       if File.file?(source_path)
         return [source_path]
       end
 
       includes = config.include
       excludes = config.exclude
-      files = includes.flat_map { |g| Dir.glob(g) }.select { |f| f.ends_with?(".rb") }
+      exts = case target
+             when TranspileTarget::Crystal, TranspileTarget::Rbs, TranspileTarget::Rbi, TranspileTarget::InjectRbs
+               [".rb"]
+             when TranspileTarget::Ruby
+               [".cr"]
+             else
+               [".rb", ".cr"]
+             end
+      files = includes.flat_map { |g| Dir.glob(g) }.select { |f| exts.any? { |ext| f.ends_with?(ext) } }
       files = files.reject { |f| excludes.any? { |ex| File.match?(ex, f) } }
       files
     end
@@ -156,8 +183,41 @@ YAML
     )
       source = File.read(path)
       bytes = source.to_slice
-      tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(bytes)
-      return unless lex_error == Warp::Core::ErrorCode::Success
+      case target
+      when TranspileTarget::Ruby
+        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes)
+        if result.error != Warp::Core::ErrorCode::Success
+          puts "Transpile error (Crystal->Ruby): #{path}"
+          result.diagnostics.each { |d| puts "  - #{d}" }
+          return
+        end
+
+        if stdout
+          puts result.output
+        else
+          write_or_print(path, output_root, result.output, ".rb", stdout)
+        end
+        return
+      when TranspileTarget::RoundTrip
+        if path.ends_with?(".rb")
+          result = Warp::Testing::BidirectionalValidator.ruby_to_crystal_to_ruby(source)
+          puts "Round-trip Ruby: #{path} (delta=#{result.formatting_delta})"
+          result.diagnostics.each { |d| puts "  - #{d}" }
+        elsif path.ends_with?(".cr")
+          result = Warp::Testing::BidirectionalValidator.crystal_to_ruby_to_crystal(source)
+          puts "Round-trip Crystal: #{path} (delta=#{result.formatting_delta})"
+          result.diagnostics.each { |d| puts "  - #{d}" }
+        else
+          puts "Skipping unsupported file: #{path}"
+        end
+        return
+      else
+        tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(bytes)
+        if lex_error != Warp::Core::ErrorCode::Success
+          puts "Lex error (Ruby): #{path}"
+          return
+        end
+      end
 
       case target
       when TranspileTarget::Rbs, TranspileTarget::Rbi, TranspileTarget::InjectRbs
@@ -178,6 +238,11 @@ YAML
       else
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
         result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations)
+        if result.error != Warp::Core::ErrorCode::Success
+          puts "Transpile error (Ruby->Crystal): #{path}"
+          result.diagnostics.each { |d| puts "  - #{d}" }
+          return
+        end
         if stdout
           puts result.output
         else

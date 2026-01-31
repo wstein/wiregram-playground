@@ -5,6 +5,8 @@ module Warp::CLI
     getter include : Array(String)
     getter exclude : Array(String)
     getter output_dir : String
+    getter ruby_output_dir : String
+    getter crystal_output_dir : String
     getter rbs_paths : Array(String)
     getter rbi_paths : Array(String)
     getter inline_rbs : Bool
@@ -13,6 +15,8 @@ module Warp::CLI
       @include : Array(String),
       @exclude : Array(String),
       @output_dir : String,
+      @ruby_output_dir : String,
+      @crystal_output_dir : String,
       @rbs_paths : Array(String) = [] of String,
       @rbi_paths : Array(String) = [] of String,
       @inline_rbs : Bool = true,
@@ -29,13 +33,15 @@ module Warp::CLI
         output = data["output"]?.try(&.as_h?)
         annotations = data["annotations"]?.try(&.as_h?)
 
-        include_globs = transpiler.try(&.["include"]?).try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb"]
+        include_globs = transpiler.try(&.["include"]?).try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb", "**/*.cr"]
         exclude_globs = transpiler.try(&.["exclude"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
         output_dir = output.try(&.["directory"]?).try(&.as_s) || "out"
+        ruby_output_dir = output.try(&.["ruby_directory"]?).try(&.as_s) || output_dir
+        crystal_output_dir = output.try(&.["crystal_directory"]?).try(&.as_s) || output_dir
         rbs_paths = annotations.try(&.["rbs_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
         rbi_paths = annotations.try(&.["rbi_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
         inline_rbs = annotations.try(&.["inline_rbs"]?).try(&.as_bool) || true
-        return ProjectConfig.new(include_globs, exclude_globs, output_dir, rbs_paths, rbi_paths, inline_rbs)
+        return ProjectConfig.new(include_globs, exclude_globs, output_dir, ruby_output_dir, crystal_output_dir, rbs_paths, rbi_paths, inline_rbs)
       end
 
       # fallback to warp.yaml if present
@@ -45,16 +51,18 @@ module Warp::CLI
         output = data["output"]?.try(&.as_h?)
         annotations = data["annotations"]?.try(&.as_h?)
 
-        include_globs = transpiler.try(&.["include"]?).try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb"]
+        include_globs = transpiler.try(&.["include"]?).try(&.as_a?).try(&.map(&.as_s)) || ["**/*.rb", "**/*.cr"]
         exclude_globs = transpiler.try(&.["exclude"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
         output_dir = output.try(&.["directory"]?).try(&.as_s) || "out"
+        ruby_output_dir = output.try(&.["ruby_directory"]?).try(&.as_s) || output_dir
+        crystal_output_dir = output.try(&.["crystal_directory"]?).try(&.as_s) || output_dir
         rbs_paths = annotations.try(&.["rbs_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
         rbi_paths = annotations.try(&.["rbi_paths"]?).try(&.as_a?).try(&.map(&.as_s)) || [] of String
         inline_rbs = annotations.try(&.["inline_rbs"]?).try(&.as_bool) || true
-        return ProjectConfig.new(include_globs, exclude_globs, output_dir, rbs_paths, rbi_paths, inline_rbs)
+        return ProjectConfig.new(include_globs, exclude_globs, output_dir, ruby_output_dir, crystal_output_dir, rbs_paths, rbi_paths, inline_rbs)
       end
 
-      ProjectConfig.new(["**/*.rb"], [] of String, "out", [] of String, [] of String, true)
+      ProjectConfig.new(["**/*.rb", "**/*.cr"], [] of String, "out", "out", "out", [] of String, [] of String, true)
     end
   end
 end
