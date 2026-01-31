@@ -1,0 +1,3 @@
+class Object
+  def check: (Integer | String, String?) -> bool
+end

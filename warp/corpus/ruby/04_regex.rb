@@ -1,13 +1,17 @@
-# typed: strict
+# frozen_string_literal: true
+# typed: false
+
+require 'sorbet-runtime'
+
 # Regular expressions
-pattern1 = T.let(/\d+/, Regexp)
-pattern2 = T.let(%r{/path/to/file}, Regexp)
-pattern3 = T.let(/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/, Regexp)
+T.let(/\d+/, Regexp)
+T.let(%r{/path/to/file}, Regexp)
+T.let(/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/, Regexp)
 
 def match_test(string)
-  if string =~ /[0-9]+/
-    puts "Contains digits"
-  end
+  return unless string =~ /[0-9]+/
+
+  puts 'Contains digits'
 end
 
 def gsub_example(text)
@@ -15,5 +19,5 @@ def gsub_example(text)
 end
 
 # Ruby 3.4: Byte-based MatchData
-match = "foo".match(/o/)
+match = 'foo'.match(/o/)
 match.bytebegin(0) #=> 1

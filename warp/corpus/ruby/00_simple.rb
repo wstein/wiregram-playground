@@ -1,12 +1,15 @@
-# typed: strict
+# frozen_string_literal: true
+# typed: false
+
+require 'sorbet-runtime'
+
 # Simple Ruby file: basic structure
-sig { params().returns(String) }
+sig { returns(String) }
 def hello
-  "Hello, World!"
+  'Hello, World!'
 end
 
 puts hello
-
 
 sig { params(x: Integer).returns(Integer) }
 def square(x)

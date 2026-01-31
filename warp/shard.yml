@@ -9,6 +9,8 @@ authors:
 targets:
   warp_bench:
     main: bin/bench.cr
+  warp:
+    main: bin/warp.cr
 
 development_dependencies:
   ameba:

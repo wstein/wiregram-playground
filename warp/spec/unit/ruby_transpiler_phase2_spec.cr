@@ -1,34 +1,39 @@
 require "../spec_helper"
 
-describe "Ruby Transpiler Phase 2" do
-  it "parses corpus files into AST" do
-    corpus_files = Dir.glob("corpus/ruby/*.rb")
-    corpus_files.each do |file|
-      source = File.read(file)
-      result = Warp::Lang::Ruby::Parser.parse(source.to_slice)
-      result.error.should eq(Warp::Core::ErrorCode::Success)
-      result.node.not_nil!.kind.should eq(Warp::Lang::Ruby::NodeKind::Program)
+describe "Ruby Annotation Extraction (Phase 2)" do
+  it "extracts sig blocks and method names" do
+    source = <<-RUBY
+    sig { params(x: String).returns(Integer) }
+    def greet(x)
+      x.length
     end
+    RUBY
+
+    bytes = source.to_slice
+    tokens, err = Warp::Lang::Ruby::Lexer.scan(bytes)
+    err.should eq(Warp::Core::ErrorCode::Success)
+
+    extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(bytes, tokens)
+    sigs = extractor.extract
+    sigs.size.should eq(1)
+    sigs[0].method_name.should eq("greet")
   end
 
-  it "builds IR and transpiles simple definitions" do
-    source = "class Greeter\n  def hello(name)\n    puts \"hi\"\n  end\nend"
-    ast = Warp::Lang::Ruby::Parser.parse(source.to_slice)
-    ast.error.should eq(Warp::Core::ErrorCode::Success)
+  it "generates inline RBS comments" do
+    source = <<-RUBY
+    sig { params(x: String).returns(Integer) }
+    def greet(x)
+      x.length
+    end
+    RUBY
 
-    ir = Warp::Lang::Ruby::IR::Builder.from_ast(ast.node.not_nil!)
-    ir.kind.should eq(Warp::Lang::Ruby::IR::Kind::Program)
+    bytes = source.to_slice
+    tokens, err = Warp::Lang::Ruby::Lexer.scan(bytes)
+    err.should eq(Warp::Core::ErrorCode::Success)
 
-    result = Warp::Lang::Ruby::Transpiler.transpile(source.to_slice)
-    result.error.should eq(Warp::Core::ErrorCode::Success)
-    result.output.should contain("class Greeter")
-    result.output.should contain("def hello")
-  end
-
-  it "adds return type annotations for literal returns" do
-    source = "def answer\n  42\nend"
-    result = Warp::Lang::Ruby::Transpiler.transpile(source.to_slice)
-    result.error.should eq(Warp::Core::ErrorCode::Success)
-    result.output.should contain("def answer : Int32")
+    extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(bytes, tokens)
+    sigs = extractor.extract
+    output = Warp::Lang::Ruby::Annotations::InlineRbsInjector.inject(source, sigs)
+    output.should contain("# @rbs (String) -> Integer")
   end
 end

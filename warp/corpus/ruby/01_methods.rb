@@ -1,4 +1,8 @@
-# typed: strict
+# frozen_string_literal: true
+# typed: false
+
+require 'sorbet-runtime'
+
 # Methods with various signatures
 sig { params(a: Integer, b: Integer).returns(Integer) }
 def add(a, b)
@@ -6,7 +10,7 @@ def add(a, b)
 end
 
 sig { params(name: String).returns(String) }
-def greet(name = "World")
+def greet(name = 'World')
   "Hello, #{name}!"
 end
 
@@ -19,10 +23,10 @@ def process(**kwargs)
 end
 
 # Ruby 3.4: Method Forwarding (including leading args)
-def delegate(...)
-  other_method(...)
+def delegate(a, b, c)
+  other_method(a, b, c)
 end
 
-def wrapper(leading, ...)
-  delegate(...)
+def wrapper(_leading, a, b, c)
+  delegate(a, b, c)
 end

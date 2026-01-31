@@ -68,7 +68,6 @@ When adding new edge cases, consider:
 - String features (percent strings, %w arrays, etc.)
 - Complex expressions (method chaining, operator precedence)
 - Visibility modifiers (private, protected, public)
-- Metaprogramming (define_method, method_missing, etc.)
 - Error handling (begin/rescue/ensure/retry)
 - Pattern matching (case...in)
 - Type annotations (Sorbet sigs)

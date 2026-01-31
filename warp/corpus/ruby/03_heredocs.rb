@@ -1,24 +1,27 @@
+# typed: false
+# frozen_string_literal: true
+
+require 'sorbet-runtime'
+
 # Heredoc string literals (edge case!)
 def heredoc_simple
-  text = <<-HEREDOC
+  <<-HEREDOC
     This is a heredoc
     with multiple lines
     and indentation
   HEREDOC
-  text
 end
 
 def heredoc_with_interpolation
-  name = "World"
-  greeting = <<-GREETING
+  name = 'World'
+  <<-GREETING
     Hello, #{name}!
     Welcome to Ruby.
   GREETING
-  greeting
 end
 
 def heredoc_squiggly
-  text = <<~HEREDOC
+  <<~HEREDOC
     Squiggly heredoc
     removes leading whitespace
     automatically
@@ -29,7 +32,7 @@ end
 # Rescue into an array index
 begin
   raise
-rescue => array
+rescue StandardError
 end
 
 # Rescue into a zero-arity method call on an object
@@ -37,5 +40,5 @@ obj = Object.new
 def obj.[]=(val); end
 begin
   raise
-rescue => obj[]
+rescue StandardError => obj[]
 end

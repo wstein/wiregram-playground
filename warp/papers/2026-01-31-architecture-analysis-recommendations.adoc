@@ -1,0 +1,327 @@
+= Architecture Analysis & Recommendations
+:docdate: 2026-01-31T22:40:00Z
+:author: Warp Team
+:toc: left
+:toclevels: 2
+
+== Overview
+
+This document captures an actionable architecture and implementation plan to move the Ruby→Crystal transpiler from token-level rewrites to a full CST→CST (semantic) transpilation pipeline, plus a recommended project-aware CLI for large-codebase workflows.
+
+Two critical findings:
+- The current pipeline performs token-based rewrites which causes whitespace/trivia and semantic fidelity issues.
+- A CST-to-CST approach (Ruby CST -> semantic analysis -> Crystal CST -> emitter) is necessary for production quality and extensibility.
+
+== Recommended Pipeline
+
+A deterministic, testable, and language-agnostic pipeline in four phases:
+
+. ANALYZE (Ruby Green/Red CST — use Red nodes for traversal)
+* Input: Ruby CST (Green/Red nodes)
+* Approach: Use Red nodes for navigation and semantic extraction — `RedNode` provides parent/child links and convenient traversal — while referencing immutable Green nodes for stable token spans and trivia.
+* Extract: method signatures, Sorbet types, T.let/T.type_alias, class/module structure
+* Output: TranspileContext (immutable semantic map)
+
+. TRANSFORM (Semantic mapping)
+* Input: TranspileContext + transformation rules
+* Map Ruby concepts to target language semantics (Ruby sigs → Crystal method signatures, type mapping, DSLs)
+* Output: TransformationMap (pure, no side-effects)
+
+. BUILD (Crystal CST)
+* Input: TransformationMap
+* Build Crystal GreenNodes (preserve trivia; use TriviaBag for leading/trailing comments and whitespace)
+* Attach type information to nodes (not as lexemes, but as type nodes)
+* Output: Crystal CST Document (Green/Red)
+
+. SERIALIZE (Emit source)
+* Input: Crystal CST Document
+* Serialize to disk preserving formatting and applying target-specific formatting rules
+* Output: production-ready `.cr` files
+
+== Red / Green CST Clarification
+
+Finding: The Red/Green pattern separates immutable token/trivia storage (Green) from navigable trees (Red). This lets us perform semantic analysis on `RedNode` traversal while keeping byte-accurate spans and trivia in immutable `GreenNode`s for reliable emission.
+
+.A Visual Flow (Ruby -> Semantic -> Crystal)
+```mermaid
+flowchart LR
+  RubySource["Ruby Source"] --> Lexer["Lexer (tokens + trivia)"]
+  Lexer --> Parser["CST Parser"]
+  Parser --> RubyGreen["Ruby Green Tree\n(immutable tokens & trivia)"]
+  RubyGreen --> RubyRed["Ruby Red Tree\n(navigation wrapper)"]
+  RubyRed --> SemanticAnalyzer["Semantic Analyzer\n(extract TranspileContext)"]
+  SemanticAnalyzer --> TranspileContext["TranspileContext\n(semantic map)"]
+  TranspileContext --> CrystalBuilder["CrystalCSTBuilder\n(build Crystal Green nodes)"]
+  CrystalBuilder --> CrystalGreen["Crystal Green Tree\n(immutable target nodes)"]
+  CrystalGreen --> CrystalRed["Crystal Red Tree\n(navigation + offsets)"]
+  CrystalRed --> Serializer["Serializer / Emitter"]
+  Serializer --> CrystalSource["Crystal Source (.cr)"]
+```
+
+.A Green vs Red Roles (concept)
+```mermaid
+flowchart TB
+  GreenNode["GreenNode\n- Immutable\n- Token spans\n- Trivia stored\n- Shareable"] --> RedNode["RedNode\n- Parent pointers\n- Offsets/positions\n- Convenient traversal\n- Built on-demand from Green"]
+```
+
+.Bullets
+* Use `RedNode` for semantic traversal: it provides parent/child links, scopes, and convenient navigation methods used by `SemanticAnalyzer`.
+* Use `GreenNode` to read exact byte spans and preserve trivia/comments for re-emission without loss.
+* Build `RedNode` views on-demand to reduce memory overhead: keep `GreenNode`s as the canonical immutable store and derive `RedNode`s when traversal or editing is required.
+
+.Examples / Guidance
+* When extracting types and signatures, traverse the **Ruby Red Tree** and record spans that reference **GreenNode** tokens (for exact positions).
+* When emitting Crystal, construct **Crystal Green Nodes** (with trivia copied/adapted from Ruby GreenNodes), then materialize Crystal RedNodes only as needed for formatting and serialization.
+
+
+[source,crystal]
+----
+# example: builder API sketches
+class CrystalCSTBuilder
+  def method_def(name : String, params : Array(Param), return_type : Type?, body : GreenNode, trivia : TriviaBag) : GreenNode
+  end
+end
+----
+
+== CLI: Options & Recommendation
+
+Three possible CLI styles were considered:
+
+=== Option A — Single-file tool
+*Pros*: Simple, fast to implement.
+*Cons*: Not suitable for multi-file projects; limited configuration.
+
+=== Option B — Project-aware (RECOMMENDED)
+*Pros*: Supports `.warp.yaml`, project-scoped transpile, incremental runs, and CI integration.
+*Cons*: Slightly more implementation effort.
+
+Usage examples:
+
+[source,bash]
+----
+# project initialization
+warp init --from-sorbet
+# transpile entire project
+warp transpile
+# dry-run
+warp transpile --check
+# analyze unsupported constructs
+warp analyze --unsupported-only
+----
+
+=== Option C — LSP Server (Long-term)
+*Pros*: IDE integration and real-time feedback.
+*Cons*: Higher complexity; deferred until CLI stabilizes.
+
+== Configuration (Example `.warp.yaml`)
+
+[source,yaml]
+----
+transpiler:
+  source_language: ruby
+  target_language: crystal
+  include:
+    - app/**/*.rb
+    - lib/**/*.rb
+  exclude:
+    - spec/**
+    - vendor/**
+  type_mapping:
+    Integer: Int32
+    Float: Float64
+    T::Boolean: Bool
+    T::Nil: Nil
+  transformations:
+    remove_sigs: true
+    convert_attr_readers: true
+    remove_program_guards: true
+output:
+  directory: ./src
+  preserve_structure: true
+  dry_run: false
+errors:
+  on_unknown_type: warn
+  fail_on_error: false
+logging:
+  level: info
+  file: .warp.log
+----
+
+== Implementation Roadmap & Priorities
+
+. Phase 1 — Core CST-to-CST (2–3 weeks) — **CRITICAL**
+* Build `SemanticAnalyzer` to extract `TranspileContext` using the Ruby Red/Green CST (use Red nodes for traversal).
+* Implement `CrystalCSTBuilder` that constructs Crystal GreenNodes from semantic mapping.
+* Add serializer/emitter to write Crystal sources.
+
+. Phase 2 — CLI & Project Support (1–2 weeks) — **HIGH**
+* Implement `warp init`, `warp transpile`, `warp analyze`, config validation and logging.
+
+. Phase 3 — Advanced (LSP, incremental) — **MEDIUM**
+* Optional: LSP server, watch mode, incremental caches and performance optimizations.
+
+== Testing Strategy
+
+* Unit tests for: Semantic extraction, Transformer rules, Crystal CST Builder, Serializer.
+* Integration tests: end-to-end on corpus files (must match expected `.cr` output).
+* Red tests: intentionally failing tests for missing features.
+* Performance benchmarks: single-file <100ms; 10K LOC <5s (with parallel workers).
+
+== Risk Assessment & Mitigations
+
+.Risks
+* Trivia loss when building Crystal CST — *Mitigation*: define `TriviaBag` and explicit mappings for comments/whitespace. Test with corpus focusing on formatting preservation.
+* Type information loss during semantic extraction — *Mitigation*: keep detailed `TranspileContext` with source spans; fallback to `Object` and warn.
+* Partial transpilation inconsistency — *Mitigation*: atomic writes (temp file + rename) and `--dry-run` option.
+
+== Success Criteria
+
+* Semantic pipeline implemented and tested end-to-end.
+* Transpiled Crystal code compiles and preserves non-transformed source bytes where unchanged.
+* Integration test suite passes (25/25 currently for Sorbet corpus).
+* CLI tooling supports project workflows and is documented.
+
+== Timeline & Resources
+
+*Estimated MVP*: 3–5 weeks (Phases 1+2).
+*Full package (incl. LSP + extras)*: 7–12 weeks.
+
+== Next Actions (short-term)
+
+1. Implement `SemanticAnalyzer` using Red nodes to traverse the Ruby CST and build an immutable `TranspileContext`.
+2. Implement `CrystalCSTBuilder` and add unit tests for canonical constructs (method defs, class defs, type aliases).
+3. Wire serializer and run corpus integration tests.
+4. Implement `warp init` + `warp transpile` with a basic config loader.
+
+== Questions for reviewers
+
+1. How should Ruby comments in method bodies map to Crystal locations (preserve verbatim or adapt)?
+2. For ambiguous types, prefer `Object` or require explicit mapping by failing with `on_unknown_type: error`?
+3. Should we prioritize incremental cache design in Phase 1 or Phase 2?
+
+== Appendix: Short API sketches
+
+[source,crystal]
+----
+struct TranspileContext
+  method_sigs : Hash(String, MethodSignature)
+  type_annotations : Hash(String, TypeInfo)
+  location_map : Hash(String, SourceLocation)
+end
+
+class CrystalCSTBuilder
+  def method_def(name : String, params : Array(Param), return_type : Type?, body : GreenNode, trivia : TriviaBag) : GreenNode
+  end
+end
+----
+
+== Explicit Recommendation (Clarification)
+
+You're absolutely correct: the current implementation is fundamentally wrong — it performs token-level rewrites on Ruby source instead of building a proper Crystal CST. The following is the explicit, canonical approach and the CLI/implementation guidance you supplied; it has been included verbatim here for clarity and adoption.
+
+=== The Correct Three-Phase Approach
+
+. Phase 1: SEMANTIC ANALYSIS (Read-Only Ruby CST)
+* Extract type information, method signatures, Sorbet constructs
+* Build `TranspileContext` (immutable data structure)
+* Output: Semantic map with no mutations
+
+. Phase 2: TRANSFORMATION (Language Mapping)
+* Map Ruby AST concepts → Crystal AST concepts
+* Apply type mappings (Integer → Int32, etc.)
+* Generate transformation rules
+* Output: Semantic transformation rules
+
+. Phase 3: BUILD CRYSTAL CST (Generate Target Tree)
+* Create Crystal GreenNodes with semantic types
+* Preserve Ruby trivia appropriately
+* Adapt formatting rules for Crystal
+* Output: Complete Crystal CST Document
+
+. Phase 4: SERIALIZE (Emit Source)
+* Walk Crystal CST depth-first
+* Write to `.cr` file with proper formatting
+* Output: Production-ready Crystal source
+
+=== CLI Tool Architecture - Three Options
+
+[cols="1,1,3"]
+|===
+| Option | Rating | Notes
+| Option A: Simple Single-File | 2/5 | Pros: Easy distribution, minimal deps. Cons: No project awareness, limited config. Not recommended for professional use.
+| Option B: Project-Aware with Config | 5/5 | RECOMMENDED — Natural for codebases, persistent config, incremental support. This is what production tools use (TypeScript, Go, Rust tools).
+| Option C: LSP Server | 3/5 | Pros: Real-time IDE feedback. Cons: Complex, requires clients. Nice-to-have for later.
+|===
+
+=== Configuration Schema (`.warp.yaml`)
+
+(Refer to the Configuration section above for examples; keep mappings in YAML for per-project customizations.)
+
+=== Comprehensive CLI Subcommands (suggested)
+
+`warp init`, `warp transpile`, `warp analyze`, `warp config` and utility commands (format, test, status). See the main document's CLI section for exact flags and usage patterns.
+
+=== Implementation Priority Matrix
+
+[cols="20,10,10,10,8"]
+|===
+| Component | Priority | Effort | Duration | Rating
+| Semantic Analyzer | 🔴 CRITICAL | High | 2-3 weeks | 5/5
+| Crystal CST Builder | 🔴 CRITICAL | High | 2-3 weeks | 5/5
+| Serializer | 🔴 CRITICAL | Medium | 1 week | 5/5
+| Project-Aware CLI | 🟡 HIGH | Medium | 1-2 weeks | 4/5
+| Multi-language framework | 🟢 NICE | Medium | 1 week | 3/5
+| LSP Server | 🟢 NICE | High | 2-3 weeks | 3/5
+| Watch mode | 🟢 NICE | Low | 1 week | 2/5
+|===
+
+=== Key Architectural Decisions
+
+[cols="25,15,40"]
+|===
+| Decision | Recommendation | Rationale
+| CST Building | Build Crystal CST from semantic info | Proper transpilation, enables incremental updates
+| CLI Approach | Project-aware with `.warp.yaml` | Professional tools use this, enables batch transpilation
+| Type Mapping | YAML config + extensible registry | Per-project customization without code changes
+| Multi-language | Ruby→Crystal first, extensible later | Core use case, architecture supports others
+| Error Handling | Partial success with detailed report | Production-grade; continues on non-blocking errors
+| Trivia Handling | Preserve Ruby comments, adapt indentation | Maintains readability + source provenance
+|===
+
+=== Risk Mitigation
+
+[cols="20,10,50"]
+|===
+| Risk | Severity | Mitigation
+| Trivia loss in CST build | 🔴 HIGH | Use `TriviaBag` structure; map Ruby→Crystal trivia
+| Type inference failure | 🟡 MEDIUM | Fallback to `Object`; preserve Sorbet comment
+| Partial transpilation inconsistency | 🟡 MEDIUM | Atomic writes (temp+rename); track checksums
+| Performance degradation | 🟡 MEDIUM | Caching + parallel workers; benchmark regularly
+|===
+
+=== Success Metrics
+
+* ✅ All 25 integration tests pass with CST-to-CST approach
+* ✅ `warp transpile` works on entire projects
+* ✅ Single file: <100ms, full project (10K LOC): <5s
+* ✅ Formatted output is production-ready Crystal
+* ✅ Error messages are actionable with line/column info
+* ✅ Configuration is version-controllable and portable
+
+=== Timeline for MVP
+
+[cols="10,40"]
+|===
+| Week | Deliverable
+| Week 1 | Semantic Analyzer + Crystal CST Builder
+| Week 2 | Serializer + integration tests
+| Week 3 | Project-aware CLI (init, transpile, analyze)
+| Week 4 | Documentation + distribution (Homebrew)
+| End of Month | Production-ready MVP
+|===
+
+=== Recommendation
+
+Start with **Option B (Project-Aware CLI)** and implement proper CST-to-CST transpilation — this scales to real codebases and provides a professional user experience.
+
+// end of document

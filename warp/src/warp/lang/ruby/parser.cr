@@ -177,12 +177,12 @@ module Warp
         private def parse_def(sig_meta : Hash(String, String)? = nil) : AstNode
           def_tok = consume(TokenKind::Def)
           skip_trivia
-          
+
           # Handle class methods: def self.method_name or def ClassName.method_name
           receiver = nil
           name_tok = consume_identifier
           name_node = name_tok ? node_from_token(NodeKind::Identifier, name_tok) : node_unknown("<anonymous>")
-          
+
           # Check if followed by dot (class method syntax)
           skip_trivia
           if match(TokenKind::Dot)
@@ -192,7 +192,7 @@ module Warp
             name_tok = consume_identifier
             name_node = name_tok ? node_from_token(NodeKind::Identifier, name_tok) : node_unknown("<anonymous>")
           end
-          
+
           params_node = parse_param_list
           body_node = parse_block_until(TokenKind::End)
           end_tok = consume(TokenKind::End)

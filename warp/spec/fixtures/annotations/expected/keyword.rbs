@@ -1,0 +1,3 @@
+class Object
+  def greet: (name: String, age: Integer) -> void
+end

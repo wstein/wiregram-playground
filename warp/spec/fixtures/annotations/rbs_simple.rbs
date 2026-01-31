@@ -1,0 +1,4 @@
+class User
+  def name: () -> String
+  def self.find: (String) -> User
+end

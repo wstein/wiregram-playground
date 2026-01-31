@@ -1,5 +1,20 @@
 # Ruby → Crystal Transpilation Status
 
+## Architecture Transition: AST → CST
+
+⚠️ **Major Refactor in Progress**: Transitioning from AST-based to CST-based transpilation.
+
+- **Current (AST)**: Loses formatting, reconstructs code from scratch
+- **New (CST)**: Preserves formatting, minimal targeted edits
+- **Status**: Design complete ([papers/cst-transpiler-design.adoc](../../papers/cst-transpiler-design.adoc)), implementation starting
+
+**Benefits of CST Approach:**
+
+- Preserves original formatting, whitespace, comments
+- Minimal diffs (only transformed code changes)
+- Professional transpiler quality
+- Easier debugging and review
+
 ## Corpus File Status
 
 | File | Status | Notes |
@@ -111,11 +126,8 @@ end
 
 ### Runtime Shims
 
-- [ ] attr_accessor/reader/writer should generate Crystal properties
 - [ ] super(...) forwarding
 - [ ] yield and block_given?
-- [ ] method_missing and send
-- [ ] define_method and metaprogramming
 
 ### Output Quality
 

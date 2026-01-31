@@ -1,0 +1,365 @@
+= CST-Based Ruby→Crystal Transpiler Design
+:toc:
+:toclevels: 3
+
+== Overview
+
+This document describes the architecture for refactoring the Ruby→Crystal transpiler from AST-based rendering to CST-based (Concrete Syntax Tree) rendering. The goal is to preserve original formatting, trivia, and lexemes while making minimal targeted transformations.
+
+== Problem Statement
+
+=== Current AST-Based Approach
+
+The current pipeline:
+1. Lexer → Tokens (with positions)
+2. Parser → AST (semantic nodes, **loses trivia**)
+3. IR Builder → IR (further simplification)
+4. Lowering → Crystal AST
+5. Renderer → String output (reconstructed)
+
+**Issues:**
+- AST loses all whitespace, comments, and formatting
+- Renderer reconstructs code from scratch (different style)
+- Cannot preserve original code structure
+- Unnecessary changes make diffs hard to review
+
+=== Desired CST-Based Approach
+
+1. Lexer → Tokens (with positions and trivia)
+2. Parser → **CST** (preserves all tokens and trivia)
+3. Analyzer → Identify transformation spans (sig blocks, method signatures)
+4. Rewriter → Apply minimal edits to token stream
+5. Emitter → Reassemble with preserved trivia
+
+**Benefits:**
+- Preserves original formatting and style
+- Minimal diffs (only transformed code)
+- Easier debugging and review
+- Professional transpiler quality
+
+== Architecture
+
+=== Green/Red Tree Pattern
+
+We'll adopt the existing CST infrastructure's Green/Red pattern:
+
+**GreenNode** (Immutable)::
+- Contains: NodeKind, children, token, leading_trivia
+- Shareable across multiple parents
+- Persistent data structure
+
+**RedNode** (Navigation)::
+- Provides parent/child references
+- Efficient tree traversal
+- Built on-demand from GreenNode
+
+=== Ruby CST Node Types
+
+```crystal
+module Warp::Lang::Ruby::CST
+  enum NodeKind
+    Root
+    MethodDef
+    ClassDef
+    ModuleDef
+    SorbetSig
+    BlockDo
+    BlockBrace
+    Params
+    Body
+    # ... other nodes
+  end
+
+  class GreenNode
+    getter kind : NodeKind
+    getter children : Array(GreenNode)
+    getter token : Token?
+    getter leading_trivia : Array(Token)
+    getter trailing_trivia : Array(Token)?
+  end
+
+  class RedNode
+    getter green : GreenNode
+    getter parent : RedNode?
+  end
+end
+```
+
+=== Parser Changes
+
+The parser will be modified to:
+1. Build CST instead of AST
+2. Attach trivia to nodes
+3. Preserve all tokens
+
+```crystal
+class Parser
+  def parse_program : CST::GreenNode
+    trivia = skip_trivia  # Collect leading trivia
+    children = [] of CST::GreenNode
+
+    while !at_eof?
+      stmt = parse_statement
+      children << stmt if stmt
+    end
+
+    CST::GreenNode.new(CST::NodeKind::Root, children, nil, trivia)
+  end
+
+  def parse_statement : CST::GreenNode?
+    leading_trivia = skip_trivia
+    tok = current
+
+    case tok.kind
+    when TokenKind::Def
+      parse_def(leading_trivia)
+    when TokenKind::Class
+      parse_class(leading_trivia)
+    # ...
+    end
+  end
+end
+```
+
+=== Transformation Strategy
+
+==== Identification Phase
+
+Traverse the CST to identify transformation targets:
+- Sorbet `sig { ... }` blocks before methods
+- Method definitions with type annotations
+- `T.let()` calls
+
+==== Rewrite Phase
+
+For each transformation target:
+1. Calculate the span to replace (start, end positions)
+2. Generate replacement text (minimal Crystal equivalent)
+3. Record the rewrite: `(start, end, replacement)`
+
+Example:
+```ruby
+sig { returns(String) }  # <-- Remove this span
+def hello               # <-- Add ": String" at end
+  "world"
+end
+```
+
+Rewrites:
+- Remove: `[0, 24]` (sig block + newline)
+- Insert: `[def hello]` → `[def hello : String]`
+
+==== Emission Phase
+
+Emit the modified source:
+1. Walk the token stream
+2. For each token:
+   - Skip if in a "remove" span
+   - Emit replacement if at a "replace" position
+   - Otherwise, emit original token text with trivia
+
+=== Minimal Rewriter
+
+```crystal
+module Warp::Lang::Ruby
+  struct Rewrite
+    enum Kind
+      Remove    # Remove span [start, end)
+      Replace   # Replace span with text
+      Insert    # Insert text at position
+    end
+
+    getter kind : Kind
+    getter start : Int32
+    getter end_pos : Int32
+    getter text : String?
+  end
+
+  class Rewriter
+    def initialize(@bytes : Bytes, @tokens : Array(Token))
+      @rewrites = [] of Rewrite
+    end
+
+    def remove(start : Int32, end_pos : Int32)
+      @rewrites << Rewrite.new(Kind::Remove, start, end_pos, nil)
+    end
+
+    def replace(start : Int32, end_pos : Int32, text : String)
+      @rewrites << Rewrite.new(Kind::Replace, start, end_pos, text)
+    end
+
+    def insert(pos : Int32, text : String)
+      @rewrites << Rewrite.new(Kind::Insert, pos, pos, text)
+    end
+
+    def emit : String
+      # Sort rewrites by position
+      sorted = @rewrites.sort_by(&.start)
+
+      # Build output
+      output = String::Builder.new
+      pos = 0
+
+      sorted.each do |rw|
+        # Emit unchanged bytes before this rewrite
+        if rw.start > pos
+          output.write(@bytes[pos, rw.start - pos])
+        end
+
+        case rw.kind
+        when Kind::Remove
+          # Skip this span
+        when Kind::Replace
+          output << rw.text.not_nil!
+        when Kind::Insert
+          output << rw.text.not_nil!
+          # Don't advance pos for inserts
+          next
+        end
+
+        pos = rw.end_pos
+      end
+
+      # Emit remaining bytes
+      if pos < @bytes.size
+        output.write(@bytes[pos, @bytes.size - pos])
+      end
+
+      output.to_s
+    end
+  end
+end
+```
+
+=== Transformation Pipeline
+
+```crystal
+class CSTToCSTTranspiler
+  def self.transpile(bytes : Bytes) : TranspileResult
+    # 1. Parse to CST
+    tokens, lex_err = Lexer.scan(bytes)
+    return error_result(lex_err) unless lex_err.success?
+
+    cst, parse_err = CST::Parser.parse(bytes, tokens)
+    return error_result(parse_err) unless parse_err.success?
+
+    # 2. Analyze and identify transformations
+    analyzer = Analyzer.new(bytes, tokens, cst)
+    transforms = analyzer.analyze
+
+    # 3. Apply rewrites
+    rewriter = Rewriter.new(bytes, tokens)
+    transforms.each do |t|
+      apply_transform(rewriter, t)
+    end
+
+    # 4. Emit
+    output = rewriter.emit
+    TranspileResult.new(output, [], ErrorCode::Success)
+  end
+
+  private def self.apply_transform(rw : Rewriter, t : Transform)
+    case t.kind
+    when TransformKind::SigToTypeAnnotation
+      # Remove sig block
+      rw.remove(t.sig_start, t.sig_end)
+
+      # Add type annotation to method
+      rw.insert(t.method_name_end, " : #{t.return_type}")
+
+    when TransformKind::TLetRemoval
+      # Replace T.let(value, Type) with just value
+      rw.replace(t.start, t.end_pos, t.value_text)
+    end
+  end
+end
+```
+
+== Implementation Plan
+
+=== Phase 1: Foundation (Green/Red Tests)
+- [x] Review existing CST infrastructure
+- [ ] Create Ruby CST types (GreenNode, RedNode)
+- [ ] Write unit tests for CST construction
+- [ ] Implement CST parser for minimal Ruby subset
+
+=== Phase 2: Rewriter (Red Tests)
+- [ ] Implement Rewriter class
+- [ ] Write unit tests for rewrite operations
+- [ ] Test edge cases (overlapping, ordering)
+
+=== Phase 3: Analyzer (Green Tests)
+- [ ] Implement Analyzer to identify sig blocks
+- [ ] Write unit tests for sig detection
+- [ ] Implement transformation descriptors
+
+=== Phase 4: Integration (Green Tests)
+- [ ] Wire up CSTToCSTTranspiler.transpile
+- [ ] Write integration tests
+- [ ] Test on corpus files
+
+=== Phase 5: Refinement (Red → Green)
+- [ ] Fix failing corpus tests
+- [ ] Add more transformation types
+- [ ] Optimize performance
+
+== Test Strategy (Green/Red Concept)
+
+=== Green Tests (Should Pass)
+Tests that validate correct behavior:
+- CST construction preserves all tokens
+- Rewriter emits unchanged source when no rewrites
+- Sig block detection identifies correct spans
+- Type annotations inserted at correct positions
+
+=== Red Tests (Should Fail Initially)
+Tests that expose missing features:
+- Complex sig with params
+- Nested methods
+- Multiple transformations
+- Edge cases (EOF, empty files)
+
+=== TDD Workflow
+1. Write red test (failing)
+2. Implement minimal code to pass
+3. Refactor
+4. Write next red test
+
+== Success Criteria
+
+1. **Fidelity**: Unchanged code preserves exact formatting
+2. **Minimal Diffs**: Only sig blocks and type annotations change
+3. **Correctness**: All corpus files transpile to valid Crystal
+4. **Performance**: Similar speed to AST-based transpiler
+5. **Maintainability**: Clear separation of concerns
+
+== Migration Path
+
+=== Dual Implementation Period
+- Keep both AST and CST transpilers
+- Use `--cst` flag to enable CST mode
+- Compare outputs for validation
+
+=== Gradual Transition
+1. CST for simple cases (methods with sig)
+2. Expand to classes, modules
+3. Handle complex Ruby constructs
+4. Deprecate AST transpiler when CST is complete
+
+=== Rollback Plan
+- Keep AST code until CST proves stable
+- Document differences in output
+- Provide migration guide for users
+
+== Future Enhancements
+
+- **Incremental Transpilation**: Only re-transpile changed methods
+- **Format Preserving Edits**: IDE integration
+- **Source Maps**: Map Crystal output to Ruby input
+- **Batch Transformations**: Optimize multiple files
+
+== References
+
+- Green/Red Trees: https://ericlippert.com/2012/06/08/red-green-trees/
+- Roslyn Architecture: https://github.com/dotnet/roslyn/wiki/Roslyn-Overview
+- Syntax Rewriter Pattern: https://docs.rs/syn/latest/syn/visit_mut/

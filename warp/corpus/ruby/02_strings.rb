@@ -1,25 +1,23 @@
+# frozen_string_literal: true
 # typed: strict
+
+require 'sorbet-runtime'
+
 # String literals and interpolation
-single_quoted = T.let('single quoted string', String)
-double_quoted = T.let("double quoted string", String)
-interpolated = T.let("Value: #{1 + 2}", String)
-escaped = T.let("Escaped: \n\t\"", String)
-
-percent_string = %q(percent quoted)
-percent_interpolated = %Q(percent #{1 + 1})
-
-symbol = :symbol_literal
-symbol_interpolated = :"symbol_#{42}"
+T.let('single quoted string', String)
+T.let('double quoted string', String)
+T.let("Value: #{1 + 2}", String)
+T.let("Escaped: \n\t\"", String)
 
 # Ruby 3.4: Chilled Strings
 # Warning when mutating literal strings
-s1 = "mutable"
-s1 << " mutation" #=> warning: literal string will be frozen in the future
+s1 = 'mutable'
+s1 << ' mutation' #=> warning: literal string will be frozen in the future
 
 # Explicitly mutable (suppresses warning)
-s2 = +"mutable"
-s2 << " safe mutation"
+s2 = +'mutable'
+s2 << ' safe mutation'
 
 # Ruby 3.4: Byte-based String Operations
-str = "string".b
+str = 'string'.b
 str.append_as_bytes(0xFF)

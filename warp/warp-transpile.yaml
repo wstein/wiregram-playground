@@ -1,0 +1,134 @@
+# Warp Transpiler Configuration
+# Defines rules for handling language-specific libraries and imports during transpilation
+
+version: 1.0
+
+# Target languages and their configurations
+targets:
+  crystal:
+    description: "Transpile Ruby (Sorbet) to Crystal with type annotations"
+    target_path: "ports/crystal/" # Output directory for transpiled Crystal files
+
+    # Library handling rules
+    libraries:
+      sorbet-runtime:
+        action: "comment_out"
+        description: "Sorbet runtime is Ruby-specific, comment out for Crystal"
+        pattern: 'require [''"]sorbet-runtime[''"]'
+        replacement: "# require 'sorbet-runtime' # Sorbet is Ruby-specific"
+
+      T::Sig:
+        action: "remove"
+        description: "Remove T::Sig extend declarations (not needed in Crystal)"
+        pattern: "extend T::Sig"
+        replacement: "# extend T::Sig # Sorbet type checking"
+
+    # Type annotation handling
+    type_mappings:
+      Integer: "Int32"
+      String: "String"
+      Boolean: "Bool"
+      Float: "Float64"
+      Array: "Array"
+      Hash: "Hash"
+      Symbol: "Symbol"
+      NilClass: "Nil"
+      "T.nilable": "?"
+      "T.any": "|"
+
+    # Sorbet-specific constructs to handle
+    sorbet_constructs:
+      "T.let":
+        action: "remove_cast"
+        description: "Remove T.let type casts"
+        pattern: "T\\.let\\((.+?),\\s*(.+?)\\)"
+        replacement: "$1"
+
+      "T.must":
+        action: "remove_cast"
+        description: "Remove T.must assertions"
+        pattern: "T\\.must\\((.+?)\\)"
+        replacement: "$1"
+
+      "T.cast":
+        action: "remove_cast"
+        description: "Remove T.cast assertions"
+        pattern: "T\\.cast\\((.+?),\\s*(.+?)\\)"
+        replacement: "$1"
+
+      "T.unsafe":
+        action: "remove_cast"
+        description: "Remove T.unsafe assertions"
+        pattern: "T\\.unsafe\\((.+?)\\)"
+        replacement: "$1"
+
+      "T::Array":
+        action: "map_type"
+        description: "Map T::Array to Array"
+        pattern: "T::Array"
+        replacement: "Array"
+
+      "T::Hash":
+        action: "map_type"
+        description: "Map T::Hash to Hash"
+        pattern: "T::Hash"
+        replacement: "Hash"
+
+    # Keyword argument handling
+    keyword_arguments:
+      enabled: true
+      description: "Convert Ruby keyword args (x:, y:) to Crystal type annotations"
+      example:
+        before: "def method(x:, y:)"
+        after: "def method(x : Type1, y : Type2)"
+
+  ruby:
+    description: "Transpile Sorbet annotations to RBS format (Ruby → Ruby)"
+    target_path: "ports/ruby/" # Output directory for transpiled Ruby files
+
+    libraries:
+      sorbet-runtime:
+        action: "keep"
+        description: "Keep sorbet-runtime for Ruby"
+
+    type_annotations:
+      format: "rbs"
+      description: "Convert Sorbet sig to RBS annotations"
+
+# Global settings
+settings:
+  preserve_comments: true
+  preserve_formatting: true
+  preserve_whitespace: true
+  minimal_changes: true
+
+  # Logging
+  verbose: false
+  debug: false
+
+# Examples
+examples:
+  ruby_to_crystal:
+    description: "Convert Sorbet Ruby to Crystal with types"
+    input: |
+      require 'sorbet-runtime'
+
+      module Example
+        extend T::Sig
+
+        sig { params(x: Integer, y: String).returns(Integer) }
+        def self.add(x, y)
+          T.let(x, Integer) + y.to_i
+        end
+      end
+
+    output: |
+      # require 'sorbet-runtime' # Sorbet is Ruby-specific
+
+      module Example
+        # extend T::Sig # Sorbet type checking
+
+        def self.add(x : Int, y : String)
+          x + y.to_i
+        end
+      end
