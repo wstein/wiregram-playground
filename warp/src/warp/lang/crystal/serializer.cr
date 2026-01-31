@@ -1,9 +1,16 @@
+require "file_utils"
+
 module Warp::Lang::Crystal
   class Serializer
     def self.emit(doc : CST::Document) : String
       builder = String::Builder.new
       write_node(builder, doc.root)
       builder.to_s
+    end
+
+    def self.emit_to_file(doc : CST::Document, path : String) : Nil
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, emit(doc))
     end
 
     private def self.write_node(io : String::Builder, node : CST::RedNode) : Nil

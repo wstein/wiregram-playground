@@ -178,8 +178,23 @@ YAML
       else
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
         result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations)
-        write_or_print(path, output_root, result.output, ".cr", stdout)
+        if stdout
+          puts result.output
+        else
+          out_path = output_path_for(path, output_root, ".cr")
+          if result.crystal_doc
+            Warp::Lang::Crystal::Serializer.emit_to_file(result.crystal_doc.not_nil!, out_path)
+          else
+            write_output(path, output_root, result.output, ".cr")
+          end
+        end
       end
+    end
+
+    private def self.output_path_for(source_path : String, output_root : String, ext : String) : String
+      rel = source_path
+      rel = rel.sub(%r{^\./}, "")
+      File.join(output_root, rel).sub(/\.rb$/, ext)
     end
 
     private def self.write_or_print(source_path : String, output_root : String, content : String, ext : String, stdout : Bool)
@@ -239,9 +254,7 @@ YAML
     end
 
     private def self.write_output(source_path : String, output_root : String, content : String, ext : String)
-      rel = source_path
-      rel = rel.sub(%r{^\./}, "")
-      out_path = File.join(output_root, rel).sub(/\.rb$/, ext)
+      out_path = output_path_for(source_path, output_root, ext)
       FileUtils.mkdir_p(File.dirname(out_path))
       File.write(out_path, content)
     end

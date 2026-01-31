@@ -1,0 +1,1468 @@
+= Comprehensive Architecture Analysis & Recommendations: Crystal to Ruby Transpilation
+:docdate: 2026-01-31
+:author: Warp Architecture Team
+:toc: left
+:toclevels: 3
+:sectnums:
+
+== Executive Summary
+
+This document provides a comprehensive architecture analysis and recommendations for extending the Warp transpiler to support **bidirectional transpilation**, with specific emphasis on the **Crystal → Ruby** direction. Building on the existing Ruby → Crystal pipeline (documented in `2026-01-31-architecture-analysis-recommendations.adoc`), this analysis addresses the unique challenges, architectural patterns, and implementation strategies required to support reverse transpilation while maintaining lossless round-trip fidelity.
+
+=== Key Findings
+
+1. **Asymmetric Translation Challenge**: Crystal → Ruby transpilation is fundamentally more complex than Ruby → Crystal due to Crystal's static type system, compile-time macros, and stricter semantics.
+
+2. **Type Information Loss**: Ruby's dynamic nature means type information from Crystal must be preserved through annotations (RBS, Sorbet sigs) to enable round-trip fidelity.
+
+3. **Macro Expansion Strategy**: Crystal's compile-time macros require either preservation as verbatim blocks or conversion to Ruby metaprogramming equivalents.
+
+4. **Shared Infrastructure**: The existing CST/AST/Tape pipeline can be extended to support Crystal parsing with minimal duplication.
+
+=== Strategic Recommendation
+
+Implement Crystal → Ruby transpilation using a **parallel but symmetric pipeline** that mirrors the Ruby → Crystal architecture:
+
+- **Phase 1**: Crystal CST parsing and semantic analysis
+- **Phase 2**: Type annotation preservation via RBS/Sorbet generation
+- **Phase 3**: Semantic transformation with explicit lossiness tracking
+- **Phase 4**: Ruby CST construction and emission
+- **Phase 5**: Bidirectional validation and round-trip testing
+
+== Current State Assessment
+
+=== Existing Infrastructure (Ruby → Crystal)
+
+[cols="3,2,5",options="header"]
+|===
+|Component |Status |Notes
+|Ruby Lexer |✓ Complete |71 token types, full trivia support
+|Ruby CST Parser |✓ Complete |Green/Red pattern, lossless preservation
+|Semantic Analyzer |⚠ Minimal |Basic annotation extraction only
+|Crystal CST Builder |⚠ Minimal |Method defs only, no full syntax support
+|Crystal Serializer |⚠ Minimal |Basic emission, limited formatting
+|Type Mapping |⚠ Partial |RBS → Crystal types via annotations
+|CLI Tooling |✗ Missing |No `warp` CLI yet (planned)
+|Configuration |⚠ Partial |TranspilerConfig exists but unused
+|Testing |⚠ Partial |25 Sorbet integration tests passing
+|===
+
+=== Gaps for Crystal → Ruby
+
+[cols="3,2,5",options="header"]
+|===
+|Required Component |Status |Priority
+|Crystal Lexer |✗ Missing |**CRITICAL**
+|Crystal CST Parser |✗ Missing |**CRITICAL**
+|Crystal Semantic Analyzer |✗ Missing |**HIGH**
+|Type → Annotation Converter |✗ Missing |**HIGH**
+|Macro Preservation Strategy |✗ Missing |**HIGH**
+|Ruby CST Builder (full) |✗ Missing |**MEDIUM**
+|Ruby Serializer |✗ Missing |**MEDIUM**
+|Bidirectional Test Suite |✗ Missing |**HIGH**
+|===
+
+== Architecture Overview
+
+=== Bidirectional Pipeline Design
+
+.Complete Bidirectional Transpilation Flow
+[source,mermaid]
+----
+flowchart TB
+    subgraph "Ruby → Crystal Pipeline (Existing)"
+        R1[Ruby Source] --> R2[Ruby Lexer]
+        R2 --> R3[Ruby CST Parser]
+        R3 --> R4[Ruby Green/Red Tree]
+        R4 --> R5[Semantic Analyzer]
+        R5 --> R6[TranspileContext]
+        R6 --> R7[Crystal CST Builder]
+        R7 --> R8[Crystal Green Tree]
+        R8 --> R9[Crystal Serializer]
+        R9 --> R10[Crystal Source]
+    end
+    
+    subgraph "Crystal → Ruby Pipeline (New)"
+        C1[Crystal Source] --> C2[Crystal Lexer]
+        C2 --> C3[Crystal CST Parser]
+        C3 --> C4[Crystal Green/Red Tree]
+        C4 --> C5[Semantic Analyzer]
+        C5 --> C6[TranspileContext]
+        C6 --> C7[Type Annotation Generator]
+        C7 --> C8[Ruby CST Builder]
+        C8 --> C9[Ruby Green Tree]
+        C9 --> C10[Ruby Serializer]
+        C10 --> C11[Ruby Source + RBS]
+    end
+    
+    R10 -.->|Round-trip test| C1
+    C11 -.->|Round-trip test| R1
+----
+
+=== Shared Components
+
+.Reusable Infrastructure
+[cols="3,2,5",options="header"]
+|===
+|Component |Shared? |Notes
+|Green/Red CST Pattern |✓ Yes |Both languages use same pattern
+|TranspileContext |✓ Yes |Language-agnostic semantic container
+|Error Handling |✓ Yes |Shared ErrorCode enum
+|Token/Trivia System |✓ Partial |Same concept, language-specific types
+|Serializer Base |✓ Partial |Common emission patterns
+|Test Framework |✓ Yes |Shared test utilities and corpus
+|CLI Infrastructure |✓ Yes |Single `warp` CLI for both directions
+|Configuration |✓ Yes |`.warp.yaml` supports bidirectional config
+|===
+
+== Crystal Language Analysis
+
+=== Lexical Differences from Ruby
+
+[cols="3,3,3,4",options="header"]
+|===
+|Feature |Ruby |Crystal |Transpilation Impact
+|Type Annotations |None (dynamic) |`: Type` syntax |Must convert to RBS/Sorbet
+|Macros |`define_method`, `class_eval` |`macro ... end`, `{{ }}` |Requires special handling
+|Symbols |`:symbol` runtime |`:symbol` compile-time |Semantically different
+|String Interpolation |`#{}` |`#{}` |Direct mapping
+|Proc vs Block |Both exist |More restrictive |May need conversion
+|Null Safety |`nil` checks |`Nil` type + `?` |Type annotations only
+|Union Types |None |`String | Int32` |Convert to RBS unions
+|Generic Types |None |`Array(T)` |Convert to RBS generics
+|Visibility |`private`, `protected` |Stricter scoping |May lose precision
+|Constants |Open, dynamic |Compile-time only |Behavioral differences
+|===
+
+=== Syntax Mapping Table (Crystal → Ruby)
+
+[cols="3,3,2,4",options="header"]
+|===
+|Crystal Construct |Ruby Equivalent |Lossless? |Notes
+|`def foo(x : Int32) : String` |`def foo(x)` + sig |Partial |Type info → Sorbet sig
+|`class Foo(T)` |`class Foo` |No |Generic params → RBS
+|`macro foo ... end` |Comment + verbatim |No |Preserve as text, warn
+|`{{ expr }}` |Eval or comment |No |Macro expansion → comment
+|`lib LibC` |FFI wrapper |No |Requires manual translation
+|`struct Point` |`class Point` |Partial |Value semantics lost
+|`enum Color` |`class Color` |Partial |Type-safe enum → constants
+|`alias Name = Type` |`# type alias` + RBS |Partial |RBS type alias
+|`abstract class` |`class` + comment |No |Abstract semantics lost
+|`getter`, `setter`, `property` |`attr_reader`, etc. |Yes |Direct mapping
+|`pointerof` |N/A |No |No Ruby equivalent
+|`sizeof` |N/A |No |No Ruby equivalent
+|`union` |N/A |No |C union, no Ruby equivalent
+|`annotation` |Comment |No |Compile-time only
+|`@[Attribute]` |Comment |No |Annotations → comments
+|===
+
+=== Type System Mapping
+
+==== Crystal Types → Ruby Annotations
+
+Crystal's static type system must be preserved through Ruby type annotations (RBS and Sorbet) for round-trip fidelity.
+
+.Type Conversion Table
+[cols="3,3,3",options="header"]
+|===
+|Crystal Type |Ruby RBS |Sorbet sig
+|`Int32` |`Integer` |`T.let(..., Integer)`
+|`Int64` |`Integer` |`T.let(..., Integer)`
+|`Float64` |`Float` |`T.let(..., Float)`
+|`String` |`String` |`String`
+|`Bool` |`bool` |`T::Boolean`
+|`Nil` |`nil` |`NilClass`
+|`String \| Nil` |`String?` |`T.nilable(String)`
+|`Array(Int32)` |`Array[Integer]` |`T::Array[Integer]`
+|`Hash(String, Int32)` |`Hash[String, Integer]` |`T::Hash[String, Integer]`
+|`Tuple(String, Int32)` |`[String, Integer]` |`[String, Integer]`
+|`NamedTuple(x: Int32)` |`{ x: Integer }` |`{x: Integer}`
+|`Proc(Int32, String)` |`^(Integer) -> String` |`T.proc.params(arg0: Integer).returns(String)`
+|`Class` |`Class` |`T.class_of(...)`
+|`T.class` (generic) |Class with type param |RBS generic
+|===
+
+==== Type Annotation Strategy
+
+Three-tier approach for preserving type information:
+
+1. **Inline Sorbet sigs** (preferred for methods)
++
+[source,ruby]
+----
+# Crystal:
+def calculate(x : Int32, y : Float64) : String
+  # ...
+end
+
+# Ruby with Sorbet:
+sig { params(x: Integer, y: Float).returns(String) }
+def calculate(x, y)
+  # ...
+end
+----
+
+2. **RBS sidecar files** (for complex types)
++
+[source,rbs]
+----
+# types.rbs
+class Calculator
+  def calculate: (Integer x, Float y) -> String
+end
+----
+
+3. **Inline type comments** (for local variables)
++
+[source,ruby]
+----
+# Crystal:
+x : Int32 = 42
+
+# Ruby:
+x = 42 # : Integer (Crystal type preserved)
+----
+
+=== Macro Handling Strategy
+
+Crystal macros are compile-time code generation, which has no direct Ruby equivalent. We need a multi-strategy approach:
+
+==== Strategy 1: Verbatim Preservation (Safe)
+
+For macros that cannot be translated, preserve as commented Crystal code:
+
+[source,ruby]
+----
+# Crystal:
+macro define_property(name)
+  def {{name}}
+    @{{name}}
+  end
+end
+
+# Ruby transpiled:
+# [CRYSTAL MACRO - NOT EXECUTABLE]
+# macro define_property(name)
+#   def {{name}}
+#     @{{name}}
+#   end
+# end
+# [END CRYSTAL MACRO]
+
+# Expanded form preserved if available:
+def property_name
+  @property_name
+end
+----
+
+==== Strategy 2: Ruby Metaprogramming Conversion (Lossy)
+
+For simple macros, convert to Ruby metaprogramming:
+
+[source,ruby]
+----
+# Crystal:
+macro define_getter(name)
+  def {{name}}
+    @{{name}}
+  end
+end
+
+define_getter :username
+
+# Ruby:
+# Note: Converted from Crystal macro
+define_method :username do
+  instance_variable_get(:@username)
+end
+----
+
+==== Strategy 3: Expansion Annotation
+
+Track macro expansions in metadata for round-trip:
+
+[source,yaml]
+----
+# .warp.macros.yaml (sidecar metadata)
+macros:
+  - source_location: "app/models/user.cr:15"
+    macro_name: "define_property"
+    arguments: ["username"]
+    expanded_code: |
+      def username
+        @username
+      end
+    expansion_hash: "sha256:abc123..."
+----
+
+== Detailed Architecture Design
+
+=== Phase 1: Crystal Lexer and Parser
+
+==== Crystal Token Types (Proposed)
+
+[source,crystal]
+----
+module Warp::Lang::Crystal
+  enum TokenKind
+    # Keywords (57 total)
+    Abstract, Alias, Annotation, As, Asm, Begin, Break, Case, Class,
+    Def, Do, Else, Elsif, End, Ensure, Enum, Extend, False, For, Fun,
+    If, In, Include, Instance_sizeof, Is_a, Lib, Macro, Module, Next,
+    Nil, Of, Out, Pointerof, Private, Protected, Require, Rescue, Return,
+    Select, Self, Sizeof, Struct, Super, Then, True, Type, Typeof, Union,
+    Unless, Until, Verbatim, When, While, With, Yield
+    
+    # Identifiers
+    Identifier       # foo, bar_baz
+    Constant        # Foo, MY_CONST
+    InstanceVar     # @name
+    ClassVar        # @@count
+    GlobalVar       # $global
+    MacroVar        # %macro_var
+    
+    # Literals
+    String          # "hello", 'world'
+    StringInterp    # "hello #{name}"
+    Symbol          # :symbol
+    Number          # 42, 3.14, 0x1A
+    Char            # 'a'
+    Regex           # /pattern/
+    Command         # `ls -la`
+    Heredoc         # <<-EOF
+    
+    # Operators (matching Ruby + Crystal-specific)
+    Plus, Minus, Star, Slash, Percent, StarStar
+    Eq, EqEq, EqEqEq, Neq, Lt, Gt, Le, Ge, Cmp, Match, NotMatch
+    And, Or, Not, AndAnd, OrOr, Ampersand, Pipe, Caret, Tilde
+    LShift, RShift, Question
+    
+    # Delimiters
+    LParen, RParen, LBracket, RBracket, LBrace, RBrace
+    Comma, Dot, DotDot, DotDotDot, Colon, ColonColon, Semicolon
+    Arrow, FatArrow, AtSign
+    
+    # Type-specific
+    TypeDecl        # : Type
+    TypeUnion       # |
+    TypeGeneric     # (T)
+    
+    # Macro-specific
+    MacroStart      # {{
+    MacroEnd        # }}
+    MacroExpr       # {{ expr }}
+    
+    # Trivia
+    Whitespace, Newline, Comment
+    
+    # Special
+    Eof, Error
+  end
+end
+----
+
+==== Crystal CST Node Types
+
+[source,crystal]
+----
+module Warp::Lang::Crystal::CST
+  enum NodeKind
+    Root
+    
+    # Declarations
+    ClassDef        # class Foo ... end
+    ModuleDef       # module Bar ... end
+    StructDef       # struct Point ... end
+    EnumDef         # enum Color ... end
+    LibDef          # lib LibC ... end
+    FunDef          # fun malloc(size : UInt32) : Void*
+    MethodDef       # def foo(x : Int32) : String
+    MacroDef        # macro define_property(name)
+    AliasDef        # alias Name = Type
+    AnnotationDef   # annotation MyAnnotation
+    
+    # Type Expressions
+    TypeDecl        # : Type
+    TypeUnion       # Type1 | Type2
+    TypeGeneric     # Array(Int32)
+    TypePath        # Foo::Bar::Baz
+    TypeNilable     # Type?
+    TypeProc        # Proc(Int32, String)
+    TypeTuple       # Tuple(Int32, String)
+    TypeNamedTuple  # NamedTuple(x: Int32)
+    TypeMetaclass   # Foo.class
+    
+    # Statements
+    Assignment      # x = 5
+    TypedAssignment # x : Int32 = 5
+    IfStatement     # if cond ... end
+    UnlessStatement # unless cond ... end
+    CaseStatement   # case ... when ... end
+    WhileStatement  # while cond ... end
+    UntilStatement  # until cond ... end
+    ForStatement    # for x in range ... end
+    ReturnStatement # return value
+    BreakStatement  # break
+    NextStatement   # next
+    YieldStatement  # yield value
+    
+    # Expressions
+    MethodCall      # obj.method(args)
+    MacroCall       # macro_name arg1, arg2
+    MacroExpr       # {{ expr }}
+    Identifier      # variable
+    Constant        # CONST
+    InstanceVar     # @ivar
+    ClassVar        # @@cvar
+    StringLiteral   # "hello"
+    NumberLiteral   # 42
+    SymbolLiteral   # :symbol
+    ArrayLiteral    # [1, 2, 3]
+    HashLiteral     # {a: 1, b: 2}
+    TupleLiteral    # {1, "two"}
+    NamedTupleLiteral # {x: 1, y: 2}
+    RangeLiteral    # 1..10, 1...10
+    RegexLiteral    # /pattern/
+    ProcLiteral     # ->(x : Int32) { x + 1 }
+    
+    # Blocks
+    Block           # { |x| x + 1 } or do |x| ... end
+    BlockParams     # |x, y|
+    
+    # Operators
+    BinaryOp        # +, -, *, /, etc.
+    UnaryOp         # -, +, !, ~
+    IsA             # is_a?(Type)
+    As              # as Type
+    Typeof          # typeof(expr)
+    Sizeof          # sizeof(Type)
+    Pointerof       # pointerof(@var)
+    
+    # Macros
+    MacroIf         # {% if flag %}
+    MacroFor        # {% for x in collection %}
+    MacroExpression # {{ expression }}
+    MacroVerbatim   # {% verbatim %} ... {% endverbatim %}
+    
+    # Misc
+    Annotation      # @[Attribute]
+    Argument        # method argument
+    Parameter       # method parameter with type
+    Rescue          # rescue Exception => e
+    Ensure          # ensure
+  end
+end
+----
+
+=== Phase 2: Crystal Semantic Analyzer
+
+Build a semantic analyzer that extracts type and structural information from Crystal code:
+
+[source,crystal]
+----
+module Warp::Lang::Crystal
+  class SemanticAnalyzer
+    struct TypeInfo
+      getter name : String
+      getter kind : TypeKind  # :class, :module, :struct, :enum, :alias
+      getter type_params : Array(String)
+      getter super_class : String?
+      getter includes : Array(String)
+      getter extends : Array(String)
+      getter annotations : Array(AnnotationInfo)
+      
+      enum TypeKind
+        Class
+        Module
+        Struct
+        Enum
+        Lib
+        Alias
+      end
+    end
+    
+    struct MethodInfo
+      getter name : String
+      getter params : Array(ParamInfo)
+      getter return_type : String?
+      getter visibility : Visibility
+      getter is_abstract : Bool
+      getter is_class_method : Bool
+      getter generic_params : Array(String)
+      getter annotations : Array(AnnotationInfo)
+      
+      enum Visibility
+        Public
+        Protected
+        Private
+      end
+    end
+    
+    struct ParamInfo
+      getter name : String
+      getter type : String?
+      getter default_value : String?
+      getter is_splat : Bool
+      getter is_double_splat : Bool
+      getter is_block : Bool
+    end
+    
+    struct MacroInfo
+      getter name : String
+      getter params : Array(String)
+      getter body : String
+      getter source_location : SourceLocation
+      getter expansion_sites : Array(MacroExpansionSite)
+    end
+    
+    struct MacroExpansionSite
+      getter location : SourceLocation
+      getter arguments : Array(String)
+      getter expanded_code : String?  # If available
+    end
+    
+    struct AnnotationInfo
+      getter name : String
+      getter args : Hash(String, String)
+    end
+    
+    def analyze(green_root : CST::GreenNode) : TranspileContext
+      red_root = CST::RedNode.new(green_root)
+      
+      # Extract semantic information
+      types = extract_types(red_root)
+      methods = extract_methods(red_root)
+      macros = extract_macros(red_root)
+      constants = extract_constants(red_root)
+      ivars = extract_instance_vars(red_root)
+      cvars = extract_class_vars(red_root)
+      
+      # Build type graph for dependencies
+      type_graph = build_type_graph(types, methods)
+      
+      # Analyze macro usage
+      macro_analysis = analyze_macro_usage(macros)
+      
+      TranspileContext.new(
+        source_lang: :crystal,
+        target_lang: :ruby,
+        types: types,
+        methods: methods,
+        macros: macros,
+        constants: constants,
+        ivars: ivars,
+        cvars: cvars,
+        type_graph: type_graph,
+        macro_analysis: macro_analysis,
+        diagnostics: @diagnostics,
+      )
+    end
+    
+    private def extract_types(root : CST::RedNode) : Hash(String, TypeInfo)
+      # Traverse CST and extract class/module/struct/enum definitions
+      # ...
+    end
+    
+    private def analyze_macro_usage(macros : Array(MacroInfo)) : MacroAnalysis
+      # Determine which macros can be converted vs. preserved
+      # Track expansion sites and dependencies
+      # ...
+    end
+  end
+end
+----
+
+=== Phase 3: Type Annotation Generator
+
+Convert Crystal type information to Ruby annotations:
+
+[source,crystal]
+----
+module Warp::Lang::Ruby
+  class TypeAnnotationGenerator
+    enum AnnotationStyle
+      Sorbet      # Generate Sorbet sigs
+      RBS         # Generate RBS files
+      Inline      # Generate inline comments
+      All         # All of the above
+    end
+    
+    def initialize(@style : AnnotationStyle = AnnotationStyle::All)
+      @sorbet_sigs = [] of String
+      @rbs_definitions = [] of String
+      @inline_comments = Hash(String, String).new
+    end
+    
+    def generate_for_method(method_info : Crystal::SemanticAnalyzer::MethodInfo) : String
+      case @style
+      when .sorbet?, .all?
+        generate_sorbet_sig(method_info)
+      when .rbs?
+        generate_rbs_method(method_info)
+      when .inline?
+        generate_inline_comment(method_info)
+      else
+        ""
+      end
+    end
+    
+    private def generate_sorbet_sig(method : Crystal::SemanticAnalyzer::MethodInfo) : String
+      parts = [] of String
+      
+      # Build params section
+      if method.params.any?
+        param_parts = method.params.map do |param|
+          type = crystal_type_to_sorbet(param.type)
+          "#{param.name}: #{type}"
+        end
+        parts << "params(#{param_parts.join(", ")})"
+      end
+      
+      # Build returns section
+      if return_type = method.return_type
+        parts << "returns(#{crystal_type_to_sorbet(return_type)})"
+      else
+        parts << "void"
+      end
+      
+      "sig { #{parts.join(".")} }"
+    end
+    
+    private def generate_rbs_method(method : Crystal::SemanticAnalyzer::MethodInfo) : String
+      params = method.params.map do |param|
+        type = crystal_type_to_rbs(param.type)
+        default = param.default_value ? " = #{param.default_value}" : ""
+        "#{type} #{param.name}#{default}"
+      end.join(", ")
+      
+      return_type = method.return_type ? crystal_type_to_rbs(method.return_type.not_nil!) : "void"
+      
+      "def #{method.name}: (#{params}) -> #{return_type}"
+    end
+    
+    private def crystal_type_to_sorbet(crystal_type : String?) : String
+      return "T.untyped" unless crystal_type
+      
+      # Handle nilable types
+      if crystal_type.ends_with?("?")
+        inner = crystal_type[0...-1]
+        return "T.nilable(#{crystal_type_to_sorbet(inner)})"
+      end
+      
+      # Handle union types
+      if crystal_type.includes?(" | ")
+        types = crystal_type.split(" | ").map { |t| crystal_type_to_sorbet(t.strip) }
+        return "T.any(#{types.join(", ")})"
+      end
+      
+      # Handle generic types
+      if match = crystal_type.match(/^(\w+)\((.+)\)$/)
+        container = match[1]
+        inner_type = match[2]
+        
+        case container
+        when "Array"
+          return "T::Array[#{crystal_type_to_sorbet(inner_type)}]"
+        when "Hash"
+          if inner_type.includes?(", ")
+            key_type, value_type = inner_type.split(", ", 2)
+            return "T::Hash[#{crystal_type_to_sorbet(key_type)}, #{crystal_type_to_sorbet(value_type)}]"
+          end
+        when "Set"
+          return "T::Set[#{crystal_type_to_sorbet(inner_type)}]"
+        end
+      end
+      
+      # Basic type mappings
+      case crystal_type
+      when "Int32", "Int64", "UInt32", "UInt64"
+        "Integer"
+      when "Float32", "Float64"
+        "Float"
+      when "Bool"
+        "T::Boolean"
+      when "Nil"
+        "NilClass"
+      when "String"
+        "String"
+      when "Symbol"
+        "Symbol"
+      else
+        crystal_type  # Pass through custom types
+      end
+    end
+    
+    private def crystal_type_to_rbs(crystal_type : String?) : String
+      return "untyped" unless crystal_type
+      
+      # Handle nilable types
+      if crystal_type.ends_with?("?")
+        inner = crystal_type[0...-1]
+        return "#{crystal_type_to_rbs(inner)}?"
+      end
+      
+      # Handle union types
+      if crystal_type.includes?(" | ")
+        types = crystal_type.split(" | ").map { |t| crystal_type_to_rbs(t.strip) }
+        return "(#{types.join(" | ")})"
+      end
+      
+      # Handle generic types
+      if match = crystal_type.match(/^(\w+)\((.+)\)$/)
+        container = match[1]
+        inner_type = match[2]
+        
+        case container
+        when "Array"
+          return "Array[#{crystal_type_to_rbs(inner_type)}]"
+        when "Hash"
+          if inner_type.includes?(", ")
+            key_type, value_type = inner_type.split(", ", 2)
+            return "Hash[#{crystal_type_to_rbs(key_type)}, #{crystal_type_to_rbs(value_type)}]"
+          end
+        when "Set"
+          return "Set[#{crystal_type_to_rbs(inner_type)}]"
+        end
+      end
+      
+      # Basic type mappings
+      case crystal_type
+      when "Int32", "Int64", "UInt32", "UInt64"
+        "Integer"
+      when "Float32", "Float64"
+        "Float"
+      when "Bool"
+        "bool"
+      when "Nil"
+        "nil"
+      else
+        crystal_type
+      end
+    end
+  end
+end
+----
+
+=== Phase 4: Ruby CST Builder (Full Implementation)
+
+Extend the existing Ruby CST builder to support complete Ruby syntax generation:
+
+[source,crystal]
+----
+module Warp::Lang::Ruby
+  class CSTBuilder
+    def build_from_crystal_context(context : Crystal::TranspileContext) : CST::Document
+      root_children = [] of CST::GreenNode
+      
+      # Generate requires if needed
+      if context.needs_sorbet?
+        root_children << build_require_node("sorbet-runtime")
+      end
+      
+      # Generate type definitions (classes, modules, structs)
+      context.types.each do |name, type_info|
+        root_children << build_type_definition(type_info, context)
+      end
+      
+      # Generate standalone methods
+      context.methods.select(&.is_top_level?).each do |method|
+        root_children << build_method_with_sig(method, context)
+      end
+      
+      # Generate macro preservation comments
+      context.macros.each do |macro_info|
+        root_children << build_macro_preservation(macro_info)
+      end
+      
+      root = CST::GreenNode.new(CST::NodeKind::Root, root_children)
+      CST::Document.new(context.source.to_slice, CST::RedNode.new(root))
+    end
+    
+    private def build_type_definition(
+      type_info : Crystal::SemanticAnalyzer::TypeInfo,
+      context : Crystal::TranspileContext
+    ) : CST::GreenNode
+      
+      case type_info.kind
+      when .class?
+        build_class_def(type_info, context)
+      when .module?
+        build_module_def(type_info, context)
+      when .struct?
+        # Convert Crystal struct to Ruby class with comment
+        build_struct_as_class(type_info, context)
+      when .enum?
+        build_enum_as_class(type_info, context)
+      when .alias?
+        build_type_alias_comment(type_info)
+      else
+        # Unknown type kind - preserve as comment
+        build_comment_node("# [CRYSTAL] Unknown type: #{type_info.name}")
+      end
+    end
+    
+    private def build_method_with_sig(
+      method : Crystal::SemanticAnalyzer::MethodInfo,
+      context : Crystal::TranspileContext
+    ) : CST::GreenNode
+      
+      children = [] of CST::GreenNode
+      
+      # Generate Sorbet sig if configured
+      if context.config.generate_sorbet_sigs?
+        sig_gen = TypeAnnotationGenerator.new(AnnotationStyle::Sorbet)
+        sig_text = sig_gen.generate_for_method(method)
+        children << build_comment_or_code_node(sig_text)
+      end
+      
+      # Build method definition
+      children << build_method_def_node(method)
+      
+      CST::GreenNode.new(CST::NodeKind::MethodDef, children)
+    end
+    
+    private def build_struct_as_class(
+      struct_info : Crystal::SemanticAnalyzer::TypeInfo,
+      context : Crystal::TranspileContext
+    ) : CST::GreenNode
+      
+      # Add comment about struct -> class conversion
+      comment = build_comment_node(
+        "# [CRYSTAL] Struct converted to class (value semantics not preserved)"
+      )
+      
+      # Build class with note
+      class_node = build_class_def(struct_info, context)
+      
+      CST::GreenNode.new(
+        CST::NodeKind::ClassDef,
+        [comment, class_node]
+      )
+    end
+    
+    private def build_macro_preservation(macro_info : Crystal::SemanticAnalyzer::MacroInfo) : CST::GreenNode
+      comment_lines = [
+        "# [CRYSTAL MACRO - NOT EXECUTABLE]",
+        "# macro #{macro_info.name}(#{macro_info.params.join(", ")})",
+      ]
+      
+      # Add macro body as comments
+      macro_info.body.each_line do |line|
+        comment_lines << "#   #{line}"
+      end
+      
+      comment_lines << "# [END CRYSTAL MACRO]"
+      
+      build_multiline_comment_node(comment_lines)
+    end
+  end
+end
+----
+
+=== Phase 5: Bidirectional Validation
+
+Implement comprehensive round-trip testing:
+
+[source,crystal]
+----
+module Warp::Testing
+  class BidirectionalValidator
+    struct RoundTripResult
+      getter success : Bool
+      getter ruby_source : String
+      getter crystal_source : String
+      getter ruby_to_crystal : TranspileResult
+      getter crystal_to_ruby : TranspileResult
+      getter semantic_equivalence : Bool
+      getter formatting_delta : Int32
+      getter diagnostics : Array(String)
+    end
+    
+    def validate_round_trip_ruby_to_crystal_to_ruby(ruby_source : String) : RoundTripResult
+      # Step 1: Ruby → Crystal
+      r2c = Ruby::CSTToCSTTranspiler.transpile(ruby_source.to_slice)
+      return failed_result(ruby_source, "", r2c, nil) unless r2c.error.success?
+      
+      crystal_output = r2c.output
+      
+      # Step 2: Crystal → Ruby
+      c2r = Crystal::CSTToCSTTranspiler.transpile(crystal_output.to_slice)
+      return failed_result(ruby_source, crystal_output, r2c, c2r) unless c2r.error.success?
+      
+      ruby_output = c2r.output
+      
+      # Step 3: Compare semantic equivalence
+      semantic_eq = compare_semantics(ruby_source, ruby_output)
+      
+      # Step 4: Measure formatting delta
+      delta = measure_formatting_delta(ruby_source, ruby_output)
+      
+      RoundTripResult.new(
+        success: true,
+        ruby_source: ruby_source,
+        crystal_source: crystal_output,
+        ruby_to_crystal: r2c,
+        crystal_to_ruby: c2r,
+        semantic_equivalence: semantic_eq,
+        formatting_delta: delta,
+        diagnostics: collect_diagnostics(r2c, c2r),
+      )
+    end
+    
+    def validate_round_trip_crystal_to_ruby_to_crystal(crystal_source : String) : RoundTripResult
+      # Step 1: Crystal → Ruby
+      c2r = Crystal::CSTToCSTTranspiler.transpile(crystal_source.to_slice)
+      return failed_result("", crystal_source, nil, c2r) unless c2r.error.success?
+      
+      ruby_output = c2r.output
+      
+      # Step 2: Ruby → Crystal
+      r2c = Ruby::CSTToCSTTranspiler.transpile(ruby_output.to_slice)
+      return failed_result("", crystal_source, r2c, c2r) unless r2c.error.success?
+      
+      crystal_output = r2c.output
+      
+      # Step 3: Compare semantic equivalence
+      semantic_eq = compare_semantics(crystal_source, crystal_output)
+      
+      # Step 4: Measure formatting delta
+      delta = measure_formatting_delta(crystal_source, crystal_output)
+      
+      RoundTripResult.new(
+        success: true,
+        ruby_source: ruby_output,
+        crystal_source: crystal_source,
+        ruby_to_crystal: r2c,
+        crystal_to_ruby: c2r,
+        semantic_equivalence: semantic_eq,
+        formatting_delta: delta,
+        diagnostics: collect_diagnostics(r2c, c2r),
+      )
+    end
+    
+    private def compare_semantics(source1 : String, source2 : String) : Bool
+      # Parse both and compare AST structures (ignoring formatting)
+      # This is a complex operation requiring AST normalization
+      # ...
+    end
+    
+    private def measure_formatting_delta(source1 : String, source2 : String) : Int32
+      # Count character differences (excluding whitespace normalization)
+      # ...
+    end
+  end
+end
+----
+
+== Implementation Roadmap
+
+=== Phase 1: Foundation (Weeks 1-3)
+
+**Goals**: Establish Crystal parsing infrastructure
+
+[cols="1,4,3",options="header"]
+|===
+|Week |Task |Deliverable
+|1 |Crystal Lexer implementation |Complete Crystal tokenization
+|1-2 |Crystal CST Parser (basic) |Parse classes, modules, methods
+|2 |Crystal CST Parser (advanced) |Parse macros, annotations, generics
+|3 |Crystal Semantic Analyzer scaffold |Extract types and methods
+|3 |Unit tests for Crystal parsing |95%+ coverage of syntax
+|===
+
+**Success Criteria**:
+- Crystal lexer handles all token types
+- CST parser handles 90%+ of Crystal syntax
+- Can parse real-world Crystal code without errors
+
+=== Phase 2: Type System (Weeks 4-5)
+
+**Goals**: Implement type annotation generation
+
+[cols="1,4,3",options="header"]
+|===
+|Week |Task |Deliverable
+|4 |Type mapping table completion |All Crystal → Ruby type mappings
+|4 |Sorbet sig generator |Generate sigs from Crystal types
+|5 |RBS generator |Generate .rbs files
+|5 |Inline type comment generator |Generate inline annotations
+|5 |Type annotation tests |Comprehensive type mapping tests
+|===
+
+**Success Criteria**:
+- All Crystal primitive types map correctly
+- Generic types convert to RBS/Sorbet equivalents
+- Union types preserved accurately
+
+=== Phase 3: Core Transpilation (Weeks 6-8)
+
+**Goals**: Implement Crystal → Ruby pipeline
+
+[cols="1,4,3",options="header"]
+|===
+|Week |Task |Deliverable
+|6 |Ruby CST Builder (full) |Build complete Ruby AST from Crystal
+|6-7 |Semantic transformation rules |Map Crystal constructs to Ruby
+|7 |Ruby Serializer (full) |Emit idiomatic Ruby code
+|8 |Macro handling strategies |Preserve/convert macros
+|8 |Integration tests |End-to-end transpilation tests
+|===
+
+**Success Criteria**:
+- Can transpile simple Crystal programs
+- Type annotations preserved in output
+- Macros handled gracefully (preserve or convert)
+
+=== Phase 4: Bidirectional Support (Weeks 9-11)
+
+**Goals**: Enable round-trip transpilation
+
+[cols="1,4,3",options="header"]
+|===
+|Week |Task |Deliverable
+|9 |Round-trip test framework |Automated bidirectional validation
+|10 |Semantic equivalence checker |Verify AST-level equivalence
+|10 |Lossiness tracking |Track and report lossy conversions
+|11 |Corpus testing |Test on real-world code
+|11 |Performance optimization |Sub-100ms for small files
+|===
+
+**Success Criteria**:
+- 80%+ round-trip success for basic constructs
+- Lossiness clearly identified and documented
+- Performance targets met
+
+=== Phase 5: Production Readiness (Weeks 12-14)
+
+**Goals**: Polish and documentation
+
+[cols="1,4,3",options="header"]
+|===
+|Week |Task |Deliverable
+|12 |CLI integration |`warp transpile` supports both directions
+|12 |Configuration system |`.warp.yaml` bidirectional config
+|13 |Error handling and diagnostics |Clear error messages
+|13 |Documentation |User guide and API docs
+|14 |Final testing and release |1.0 release candidate
+|===
+
+**Success Criteria**:
+- Professional CLI with good UX
+- Comprehensive documentation
+- Ready for production use
+
+== Configuration Schema
+
+Extend `.warp.yaml` to support bidirectional transpilation:
+
+[source,yaml]
+----
+version: 1
+
+# Project metadata
+project:
+  name: "my-project"
+  source_language: "ruby"  # or "crystal"
+  target_language: "crystal"  # or "ruby"
+  
+# Language-specific versions
+languages:
+  ruby:
+    version: "3.4"
+    style_guide: "rubocop"  # or "standard"
+  crystal:
+    version: "1.9"
+    style_guide: "crystal_format"
+
+# Transpilation settings
+transpiler:
+  direction: "bidirectional"  # "ruby_to_crystal", "crystal_to_ruby", or "bidirectional"
+  
+  # Source patterns
+  include:
+    - "src/**/*.cr"
+    - "lib/**/*.cr"
+    - "app/**/*.rb"
+    - "lib/**/*.rb"
+  exclude:
+    - "spec/**"
+    - "test/**"
+    - "vendor/**"
+  
+  # Type annotation generation
+  annotations:
+    generate_sorbet: true
+    generate_rbs: true
+    inline_comments: false
+    sidecar_files: true  # Generate .rbs files alongside .rb
+  
+  # Type mapping overrides
+  type_mapping:
+    # Crystal → Ruby
+    "Int32": "Integer"
+    "Float64": "Float"
+    "Bool": "T::Boolean"
+    
+    # Ruby → Crystal
+    "Integer": "Int32"  # Default int type
+    "Float": "Float64"
+    "T::Boolean": "Bool"
+  
+  # Macro handling
+  macros:
+    strategy: "preserve"  # "preserve", "convert", or "expand"
+    preserve_as_comments: true
+    try_metaprogramming_conversion: false
+    track_expansions: true
+  
+  # Transformation rules
+  transformations:
+    # Ruby → Crystal
+    remove_sorbet_sigs: true
+    convert_attr_accessors: true
+    remove_program_guards: true
+    
+    # Crystal → Ruby
+    generate_attr_accessors: true
+    convert_structs_to_classes: true
+    preserve_generic_params: "rbs"  # "rbs", "comment", or "ignore"
+  
+  # Lossiness handling
+  lossiness:
+    on_lossy_conversion: "warn"  # "error", "warn", or "silent"
+    track_lossiness: true
+    generate_lossiness_report: true
+    max_lossiness_percentage: 10  # Fail if >10% of constructs are lossy
+
+# Output configuration
+output:
+  directory: "./transpiled"
+  preserve_directory_structure: true
+  generate_metadata: true
+  metadata_format: "yaml"  # or "json"
+  
+  # Ruby output
+  ruby:
+    file_extension: ".rb"
+    sorbet_sig_style: "block"  # "block" or "inline"
+    generate_rbs_directory: "./sig"
+  
+  # Crystal output
+  crystal:
+    file_extension: ".cr"
+    preserve_type_annotations: true
+
+# Error handling
+errors:
+  on_parse_error: "fail"  # "fail", "skip", or "continue"
+  on_unknown_type: "warn"
+  on_macro_expansion_failure: "warn"
+  fail_on_error: false
+
+# Logging
+logging:
+  level: "info"  # "debug", "info", "warn", "error"
+  file: ".warp.log"
+  format: "text"  # "text" or "json"
+  
+# Testing and validation
+validation:
+  enable_round_trip_tests: true
+  semantic_equivalence_check: true
+  max_formatting_delta: 1000  # Characters
+  
+# Performance
+performance:
+  parallel: true
+  max_workers: 4
+  cache_enabled: true
+  cache_directory: ".warp_cache"
+----
+
+== Testing Strategy
+
+=== Test Categories
+
+[cols="3,2,5",options="header"]
+|===
+|Category |Priority |Coverage Target
+|Unit Tests (Crystal Lexer) |CRITICAL |100% token types
+|Unit Tests (Crystal Parser) |CRITICAL |95% syntax nodes
+|Unit Tests (Type Mapping) |HIGH |100% type conversions
+|Integration Tests (Simple) |HIGH |Basic constructs
+|Integration Tests (Complex) |MEDIUM |Real-world patterns
+|Round-Trip Tests |HIGH |Bidirectional equivalence
+|Corpus Tests |MEDIUM |Open-source projects
+|Performance Tests |LOW |Benchmarks
+|===
+
+=== Round-Trip Test Cases
+
+==== Test 1: Simple Method with Types
+
+[source,crystal]
+----
+# Crystal input
+def greet(name : String) : String
+  "Hello, #{name}!"
+end
+----
+
+Expected Ruby output:
+[source,ruby]
+----
+sig { params(name: String).returns(String) }
+def greet(name)
+  "Hello, #{name}!"
+end
+----
+
+Expected round-trip: ✓ Perfect (except whitespace)
+
+==== Test 2: Generic Class
+
+[source,crystal]
+----
+# Crystal input
+class Box(T)
+  getter value : T
+  
+  def initialize(@value : T)
+  end
+end
+----
+
+Expected Ruby output:
+[source,ruby]
+----
+# [CRYSTAL] Generic class Box(T)
+# RBS: class Box[T]
+class Box
+  sig { returns(T.untyped) }  # Generic param lost
+  attr_reader :value
+  
+  sig { params(value: T.untyped).void }
+  def initialize(value)
+    @value = value
+  end
+end
+----
+
+Expected round-trip: ⚠ Lossy (generic parameter context lost)
+
+==== Test 3: Macro Preservation
+
+[source,crystal]
+----
+# Crystal input
+macro define_getter(name)
+  def {{name}}
+    @{{name}}
+  end
+end
+
+define_getter :username
+----
+
+Expected Ruby output:
+[source,ruby]
+----
+# [CRYSTAL MACRO - NOT EXECUTABLE]
+# macro define_getter(name)
+#   def {{name}}
+#     @{{name}}
+#   end
+# end
+# [END CRYSTAL MACRO]
+
+# Macro expansion (if available):
+def username
+  @username
+end
+----
+
+Expected round-trip: ✗ Lossy (macro expansion cannot reverse to macro definition)
+
+==== Test 4: Union Types
+
+[source,crystal]
+----
+# Crystal input
+def parse_value(input : String) : Int32 | Float64 | Nil
+  if input.to_i?
+    input.to_i
+  elsif input.to_f?
+    input.to_f
+  else
+    nil
+  end
+end
+----
+
+Expected Ruby output:
+[source,ruby]
+----
+sig { params(input: String).returns(T.any(Integer, Float, NilClass)) }
+def parse_value(input)
+  if (temp = input.to_i)
+    temp
+  elsif (temp = input.to_f)
+    temp
+  else
+    nil
+  end
+end
+----
+
+Expected round-trip: ⚠ Partial (logic preserved, type union preserved in sig)
+
+=== Performance Benchmarks
+
+[cols="3,2,2,2",options="header"]
+|===
+|File Size |Target Time (Crystal→Ruby) |Target Time (Ruby→Crystal) |Memory Limit
+|< 100 lines |< 50ms |< 50ms |< 10MB
+|100-1000 lines |< 200ms |< 200ms |< 50MB
+|1000-10000 lines |< 2s |< 2s |< 200MB
+|> 10000 lines |< 10s |< 10s |< 1GB
+|===
+
+== Risk Assessment
+
+=== High-Risk Areas
+
+[cols="3,2,5,3",options="header"]
+|===
+|Risk |Probability |Impact |Mitigation Strategy
+|Type information loss |HIGH |HIGH |Comprehensive annotation generation; lossiness tracking
+|Macro expansion complexity |HIGH |MEDIUM |Multiple strategies (preserve, convert, expand); metadata tracking
+|Performance regression |MEDIUM |MEDIUM |Incremental optimization; caching; parallel processing
+|Semantic equivalence gaps |HIGH |HIGH |Extensive testing; clear documentation of limitations
+|Generic type handling |MEDIUM |HIGH |RBS generics; fallback to untyped with warnings
+|Round-trip failure |MEDIUM |HIGH |Lossiness reporting; bidirectional validation suite
+|===
+
+=== Mitigation Details
+
+==== Type Information Loss
+
+**Problem**: Ruby's dynamic nature cannot preserve all Crystal type information in executable code.
+
+**Solutions**:
+1. Generate comprehensive RBS files
+2. Emit Sorbet type signatures
+3. Use inline type comments as fallback
+4. Track type information in sidecar metadata files
+5. Provide clear warnings when types are lost
+
+==== Macro Expansion Complexity
+
+**Problem**: Crystal macros are compile-time code generation; Ruby has no equivalent.
+
+**Solutions**:
+1. **Strategy 1 (Preserve)**: Keep macro definitions as comments, emit expanded code if available
+2. **Strategy 2 (Convert)**: Attempt conversion to Ruby metaprogramming for simple cases
+3. **Strategy 3 (Metadata)**: Store macro information in `.warp.macros.yaml` for round-trip
+4. Provide user configuration to choose strategy
+5. Always warn when macros cannot be faithfully converted
+
+== Success Metrics
+
+=== Quantitative Metrics
+
+[cols="3,2,3",options="header"]
+|===
+|Metric |Target |Measurement Method
+|Syntax Coverage (Crystal) |95% |% of Crystal syntax nodes supported
+|Syntax Coverage (Ruby) |100% |% of Ruby syntax nodes supported
+|Round-trip Success (Basic) |90% |% of basic constructs that round-trip
+|Round-trip Success (Advanced) |70% |% of advanced constructs that round-trip
+|Type Preservation |85% |% of types correctly annotated
+|Performance (< 1000 LOC) |< 200ms |Benchmark suite
+|Memory Usage |< 50MB/1000 LOC |Memory profiling
+|Error Reporting Quality |User satisfaction |User testing feedback
+|===
+
+=== Qualitative Metrics
+
+1. **Code Quality**: Transpiled code is idiomatic and readable
+2. **Documentation**: Comprehensive guides for both directions
+3. **Error Messages**: Clear, actionable error messages
+4. **User Experience**: Intuitive CLI and configuration
+5. **Maintainability**: Code is well-structured and tested
+
+== Future Enhancements
+
+=== Post-1.0 Features
+
+1. **Incremental Transpilation**: Only re-transpile changed files
+2. **LSP Integration**: Real-time transpilation feedback in editor
+3. **Interactive Mode**: Step-through transpilation with decisions
+4. **Multi-file Analysis**: Cross-file type inference and optimization
+5. **Custom Transformations**: User-defined transformation rules
+6. **Migration Toolkit**: Tools for migrating entire projects
+7. **Type Inference**: Infer Ruby types from usage patterns
+8. **Macro Expansion Engine**: Execute Crystal macros during transpilation
+9. **Semantic Optimization**: Optimize output for target language idioms
+10. **Compatibility Shims**: Generate compatibility layers for API differences
+
+=== Research Areas
+
+1. **ML-Assisted Type Inference**: Use machine learning to infer types in Ruby code
+2. **Macro Translation AI**: Train models to convert Crystal macros to Ruby metaprogramming
+3. **Semantic Equivalence Verification**: Formal methods for proving equivalence
+4. **Performance Auto-Tuning**: Automatically optimize transpiled code performance
+5. **Multi-Language Support**: Extend to other languages (TypeScript, Python, etc.)
+
+== Conclusion
+
+Implementing Crystal → Ruby transpilation completes the bidirectional pipeline and enables true round-trip fidelity between the languages. The architecture leverages the existing CST/AST infrastructure while addressing the unique challenges of preserving Crystal's static type system and compile-time macros in Ruby's dynamic environment.
+
+**Key Takeaways**:
+
+1. **Symmetric Pipeline**: Mirror the Ruby → Crystal architecture for consistency
+2. **Type Preservation**: Multiple annotation strategies ensure type information survives
+3. **Lossiness Tracking**: Explicit tracking and reporting of lossy conversions
+4. **Macro Handling**: Multiple strategies for dealing with Crystal's unique macro system
+5. **Comprehensive Testing**: Bidirectional validation ensures quality
+6. **Production Ready**: Clear roadmap to 1.0 release in 14 weeks
+
+=== Recommended Next Steps
+
+1. **Week 1**: Implement Crystal Lexer (foundational)
+2. **Week 2-3**: Implement Crystal CST Parser
+3. **Week 4**: Develop Type Annotation Generator
+4. **Week 5-6**: Build Ruby CST Builder (full implementation)
+5. **Week 7-8**: Integration and testing
+6. **Week 9-11**: Bidirectional validation
+7. **Week 12-14**: Production polish and release
+
+This architecture provides a solid foundation for professional-quality bidirectional transpilation between Crystal and Ruby, with clear paths for future enhancement and optimization.
+
+== Appendices
+
+=== Appendix A: Complete Type Mapping Table
+
+See separate document: `type-mapping-reference.adoc`
+
+=== Appendix B: Macro Conversion Examples
+
+See separate document: `macro-conversion-guide.adoc`
+
+=== Appendix C: Performance Benchmarks
+
+See separate document: `performance-benchmarks.adoc`
+
+=== Appendix D: Round-Trip Test Corpus
+
+See separate document: `round-trip-test-corpus.adoc`
+
+== References
+
+1. `2026-01-31-architecture-analysis-recommendations.adoc` - Ruby → Crystal architecture
+2. `crystal-ruby-transpiler-proposal.adoc` - Original bidirectional proposal
+3. `cst-transpiler-design.adoc` - CST architecture details
+4. `ruby-crystal-language-pipeline.adoc` - Unified pipeline design
+5. Crystal Language Reference: https://crystal-lang.org/reference/
+6. RBS Specification: https://github.com/ruby/rbs
+7. Sorbet Documentation: https://sorbet.org/
