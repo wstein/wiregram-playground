@@ -1,5 +1,8 @@
 require "option_parser"
 require "file_utils"
+require "./progress"
+require "../parallel/cpu_detector"
+require "../parallel/file_processor"
 
 module Warp::CLI
   enum TranspileTarget
@@ -15,6 +18,10 @@ module Warp::CLI
     def self.run(args : Array(String)) : Int32
       return run_init(args[1..]) if args.first? == "init"
       return run_transpile(args[1..]) if args.first? == "transpile"
+      if args.first? == "version" || args.first? == "-v" || args.first? == "--version"
+        puts Warp.version_string
+        return 0
+      end
       if args.first? == "help" || args.first? == "-h" || args.first? == "--help"
         puts usage
         return 0
@@ -28,6 +35,7 @@ module Warp::CLI
 Usage:
   warp init
   warp transpile [target] [options]
+  warp version
 
 Targets:
   crystal       Ruby -> Crystal (default)
@@ -36,6 +44,12 @@ Targets:
   rbi           Generate .rbi files from Sorbet sigs
   inject-rbs    Inject inline # @rbs comments into Ruby source
   round-trip    Validate round-trip (Ruby <-> Crystal)
+
+Commands:
+  init          Create a default .warp.yaml configuration
+  transpile     Transpile between Ruby and Crystal
+  version       Show version information
+  help          Show this help message
 TXT
     end
 
@@ -51,6 +65,7 @@ Options:
   --rbs=PATH              RBS file to load (repeatable)
   --rbi=PATH              RBI file to load (repeatable)
   --inline-rbs=BOOL       Parse inline # @rbs comments (default true)
+  --parallel=N            Use N parallel workers (default: CPU cores)
   --stdout                Write output to stdout
 TXT
     end
@@ -111,6 +126,7 @@ YAML
       extra_rbi = [] of String
       inline_rbs = true
       stdout = false
+      parallel_workers : Int32? = nil
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
@@ -120,6 +136,9 @@ YAML
         p.on("--rbs=PATH", "RBS file to load (repeatable)") { |v| extra_rbs << v }
         p.on("--rbi=PATH", "RBI file to load (repeatable)") { |v| extra_rbi << v }
         p.on("--inline-rbs=BOOL", "Parse inline # @rbs comments (default true)") { |v| inline_rbs = (v != "false") }
+        p.on("--parallel=N", "Use N parallel workers (default: CPU cores)") do |v|
+          parallel_workers = v.to_i? || Warp::Parallel::CPUDetector.cpu_count
+        end
         p.on("--stdout", "Write output to stdout") { stdout = true }
       end
 
@@ -144,9 +163,45 @@ YAML
         return 1
       end
 
-      files.each do |path|
-        process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, stdout)
+      # Determine parallelism
+      workers = if pw = parallel_workers
+                  pw
+                elsif files.size > 4
+                  Warp::Parallel::CPUDetector.cpu_count
+                else
+                  1
+                end
+      workers = 1 if stdout # No parallel when using stdout
+
+      # Show CPU info if using parallel processing
+      if workers > 1
+        puts Warp::Parallel::CPUDetector.summary
+        puts "Using #{workers} parallel workers"
+        puts
       end
+
+      # Show progress for multiple files (unless using stdout)
+      progress = stdout ? nil : (files.size > 1 ? ProgressBar.new(files.size) : nil)
+
+      if workers > 1
+        # Parallel processing
+        processor = Warp::Parallel::FileProcessor.new(workers)
+        idx = Atomic(Int32).new(0)
+
+        processor.process_files(files) do |path|
+          current = idx.add(1)
+          progress.try(&.update(current, path))
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, stdout)
+        end
+      else
+        # Sequential processing
+        files.each_with_index do |path, i|
+          progress.try(&.update(i + 1, path))
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, stdout)
+        end
+      end
+
+      progress.try(&.finish)
 
       0
     end

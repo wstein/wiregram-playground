@@ -1,0 +1,733 @@
+= Warp API Reference
+:toc: left
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+:source-highlighter: rouge
+
+This document provides comprehensive API documentation for the Warp transpiler system.
+
+== Overview
+
+Warp is a bidirectional transpiler between Ruby and Crystal with SIMD-accelerated parsing and incremental compilation support.
+
+*Version*: 0.1.0 +
+*Language*: Crystal 1.19.1+ +
+*Architecture*: ARM64 (NEON) and x86-64 (AVX2/AVX-512)
+
+== Core Modules
+
+=== Warp
+
+The top-level namespace for all Warp components.
+
+[source,crystal]
+----
+module Warp
+  VERSION = "0.1.0"
+
+  def self.version_string : String
+    # Returns full version string including Crystal version
+  end
+end
+----
+
+== Language Support
+
+=== Warp::Lang::Ruby
+
+Ruby language processing infrastructure.
+
+==== Lexer
+
+Token scanner for Ruby source code.
+
+[source,crystal]
+----
+module Warp::Lang::Ruby::Lexer
+  def self.scan(bytes : Bytes) : {Array(Token), ErrorCode}
+    # Scans Ruby source into tokens
+    # Returns: tuple of (tokens, error_code)
+  end
+end
+----
+
+*Token Structure*:
+[source,crystal]
+----
+struct Token
+  property kind : TokenKind        # Token type
+  property start : Int32           # Byte offset in source
+  property length : Int32          # Token length
+  property trivia_start : Int32    # Whitespace before token
+  property trivia_length : Int32   # Whitespace length
+end
+----
+
+*TokenKind Enum*: Identifier, Constant, String, Integer, Float, Symbol, Keyword, Operator, Whitespace, Newline, Comment, etc.
+
+==== CST Parser
+
+Concrete Syntax Tree parser preserving all source information.
+
+[source,crystal]
+----
+module Warp::Lang::Ruby::CST::Parser
+  def self.parse(bytes : Bytes, tokens : Array(Token))
+    : {Document?, ErrorCode}
+    # Parses tokens into CST Document
+  end
+end
+----
+
+==== Transpiler
+
+Ruby → Crystal transpilation engine.
+
+[source,crystal]
+----
+module Warp::Lang::Ruby::CSTToCSTTranspiler
+  def self.transpile(
+    bytes : Bytes,
+    annotations : AnnotationStore? = nil
+  ) : TranspileResult
+    # Transpiles Ruby source to Crystal
+  end
+end
+
+struct TranspileResult
+  property output : String
+  property crystal_doc : Document?
+  property error : ErrorCode
+  property diagnostics : Array(String)
+end
+----
+
+==== Annotations
+
+Type annotation extraction and generation.
+
+[source,crystal]
+----
+# Annotation Store
+class AnnotationStore
+  def add_inline_rbs(method_name : String, sig : SigInfo)
+  def add_rbs(method_name : String, sig : SigInfo)
+  def add_rbi(method_name : String, sig : SigInfo)
+  def find(method_name : String) : SigInfo?
+end
+
+# Signature Information
+struct SigInfo
+  property method_name : String
+  property params : Array(ParamInfo)
+  property return_type : String
+  property type_params : Array(String)
+end
+
+# RBS File Parser
+class RbsFileParser
+  def parse(content : String) : Hash(String, SigInfo)
+end
+
+# RBI File Parser
+class RbiFileParser
+  def parse(content : String) : Hash(String, SigInfo)
+end
+
+# Inline RBS Parser
+class InlineRbsParser
+  def parse(source : String) : Hash(String, SigInfo)
+end
+
+# RBS Generator
+module RbsGenerator
+  def self.rbs_definition(sig : SigInfo) : String
+    # Generates RBS method signature
+  end
+end
+
+# Sorbet RBI Generator
+module SorbetRbiGenerator
+  def self.rbi_definition(sig : SigInfo) : String
+    # Generates Sorbet .rbi signature
+  end
+end
+
+# Inline RBS Injector
+module InlineRbsInjector
+  def self.inject(source : String, sigs : Array(SigInfo)) : String
+    # Injects # @rbs comments into source
+  end
+end
+----
+
+=== Warp::Lang::Crystal
+
+Crystal language processing.
+
+==== Lexer
+
+[source,crystal]
+----
+module Warp::Lang::Crystal::Lexer
+  def self.tokenize(source : String) : Array(Token)
+    # Tokenizes Crystal source
+  end
+end
+----
+
+==== CST Builder
+
+[source,crystal]
+----
+module Warp::Lang::Crystal::CSTBuilder
+  def self.build_document(source : String) : Document
+    # Builds CST from Crystal source
+  end
+end
+----
+
+==== Transpiler
+
+Crystal → Ruby transpilation with Sorbet signatures.
+
+[source,crystal]
+----
+module Warp::Lang::Crystal::CrystalToRubyTranspiler
+  def self.transpile(bytes : Bytes) : TranspileResult
+    # Transpiles Crystal to Ruby with Sorbet sigs
+  end
+end
+----
+
+==== Type System
+
+[source,crystal]
+----
+# Type Mapping
+module Warp::Lang::Crystal::TypeMapping
+  def self.to_sorbet(crystal_type : String) : String
+    # Maps Crystal type to Sorbet equivalent
+  end
+
+  def self.to_rbs(crystal_type : String) : String
+    # Maps Crystal type to RBS equivalent
+  end
+end
+
+# Crystal Signature Builder
+class CrystalSigBuilder
+  def extract_signature(method_def : ASTNode) : SigInfo
+    # Extracts type signature from Crystal method
+  end
+end
+----
+
+== CLI Interface
+
+=== Warp::CLI::Runner
+
+Command-line interface controller.
+
+[source,crystal]
+----
+module Warp::CLI
+  class Runner
+    def self.run(args : Array(String)) : Int32
+      # Main CLI entry point
+      # Returns: exit code (0 = success)
+    end
+  end
+end
+----
+
+*Commands*:
+
+* `warp init` - Create default configuration
+* `warp transpile [target] [options]` - Transpile code
+* `warp version` - Show version
+* `warp help` - Show help
+
+*Transpile Targets*:
+
+* `crystal` / `cr` - Ruby → Crystal
+* `ruby` / `rb` - Crystal → Ruby
+* `rbs` - Generate RBS files
+* `rbi` - Generate RBI files
+* `inject-rbs` - Inject inline RBS comments
+* `round-trip` / `rt` - Validate round-trip
+
+*Options*:
+
+* `-s, --source=PATH` - Source file/directory
+* `-o, --out=DIR` - Output directory
+* `-c, --config=PATH` - Config file
+* `--parallel=N` - Parallel workers
+* `--stdout` - Write to stdout
+* `--rbs=PATH` - Load RBS file
+* `--rbi=PATH` - Load RBI file
+
+=== Configuration
+
+[source,crystal]
+----
+struct ProjectConfig
+  property include : Array(String)           # File globs to include
+  property exclude : Array(String)           # File globs to exclude
+  property output_dir : String               # Default output directory
+  property ruby_output_dir : String          # Ruby-specific output
+  property crystal_output_dir : String       # Crystal-specific output
+  property rbs_paths : Array(String)         # RBS files to load
+  property rbi_paths : Array(String)         # RBI files to load
+  property inline_rbs : Bool                 # Parse inline @rbs comments
+end
+
+class ConfigLoader
+  def self.load(path : String?) : ProjectConfig
+    # Loads configuration from .warp.yaml or warp.yaml
+  end
+end
+----
+
+*Example Configuration*:
+
+[source,yaml]
+----
+transpiler:
+  include:
+    - "**/*.rb"
+    - "**/*.cr"
+  exclude:
+    - "spec/**"
+    - "vendor/**"
+
+annotations:
+  rbs_paths: []
+  rbi_paths: []
+  inline_rbs: true
+
+output:
+  directory: "out"
+  ruby_directory: "out/ruby"
+  crystal_directory: "out/crystal"
+----
+
+=== Progress Indicators
+
+[source,crystal]
+----
+class Warp::CLI::ProgressBar
+  def initialize(total : Int32)
+  def update(current : Int32, file : String? = nil)
+  def increment(file : String? = nil)
+  def finish
+end
+----
+
+*Features*:
+
+* Real-time progress visualization
+* ETA calculation
+* Current file display
+* Automatic CI detection (disabled in CI)
+
+== Parallel Processing
+
+=== CPU Detection
+
+[source,crystal]
+----
+module Warp::Parallel::CPUDetector
+  def self.detect_simd : SIMDCapability
+    # Detects available SIMD instructions
+  end
+
+  def self.is_performance_core? : Bool
+    # Detects P-core vs E-core (Intel)
+  end
+
+  def self.cpu_count : Int32
+    # Returns number of CPU cores
+  end
+
+  def self.summary : String
+    # Returns CPU capability summary
+  end
+end
+
+enum SIMDCapability
+  None
+  SSE42
+  AVX2
+  AVX512
+  NEON
+end
+----
+
+=== Worker Pool
+
+[source,crystal]
+----
+class Warp::Parallel::WorkerPool(T, R)
+  def initialize(worker_count : Int32)
+  def start
+  def stop
+  def submit(data : T, simd_heavy : Bool, &block : T -> R)
+  def next_result : WorkResult(R)?
+  def process_batch(items : Array(T), &block : T -> R)
+    : Array(WorkResult(R))
+end
+
+struct WorkResult(R)
+  property result : R
+  property error : Exception?
+  property worker_id : Int32
+  property duration : Time::Span
+
+  def success? : Bool
+end
+----
+
+*Features*:
+
+* SIMD-aware work distribution
+* Separate queues for SIMD vs scalar work
+* Intel P-core/E-core awareness
+* Channel-based concurrency
+* Error aggregation
+
+=== File Processor
+
+Simplified parallel file processing for CLI.
+
+[source,crystal]
+----
+class Warp::Parallel::FileProcessor
+  def initialize(worker_count : Int32)
+
+  def process_files(files : Array(String), &block : String -> Nil)
+    # Processes files in parallel
+  end
+end
+----
+
+== Incremental Compilation
+
+=== Hasher
+
+[source,crystal]
+----
+module Warp::Incremental::Hasher
+  def self.hash_file(path : String) : String
+    # Computes SHA256 of file
+  end
+
+  def self.hash_bytes(bytes : Bytes) : String
+    # Computes SHA256 of bytes
+  end
+
+  def self.composite_hash(
+    source_hash : String,
+    warp_version : String,
+    config_hash : String,
+    dependency_hashes : Array(String)
+  ) : String
+    # Computes composite cache key
+  end
+end
+----
+
+=== Cache
+
+[source,crystal]
+----
+class Warp::Incremental::Cache
+  def initialize(cache_dir : String = ".warp/cache")
+
+  def lookup(source_path : String, composite_hash : String)
+    : CacheEntry?
+    # Checks cache for valid entry
+  end
+
+  def store(
+    source_path : String,
+    source_hash : String,
+    composite_hash : String,
+    output_content : String,
+    dependencies : Array(String) = [] of String
+  ) : String
+    # Stores transpiled output in cache
+  end
+
+  def invalidate(source_path : String)
+    # Invalidates cached entry
+  end
+
+  def clear
+    # Clears entire cache
+  end
+
+  def stats : String
+    # Returns cache statistics
+  end
+
+  def in_vendor_branch? : Bool
+    # Detects vendor branch workflow
+  end
+end
+
+struct CacheEntry
+  property source_path : String
+  property source_hash : String
+  property composite_hash : String
+  property output_path : String
+  property timestamp : Int64
+  property warp_version : String
+  property dependencies : Array(String)
+
+  def expired?(current_hash : String) : Bool
+end
+----
+
+*Cache Structure*:
+
+----
+.warp/
+  cache/
+    metadata.json              # Cache metadata
+    sha256/
+      ab/
+        cd/
+          abcd1234...          # Cached outputs
+----
+
+== Diagnostics & Error Handling
+
+=== DiagnosticError
+
+Enhanced error reporting with source context.
+
+[source,crystal]
+----
+class Warp::DiagnosticError < Exception
+  property file_path : String?
+  property line : Int32?
+  property column : Int32?
+  property source_snippet : String?
+  property error_type : String
+
+  def self.from_source(
+    message : String,
+    source : Bytes,
+    position : Int32,
+    file_path : String?,
+    error_type : String
+  ) : self
+end
+
+module Warp::Diagnostics
+  def self.lex_error(...) : DiagnosticError
+  def self.parse_error(...) : DiagnosticError
+  def self.transpile_error(...) : DiagnosticError
+  def self.type_error(...) : DiagnosticError
+end
+----
+
+*Error Output Format*:
+
+----
+Error in src/file.rb:45:12
+  43 |   def process
+  44 |     @items.each do |item|
+ → 45 |       unexpected end
+                    ^
+  46 |     end
+  47 |   end
+Unexpected token 'end' - expected expression
+----
+
+== Testing Infrastructure
+
+=== BidirectionalValidator
+
+Round-trip validation testing.
+
+[source,crystal]
+----
+module Warp::Testing
+  class BidirectionalValidator
+    def self.ruby_to_crystal_to_ruby(source : String)
+      : ValidationResult
+      # Ruby → Crystal → Ruby round-trip
+    end
+
+    def self.crystal_to_ruby_to_crystal(source : String)
+      : ValidationResult
+      # Crystal → Ruby → Crystal round-trip
+    end
+  end
+
+  struct ValidationResult
+    property success : Bool
+    property formatting_delta : Float64
+    property diagnostics : Array(String)
+  end
+end
+----
+
+== Extension Points
+
+=== Custom Transformations
+
+[source,crystal]
+----
+# Implement custom Ruby analyzer transformations
+class MyAnalyzer < Warp::Lang::Ruby::Analyzer
+  def analyze : Array(Transformation)
+    # Custom transformation logic
+  end
+end
+
+# Implement custom rewriter logic
+class MyRewriter < Warp::Lang::Ruby::Rewriter
+  def transform(node : ASTNode) : String
+    # Custom rewriting
+  end
+end
+----
+
+=== Plugin Architecture
+
+Future extension point for plugins (Phase 3+).
+
+== Performance Characteristics
+
+=== Throughput Benchmarks
+
+Based on `spec/benchmarks/`:
+
+* *Lexer*: ~140 KB/s average, ~40M tokens/sec
+* *Transpiler*: ~10-50 ms per file (corpus average)
+* *Parallel*: Near-linear scaling up to CPU core count
+* *Cache*: 95%+ hit rate on incremental builds
+
+=== Memory Usage
+
+* Lexer: ~1.5× source file size
+* Parser: ~2-3× source file size
+* Transpiler: ~3-4× source file size (includes output buffers)
+
+=== SIMD Optimization
+
+* ARM NEON: Fully utilized in lexer/scanner
+* x86 AVX2: Detected and used when available
+* Fallback: Scalar implementations for non-SIMD CPUs
+
+== Compatibility
+
+=== Ruby Version Support
+
+* Ruby 2.7+
+* Sorbet type signatures
+* RBS 2.0+
+
+=== Crystal Version Support
+
+* Crystal 1.0+
+* Current: Crystal 1.19.1
+
+=== Platform Support
+
+* macOS (Apple Silicon M-series, Intel)
+* Linux (ARM64, x86-64)
+* BSD (limited testing)
+
+== Best Practices
+
+=== Performance
+
+1. Use `--parallel` for large codebases (>10 files)
+2. Enable incremental cache for iterative development
+3. Exclude unnecessary paths in `.warp.yaml`
+4. Run benchmarks before/after optimizations
+
+=== Type Annotations
+
+1. Prefer inline `# @rbs` comments for Ruby
+2. Use `.rbs` files for shared type definitions
+3. Crystal types are automatically converted to Sorbet
+4. Review generated signatures for accuracy
+
+=== Vendor Branch Workflow
+
+1. Create `vendor/<name>` branch for port updates
+2. Document upstream commit SHA in merge message
+3. Test with `warp transpile round-trip`
+4. Squash-merge to keep history clean
+
+== Troubleshooting
+
+=== Common Issues
+
+*Q: Transpilation fails with type errors*
+
+A: Check that RBS/RBI files are properly loaded with `--rbs` or in config.
+
+*Q: Cache not being used*
+
+A: Verify `.warp/cache/metadata.json` exists and config hasn't changed.
+
+*Q: Parallel processing slower than sequential*
+
+A: For small files (<10), parallel overhead dominates. Use `--parallel=1`.
+
+*Q: SIMD not detected*
+
+A: Check `CPUDetector.summary` output. Some VMs don't expose SIMD flags.
+
+=== Debug Mode
+
+Set environment variables:
+
+* `NO_PROGRESS=1` - Disable progress bars
+* `WARP_DEBUG=1` - Enable verbose logging (future)
+* `CI=1` - Disable interactive features
+
+== Appendices
+
+=== Error Codes
+
+[source,crystal]
+----
+enum ErrorCode
+  Success
+  LexError
+  ParseError
+  TranspileError
+  TypeError
+  ConfigError
+  IOError
+end
+----
+
+=== File Extensions
+
+* `.rb` - Ruby source
+* `.cr` - Crystal source
+* `.rbs` - RBS type definitions
+* `.rbi` - Sorbet type definitions
+* `.yaml` / `.yml` - Configuration
+
+=== Related Documentation
+
+* link:../GUIDE.md[Project Guide] - Development workflow
+* link:todos.adoc[TODOs] - Implementation roadmap
+* link:reference-architecture.adoc[Architecture] - System design
+* link:../README.md[README] - Quick start
+
+---
+
+_API Reference Version: 0.1.0_ +
+_Last Updated: 2026-02-01_ +
+_Crystal Version: 1.19.1_

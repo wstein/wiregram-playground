@@ -1,0 +1,301 @@
+= Warp Project TODOs
+:toc:
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+
+This document tracks all implementation tasks for the Warp transpiler project.
+Updated: February 1, 2026
+
+== Overview
+
+This comprehensive todo list organizes work into phases, tracking implementation status, dependencies, and technical notes for each feature.
+
+== Status Legend
+
+* [.green]#✓# Completed
+* [.yellow]#⧗# In Progress
+* [.gray]#○# Not Started
+* [.red]#✗# Blocked
+
+== Phase 1: Foundation & Quality [.green]#✓#
+
+=== 1.1 Documentation & Onboarding
+
+==== [.green]#✓# Create comprehensive TODO document
+*Status:* Completed +
+*File:* `papers/todos.adoc` +
+*Description:* This document - tracking all tasks in AsciiDoc format +
+*Dependencies:* None
+
+==== [.green]#✓# Fix typo: guild => guide
+*Status:* Completed +
+*Files:* Created `GUIDE.md` +
+*Description:* Created GUIDE.md with project workflow documentation +
+*Dependencies:* None +
+*Effort:* 1/10
+
+==== [.green]#✓# Add Quick Start to README
+*Status:* Completed +
+*File:* `README.md` +
+*Description:* Added installation, basic usage, and configuration examples +
+*Dependencies:* Version flag (#1.2.1) +
+*Effort:* 2/10
+
+==== [.green]#✓# Create ports/README.md
+*Status:* Completed +
+*File:* `ports/README.md` +
+*Description:* Documented all ports with upstream sources, versions, patches +
+*Dependencies:* None +
+*Effort:* 3/10 +
+*Format:* Table with columns: Port | Upstream | Version | Purpose | Patches
+
+==== [.green]#✓# Create API Documentation
+*Status:* Completed +
+*File:* `papers/api-reference.adoc` +
+*Description:* Comprehensive API documentation for all public modules +
+*Dependencies:* None +
+*Effort:* 6/10 +
+*Scope:*
+- Core modules (Lexer, Parser, CST, Transpiler)
+- CLI interfaces
+- Annotation system (RBS, RBI, Sorbet)
+- Testing utilities
+- Configuration system
+- Parallel processing
+- Incremental caching
+
+=== 1.2 CLI Enhancements
+
+==== [.green]#✓# Add --version flag
+*Status:* Completed +
+*Files:* `src/warp/version.cr`, `src/warp/cli/runner.cr` +
+*Description:* Track and display version information +
+*Dependencies:* None +
+*Effort:* 1/10 +
+*Implementation:*
+[source,crystal]
+----
+module Warp
+  VERSION = "0.1.0"
+end
+----
+
+==== [.green]#✓# Generate shell completions
+*Status:* Completed +
+*Files:* `completions/warp.bash`, `completions/warp.zsh` +
+*Description:* Auto-completion for bash and zsh shells +
+*Dependencies:* Version flag, finalized CLI interface +
+*Effort:* 3/10 +
+*Scope:*
+- Complete subcommands (transpile, init, etc.)
+- Complete targets (crystal, ruby, rbs, rbi, etc.)
+- Complete flags (-s, -o, --stdout, etc.)
+- File path completion
+
+==== [.green]#✓# Improve error messages
+*Status:* Completed +
+*Files:* `src/warp/diagnostics.cr` +
+*Description:* Add file paths, line numbers, and code snippets to errors +
+*Dependencies:* None +
+*Effort:* 4/10 +
+*Example Output:*
+----
+Error in corpus/ruby/complex.rb:45:12
+  43 |   def process
+  44 |     @items.each do |item|
+  45 |       unexpected end
+              ^^^^^^^^^^^^
+  46 |     end
+  47 |   end
+Unexpected token 'end' - expected expression
+----
+
+==== [.green]#✓# Add progress indicators
+*Status:* Completed +
+*Files:* `src/warp/cli/progress.cr`, `src/warp/cli/runner.cr` +
+*Description:* Show progress bar when transpiling multiple files +
+*Dependencies:* None +
+*Effort:* 3/10 +
+*Example Output:*
+----
+Transpiling [===>    ] 5/12 files (42%)
+  Current: src/models/user.rb
+----
+
+=== 1.3 Build & Development Tools
+
+==== [.green]#✓# Create Rakefile
+*Status:* Completed +
+*File:* `Rakefile` +
+*Description:* Common tasks for build, test, install, clean +
+*Dependencies:* None +
+*Effort:* 2/10 +
+*Tasks:*
+- `rake build` - Build release binary
+- `rake test` - Run full spec suite
+- `rake test:unit` - Run unit tests only
+- `rake test:integration` - Run integration tests
+- `rake install` - Install to system path
+- `rake clean` - Remove build artifacts
+- `rake benchmark` - Run performance benchmarks
+
+== Phase 2: Performance & Scalability [.green]#✓#
+
+=== 2.1 Benchmarking Infrastructure
+
+==== [.green]#✓# Add performance benchmarks
+*Status:* Completed +
+*Files:* `spec/benchmarks/transpiler_bench.cr`, `spec/benchmarks/lexer_bench.cr` +
+*Description:* Comprehensive benchmark suite for performance tracking +
+*Dependencies:* None +
+*Effort:* 6/10 +
+*Metrics:*
+- Lexer throughput (tokens/sec): ~40M tok/s
+- Parser throughput (nodes/sec)
+- Transpiler throughput (KB/sec): ~140 KB/s
+- Memory usage per file size
+- Baseline: Current corpus files
+- Results: Documented in benchmark output
+
+==== [.gray]#○# Benchmark corpus expansion
+*Status:* Not Started +
+*Files:* `corpus/benchmarks/*.rb`, `corpus/benchmarks/*.cr` +
+*Description:* Add representative files of various sizes (1KB, 10KB, 100KB, 1MB) +
+*Dependencies:* Benchmark infrastructure (#2.1.1) +
+*Effort:* 3/10
+
+=== 2.2 Parallel Processing
+
+==== [.green]#✓# Implement parallel processing
+*Status:* Completed +
+*Files:* `src/warp/parallel/worker_pool.cr`, `src/warp/parallel/cpu_detector.cr`, `src/warp/parallel/file_processor.cr` +
+*Description:* Add --parallel N flag with SIMD-aware worker pool +
+*Dependencies:* Progress indicators (#1.2.4) +
+*Effort:* 7/10 +
+*Architecture:*
+- Worker pool with configurable size
+- SIMD capability detection (AVX2, AVX-512, NEON)
+- Separate queues for SIMD vs scalar workloads
+- Intel P-core/E-core awareness
+- Channel-based work distribution
+- Error aggregation across workers
+- Default: Uses System.cpu_count
+
+=== 2.3 Incremental Transpilation
+
+==== [.green]#✓# Implement incremental transpilation
+*Status:* Completed +
+*Files:* `src/warp/incremental/cache.cr`, `src/warp/incremental/hasher.cr` +
+*Description:* Cache transpiled outputs with checksums, support vendor branch workflow +
+*Dependencies:* None +
+*Effort:* 9/10 +
+*Features:*
+- SHA256 hashing of source files
+- Cache storage in `.warp/cache/`
+- Dependency graph tracking
+- Vendor branch awareness (honor .gitattributes merge strategies)
+- Invalidation on config changes
+- Statistics reporting (cache hits/misses)
+
+*Cache Structure:*
+----
+.warp/
+  cache/
+    metadata.json         # Cache metadata
+    sha256/
+      ab/
+        cd/
+          abcd1234...     # Cached transpilation output
+----
+
+== Phase 3: Advanced Features [.gray]#○#
+
+=== 3.1 Watch Mode
+
+==== [.gray]#○# Implement watch mode
+*Status:* Not Started +
+*Files:* `src/warp/cli/watcher.cr` +
+*Description:* Auto-transpile on file changes +
+*Dependencies:* Progress indicators, parallel processing +
+*Effort:* 5/10
+
+=== 3.2 Language Server Protocol
+
+==== [.gray]#○# LSP server implementation
+*Status:* Not Started +
+*Files:* `src/warp/lsp/` +
+*Description:* Language Server Protocol for IDE integration +
+*Dependencies:* Improved error messages +
+*Effort:* 10/10
+
+=== 3.3 Testing Infrastructure
+
+==== [.gray]#○# Fuzzing tests
+*Status:* Not Started +
+*Files:* `spec/fuzz/` +
+*Description:* Property-based testing for transpiler +
+*Dependencies:* Benchmark infrastructure +
+*Effort:* 7/10
+
+==== [.gray]#○# CI/CD pipeline
+*Status:* Not Started +
+*Files:* `.github/workflows/ci.yml` +
+*Description:* Automated testing on push/PR +
+*Dependencies:* Rakefile +
+*Effort:* 3/10
+
+== Implementation Priority
+
+=== Immediate (Week 1)
+1. Fix typo: guild => guide
+2. Add --version flag
+3. Add Quick Start to README
+4. Create ports/README.md
+5. Create Rakefile
+
+=== Short Term (Week 2-3)
+6. Improve error messages
+7. Add progress indicators
+8. Add performance benchmarks
+9. Generate shell completions
+10. Create API documentation
+
+=== Medium Term (Month 1-2)
+11. Implement parallel processing
+12. Implement incremental transpilation
+
+=== Long Term (Month 3+)
+13. Implement watch mode
+14. CI/CD pipeline
+15. LSP server (research phase)
+16. Fuzzing tests
+
+== Technical Debt & Notes
+
+=== Known Issues
+- [ ] `t1_fixed.cr/` directory causing File.read errors in CLI
+- [ ] Need to filter out directories when collecting files
+- [ ] CLI spec used %w which prevented interpolation
+
+=== Performance Considerations
+- Current corpus transpilation: ~1.8s for 191 examples
+- Target: <1s for full corpus with parallel processing
+- Memory: Track allocation patterns in large file transpilation
+
+=== Documentation Gaps
+- Missing architecture diagrams
+- No deployment guide
+- Limited contributor onboarding beyond GUIDE.md
+
+== References
+
+- link:GUIDE.md[Project Guide]
+- link:READING-GUIDE.adoc[Reading Guide]
+- link:REFACTORING-INDEX.adoc[Refactoring Index]
+- link:papers/reference-architecture.adoc[Reference Architecture]
+- link:papers/performance.adoc[Performance Analysis]
+
+---
+_Document maintained by: Warp Development Team_ +
+_Last updated: 2026-02-01_

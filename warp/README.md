@@ -1,11 +1,78 @@
 # Warp (Crystal)
 
-Working-title PoC for an ARM64-focused JSON parsing stack on Apple Silicon (M-series).
+A high-performance, bidirectional transpiler between Ruby and Crystal with SIMD-accelerated parsing.
 
-This project provides:
+## Quick Start
 
-- A zero-copy, slice-based token iterator in Crystal.
-- SIMD-accelerated stage1 on AArch64 via NEON
+### Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd simdjson
+
+# Build the release binary
+crystal build bin/warp.cr -o bin/warp --release
+
+# Or use directly with crystal run
+crystal run bin/warp.cr -- --version
+```
+
+### Basic Usage
+
+```bash
+# Initialize a new project
+./bin/warp init
+
+# Transpile Ruby → Crystal
+./bin/warp transpile crystal -s myfile.rb -o out/
+
+# Transpile Crystal → Ruby (with Sorbet signatures)
+./bin/warp transpile ruby -s myfile.cr --stdout
+
+# Validate round-trip transpilation
+./bin/warp transpile round-trip -s spec/fixtures/
+
+# Generate RBS type signatures
+./bin/warp transpile rbs -s myfile.rb -o types/
+
+# Show help
+./bin/warp --help
+```
+
+### Configuration
+
+Create a `.warp.yaml` file in your project root:
+
+```yaml
+transpiler:
+  include:
+    - "**/*.rb"
+    - "**/*.cr"
+  exclude:
+    - "spec/**"
+    - "vendor/**"
+
+annotations:
+  rbs_paths: []
+  rbi_paths: []
+  inline_rbs: true
+
+output:
+  directory: "out"
+  ruby_directory: "out/ruby"
+  crystal_directory: "out/crystal"
+```
+
+## About
+
+This project provides a complete transpilation pipeline between Ruby and Crystal, including:
+
+- Zero-copy, SIMD-accelerated lexing and parsing
+- Bidirectional Ruby ↔ Crystal transpilation
+- Sorbet/RBS type signature generation and injection
+- Round-trip validation
+- Incremental compilation with caching
 
 ## Architecture Overview
 
