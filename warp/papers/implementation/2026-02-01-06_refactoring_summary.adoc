@@ -98,13 +98,13 @@ Existing JSON parser continues to use:
 == Documentation
 
 **New Guides Created**:
-1. `papers/implementation-plan.adoc` (400+ lines)
+1. `papers/2026-01-30-06_implementation_plan.adoc` (400+ lines)
    - Detailed breakdown of Suggestion #1 and #2
    - 6-phase roadmap for Ruby and Crystal support
    - Risk mitigation strategies
    - Timeline estimates (2-3 weeks per phase)
 
-2. `papers/multi-language-guide.adoc` (300+ lines)
+2. `papers/2026-01-30-05_multi_language_guide.adoc` (300+ lines)
    - Developer quick reference
    - Step-by-step guide for adding new languages
    - Testing guidelines

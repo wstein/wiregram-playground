@@ -1,8 +1,8 @@
 = Warp JSONC Support Notes (PoC)
 Werner Stein
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Abstract
 This note summarizes JSONC support in Warp, focusing on comment-preserving CST parsing and how JSONC flows map into tape/DOM pipelines.
 

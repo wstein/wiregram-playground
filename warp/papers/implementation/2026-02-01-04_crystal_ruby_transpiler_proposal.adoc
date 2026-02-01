@@ -1,8 +1,8 @@
 = Proposal: Non-Destructive Bidirectional Crystal <=> Ruby Transpiler
 Werner Stein
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Abstract
 This proposal outlines a non-destructive, bidirectional transpiler between Crystal and Ruby. The design prioritizes round-trip fidelity, preserving formatting, comments, and ambiguous constructs by using a lossless CST plus a language-neutral semantic IR with explicit fallback nodes.
 

@@ -4,8 +4,8 @@
 :toclevels: 3
 :sectnums:
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Quick Reference Guide
 
 This document provides a quick-reference summary of the four architectural alternatives evaluated for the Warp (Crystal) SIMD implementation.
@@ -517,9 +517,9 @@ Based on the architectural review, the board recommends:
 
 == Additional Resources
 
-- **Full Review**: See [architectural-review-minutes.adoc](architectural-review-minutes.adoc)
+- **Full Review**: See [2026-01-23-02_architectural_review_minutes.adoc](2026-01-23-02_architectural_review_minutes.adoc)
 - **RFC**: See [simd-architecture-rfc.adoc](simd-architecture-rfc.adoc)
-- **ADR**: See [simd-architecture-adr.adoc](simd-architecture-adr.adoc)
+- **ADR**: See [2026-01-28-02_simd_architecture_adr.adoc](2026-01-28-02_simd_architecture_adr.adoc)
 
 ---
 

@@ -17,9 +17,9 @@
 
 | File | Purpose | Lines | Status |
 |------|---------|-------|--------|
-| `papers/implementation-plan.adoc` | Multi-phase roadmap (6 phases) | 400+ | ✓ Complete |
-| `papers/multi-language-guide.adoc` | Developer quick reference | 300+ | ✓ Complete |
-| `papers/REFACTORING-SUMMARY.adoc` | This refactoring's summary | 250+ | ✓ Complete |
+| `papers/2026-01-30-06_implementation_plan.adoc` | Multi-phase roadmap (6 phases) | 400+ | ✓ Complete |
+| `papers/2026-01-30-05_multi_language_guide.adoc` | Developer quick reference | 300+ | ✓ Complete |
+| `papers/2026-02-01-06_refactoring_summary.adoc` | This refactoring's summary | 250+ | ✓ Complete |
 
 == Modified Files
 
@@ -54,10 +54,10 @@ src/warp/
 └── ... (other modules unchanged)
 
 papers/
-├── implementation-plan.adoc            ← NEW
-├── multi-language-guide.adoc           ← NEW
-├── REFACTORING-SUMMARY.adoc            ← NEW
-├── ruby-crystal-language-pipeline.adoc (unchanged, reviewed)
+├── 2026-01-30-06_implementation_plan.adoc            ← NEW
+├── 2026-01-30-05_multi_language_guide.adoc           ← NEW
+├── 2026-02-01-06_refactoring_summary.adoc            ← NEW
+├── 2026-01-30-04_ruby_crystal_language_pipeline.adoc (unchanged, reviewed)
 └── ... (other papers unchanged)
 ```
 
@@ -78,16 +78,16 @@ $ crystal build src/warp.cr --no-codegen
 
 == Quick Links
 
-- [Implementation Plan](papers/implementation-plan.adoc) - Multi-phase roadmap
-- [Developer Guide](papers/multi-language-guide.adoc) - Add new languages
-- [Refactoring Summary](papers/REFACTORING-SUMMARY.adoc) - Full details
+- [Implementation Plan](papers/2026-01-30-06_implementation_plan.adoc) - Multi-phase roadmap
+- [Developer Guide](papers/2026-01-30-05_multi_language_guide.adoc) - Add new languages
+- [Refactoring Summary](papers/2026-02-01-06_refactoring_summary.adoc) - Full details
 - [Ruby Prototype](src/warp/lang/ruby/tape_prototype.cr) - Feasibility study
 
 == Next: Phase 2
 
 **Ruby Lexer Implementation** (estimated 2-3 weeks)
 
-See [Implementation Plan](papers/implementation-plan.adoc) for details.
+See [Implementation Plan](papers/2026-01-30-06_implementation_plan.adoc) for details.
 
 Priority tasks:
 1. Create `src/warp/lang/ruby/lexer.cr`

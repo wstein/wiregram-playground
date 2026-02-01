@@ -1,8 +1,8 @@
 = Warp Formatting Performance Study (PoC)
 Werner Stein
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Abstract
 This paper evaluates four formatting paths in the Warp PoC: tape-based, DOM-based, CST-based, and AST-based pretty printers. Benchmarks are run with max optimization on two JSON datasets. The results show that tape-based formatting provides the highest throughput and lowest latency, especially in the parse+format path.
 

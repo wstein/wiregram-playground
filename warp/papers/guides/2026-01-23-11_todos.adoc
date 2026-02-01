@@ -24,7 +24,7 @@ This comprehensive todo list organizes work into phases, tracking implementation
 
 ==== [.green]#✓# Create comprehensive TODO document
 *Status:* Completed +
-*File:* `papers/todos.adoc` +
+*File:* `papers/2026-01-23-11_2026-01-23-11_todos.adoc` +
 *Description:* This document - tracking all tasks in AsciiDoc format +
 *Dependencies:* None
 
@@ -52,7 +52,7 @@ This comprehensive todo list organizes work into phases, tracking implementation
 
 ==== [.green]#✓# Create API Documentation
 *Status:* Completed +
-*File:* `papers/api-reference.adoc` +
+*File:* `papers/2026-01-23-06_api_reference.adoc` +
 *Description:* Comprehensive API documentation for all public modules +
 *Dependencies:* None +
 *Effort:* 6/10 +
@@ -292,9 +292,9 @@ Transpiling [===>    ] 5/12 files (42%)
 
 - link:GUIDE.md[Project Guide]
 - link:READING-GUIDE.adoc[Reading Guide]
-- link:REFACTORING-INDEX.adoc[Refactoring Index]
-- link:papers/reference-architecture.adoc[Reference Architecture]
-- link:papers/performance.adoc[Performance Analysis]
+- link:2026-01-30-08_refactoring_index.adoc[Refactoring Index]
+- link:papers/2026-01-28-01_reference_architecture.adoc[Reference Architecture]
+- link:papers/2026-01-30-01_performance_study.adoc[Performance Analysis]
 
 ---
 _Document maintained by: Warp Development Team_ +

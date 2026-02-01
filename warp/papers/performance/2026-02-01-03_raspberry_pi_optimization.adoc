@@ -823,9 +823,9 @@ Worst Performance:  Pi 1 (ARMv6) ................ 0.05-0.1 GB/s
 
 === Related Warp Documentation
 
-* `papers/amd-avx512-optimization.adoc` - Vendor-specific SIMD optimization
-* `papers/architecture-alternatives-summary.adoc` - Multi-platform architecture
-* `papers/performance.adoc` - General performance analysis
+* `papers/2026-02-01-02_amd_avx512_optimization.adoc` - Vendor-specific SIMD optimization
+* `papers/2026-01-23-03_architecture_alternatives_summary.adoc` - Multi-platform architecture
+* `papers/2026-01-30-01_performance_study.adoc` - General performance analysis
 
 == Implementation and Validation Results
 

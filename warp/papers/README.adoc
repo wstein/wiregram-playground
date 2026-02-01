@@ -1,0 +1,106 @@
+= Warp Documentation Index
+:doctype: article
+:toc: left
+:toclevels: 3
+
+== Overview
+
+This directory contains the comprehensive technical documentation for the Warp SIMD project, ranging from architectural proposals and ADRs to performance studies and implementation guides.
+
+== Documentation Hierarchy
+
+=== 🏗️ Architecture
+*Core design decisions, proposals, and reviews.*
+
+* **Executive Summary**: [architecture/2026-01-23-01_executive_summary.adoc](architecture/2026-01-23-01_executive_summary.adoc) - High-level decision summary for stakeholders.
+* **Reference Architecture**: [architecture/2026-01-28-01_reference_architecture.adoc](architecture/2026-01-28-01_reference_architecture.adoc) - Current system design and pipeline.
+* **Analysis & Recommendations (2026-01-31)**: [architecture/2026-01-31-01_architecture_analysis_recommendations.adoc](architecture/2026-01-31-01_architecture_analysis_recommendations.adoc) - Latest architectural health check.
+* **Architecture Alternatives**: [architecture/2026-01-23-03_architecture_alternatives_summary.adoc](architecture/2026-01-23-03_architecture_alternatives_summary.adoc) - Comparison of SIMD approaches.
+* **Visual Reference**: [architecture/2026-01-23-04_architecture_visual_reference.adoc](architecture/2026-01-23-04_architecture_visual_reference.adoc) - Diagrams and flowcharts.
+* **Architectural Review Minutes**: [architecture/2026-01-23-02_architectural_review_minutes.adoc](architecture/2026-01-23-02_architectural_review_minutes.adoc) - Detailed meeting records.
+* **Expert Panel Review**: [architecture/2026-01-23-05_expert_panel_review.adoc](architecture/2026-01-23-05_expert_panel_review.adoc) - Deep dives from specialist perspectives.
+* **Original SIMD ADR**: [architecture/2026-01-28-02_simd_architecture_adr.adoc](architecture/2026-01-28-02_simd_architecture_adr.adoc) - Foundation decision records.
+
+=== 🛠️ Implementation
+*Technical specs, transpiler design, and project structure.*
+
+* **Implementation Plan**: [implementation/2026-01-30-06_implementation_plan.adoc](implementation/2026-01-30-06_implementation_plan.adoc) - Roadmaps and milestones.
+* **Crystal <=> Ruby Transpiler**: [implementation/2026-02-01-04_crystal_ruby_transpiler_proposal.adoc](implementation/2026-02-01-04_crystal_ruby_transpiler_proposal.adoc) - Bidirectional transpilation design.
+* **CST Transpiler Design**: [implementation/2026-01-31-03_cst_transpiler_design.adoc](implementation/2026-01-31-03_cst_transpiler_design.adoc) - Concrete Implementation of the CST mapper.
+* **Language Pipeline**: [implementation/2026-01-30-04_ruby_crystal_language_pipeline.adoc](implementation/2026-01-30-04_ruby_crystal_language_pipeline.adoc) - Unified CST/AST/Tape flow.
+* **JSONC Support**: [implementation/2026-01-30-02_jsonc_support_notes.adoc](implementation/2026-01-30-02_jsonc_support_notes.adoc) - Handling comments and extensions.
+* **Project Structure ADR**: [architecture/2026-01-29-01_adr_project_structure.adoc](architecture/2026-01-29-01_adr_project_structure.adoc) - Rationale for the current directory layout.
+* **Stage 2 ADR**: [architecture/2026-01-29-02_adr_stage2_whitespace_structurals.adoc](architecture/2026-01-29-02_adr_stage2_whitespace_structurals.adoc) - Handling structural elements.
+* **Structure Review Minutes**: [architecture/2026-01-29-03_structure_review_minutes.adoc](architecture/2026-01-29-03_structure_review_minutes.adoc) - Reorganization meeting notes.
+
+=== ⚡ Performance
+*Benchmarks, optimization notes, and comparative studies.*
+
+* **Performance Analysis**: [performance/2026-01-30-01_performance_study.adoc](performance/2026-01-30-01_performance_study.adoc) - General SIMD and GC optimization notes.
+* **SIMD Optimization Notes**: [performance/2026-02-01-01_simd_optimization_notes.adoc](performance/2026-02-01-01_simd_optimization_notes.adoc) - Deep dive into backend-specific optimizations.
+* **Formatting Performance Study**: [performance/2026-01-30-03_formatting_performance_study.adoc](performance/2026-01-30-03_formatting_performance_study.adoc) - Comparative study of DOM vs Tape vs CST.
+* **AMD AVX-512**: [performance/2026-02-01-02_amd_avx512_optimization.adoc](performance/2026-02-01-02_amd_avx512_optimization.adoc) - Optimization for Zen 4/5.
+* **Raspberry Pi**: [performance/2026-02-01-03_raspberry_pi_optimization.adoc](performance/2026-02-01-03_raspberry_pi_optimization.adoc) - ARM specific paths.
+
+=== 🧪 Testing
+*Validation strategies and quality assurance.*
+
+* **Testing Strategy**: [testing/2026-01-23-08_testing_strategy.adoc](testing/2026-01-23-08_testing_strategy.adoc) - Overview of unit, integration, and fuzz testing.
+* **Integration Status**: [testing/2026-02-01-05_integration_test_status.adoc](testing/2026-02-01-05_integration_test_status.adoc) - Current test coverage.
+
+=== 📖 Guides
+*Developer onboarding and multi-language support.*
+
+* **Quick Start**: [implementation/2026-01-23-07_quickstart.adoc](implementation/2026-01-23-07_quickstart.adoc) - Get up and running in 5 minutes.
+* **Contributor Guide**: [guides/2026-01-23-09_contributing_guide.adoc](guides/2026-01-23-09_contributing_guide.adoc) - Coding standards and PR process.
+* **Project Guide**: [guides/2026-01-23-10_project_guide.adoc](guides/2026-01-23-10_project_guide.adoc) - Navigating the codebase.
+* **Multi-Language Support**: [guides/2026-01-30-05_multi_language_guide.adoc](guides/2026-01-30-05_multi_language_guide.adoc) - Working with Ruby/Crystal interoperability.
+* **Todos**: [guides/2026-01-23-11_todos.adoc](guides/2026-01-23-11_todos.adoc) - Roadmap and pending tasks.
+
+* **Multi-Language Guide**: [guides/multi-language-guide.adoc](guides/multi-language-guide.adoc) - Working with Ruby and Crystal concurrently.
+
+== Quick Start Paths
+
+=== New Stakeholders (15m)
+1. [Executive Summary](architecture/executive-summary.adoc)
+2. [Visual Reference](architecture/architecture-visual-reference.adoc)
+
+=== Core Developers (1h)
+1. [Reference Architecture](architecture/reference-architecture.adoc)
+2. [Implementation Plan](implementation/implementation-plan.adoc)
+3. [Language Pipeline](implementation/ruby-crystal-language-pipeline.adoc)
+
+=== Performance Engineers (45m)
+1. [SIMD Optimization Notes](performance/simd-optimization-notes.adoc)
+2. [Expert Panel (Assembly section)](architecture/expert-panel-review.adoc)
+
+== Decision Summary
+
+[cols="1,2,1,1"]
+|===
+|Alternative |Description |Rating |Decision
+
+|Alternative 1
+|Monolithic Backend
+|⭐⭐⭐⭐ (7/10)
+|❌ Rejected
+
+|Alternative 2
+|Layered Runtime Selection
+|⭐⭐⭐⭐⭐ (9/10)
+|✅ Approved (Fallback)
+
+|Alternative 3
+|Compile-Time Specialization
+|⭐⭐⭐ (6/10)
+|❌ Rejected
+
+|Alternative 4
+|Hybrid Approach
+|⭐⭐⭐⭐⭐ (9/10)
+|✅ **PRIMARY RECOMMENDATION**
+|===
+
+---
+_Documentation Index v1.1_
+_Last Updated: February 2026_

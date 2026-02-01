@@ -7,8 +7,8 @@
 :revdate: 2026-01-28
 :revnumber: 1.0
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 [abstract]
 == Abstract
 
@@ -171,9 +171,9 @@ Aligns with the architectural review plan:
 == References
 
 - Review index: [README.adoc](README.adoc)
-- Executive summary: [executive-summary.adoc](executive-summary.adoc)
-- Alternatives summary: [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc)
-- Meeting minutes: [architectural-review-minutes.adoc](architectural-review-minutes.adoc)
-- Visual reference: [architecture-visual-reference.adoc](architecture-visual-reference.adoc)
+- Executive summary: [2026-01-23-01_executive_summary.adoc](2026-01-23-01_executive_summary.adoc)
+- Alternatives summary: [2026-01-23-03_architecture_alternatives_summary.adoc](2026-01-23-03_architecture_alternatives_summary.adoc)
+- Meeting minutes: [2026-01-23-02_architectural_review_minutes.adoc](2026-01-23-02_architectural_review_minutes.adoc)
+- Visual reference: [2026-01-23-04_architecture_visual_reference.adoc](2026-01-23-04_architecture_visual_reference.adoc)
 - Current Stage 1 code: `src/warp/lexer/structural_scan.cr`
 - Current NEON masks: `src/warp/backend/neon_masks.cr`

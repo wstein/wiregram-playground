@@ -144,7 +144,7 @@ end
 === Modified Files
 
 * `src/warp.cr` - Added CST module requires
-* `papers/cst-transpiler-design.adoc` - Architecture documentation
+* `papers/2026-01-31-03_cst_transpiler_design.adoc` - Architecture documentation
 * `README.md` - CST architecture section
 * `corpus/ruby/TRANSPILATION_STATUS.md` - Status update
 

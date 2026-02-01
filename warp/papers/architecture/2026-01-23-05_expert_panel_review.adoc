@@ -4,8 +4,8 @@
 :toclevels: 4
 :sectnums:
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Expert Panel Composition
 
 [cols="1,3"]

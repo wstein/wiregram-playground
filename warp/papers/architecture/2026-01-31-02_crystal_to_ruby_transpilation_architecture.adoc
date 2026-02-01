@@ -7,7 +7,7 @@
 
 == Executive Summary
 
-This document provides a comprehensive architecture analysis and recommendations for extending the Warp transpiler to support **bidirectional transpilation**, with specific emphasis on the **Crystal → Ruby** direction. Building on the existing Ruby → Crystal pipeline (documented in `2026-01-31-architecture-analysis-recommendations.adoc`), this analysis addresses the unique challenges, architectural patterns, and implementation strategies required to support reverse transpilation while maintaining lossless round-trip fidelity.
+This document provides a comprehensive architecture analysis and recommendations for extending the Warp transpiler to support **bidirectional transpilation**, with specific emphasis on the **Crystal → Ruby** direction. Building on the existing Ruby → Crystal pipeline (documented in `2026-01-31-01_architecture_analysis_recommendations.adoc`), this analysis addresses the unique challenges, architectural patterns, and implementation strategies required to support reverse transpilation while maintaining lossless round-trip fidelity.
 
 === Key Findings
 
@@ -1459,10 +1459,10 @@ See separate document: `round-trip-test-corpus.adoc`
 
 == References
 
-1. `2026-01-31-architecture-analysis-recommendations.adoc` - Ruby → Crystal architecture
-2. `crystal-ruby-transpiler-proposal.adoc` - Original bidirectional proposal
-3. `cst-transpiler-design.adoc` - CST architecture details
-4. `ruby-crystal-language-pipeline.adoc` - Unified pipeline design
+1. `2026-01-31-01_architecture_analysis_recommendations.adoc` - Ruby → Crystal architecture
+2. `2026-02-01-04_crystal_ruby_transpiler_proposal.adoc` - Original bidirectional proposal
+3. `2026-01-31-03_cst_transpiler_design.adoc` - CST architecture details
+4. `2026-01-30-04_ruby_crystal_language_pipeline.adoc` - Unified pipeline design
 5. Crystal Language Reference: https://crystal-lang.org/reference/
 6. RBS Specification: https://github.com/ruby/rbs
 7. Sorbet Documentation: https://sorbet.org/

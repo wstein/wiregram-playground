@@ -1,7 +1,7 @@
 = Warp Language Pipeline: Ruby and Crystal Parsing, CST/AST, Tape, and Lossless Transpilation
 Werner Stein
 
-include::reference-architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
 
 == Abstract
 This paper proposes a unified parsing and representation pipeline for full Ruby and Crystal support inside Warp: a shared tokenizer, green/red CST, a compact tape IR, and a typed AST. We outline how the tape enables high-throughput formatting and how the CST supports a lossless, reversible transpiler between Ruby and Crystal. We also propose a linter that leverages CST trivia for precise diagnostics and an annotation pipeline that emits inline Sorbet signatures for Ruby.

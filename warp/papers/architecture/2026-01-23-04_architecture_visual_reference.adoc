@@ -3,8 +3,8 @@
 :toc: left
 :toclevels: 3
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Architecture Comparison Diagrams
 
 === Alternative 1: Monolithic Backend Approach

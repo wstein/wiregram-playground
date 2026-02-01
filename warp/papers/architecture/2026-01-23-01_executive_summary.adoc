@@ -2,8 +2,8 @@
 :doctype: article
 :toc: macro
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 [abstract]
 == Abstract
 
@@ -296,12 +296,12 @@ toc::[]
 Comprehensive documentation available:
 
 - **This Document**: Executive summary and decision record
-- **[architectural-review-minutes.adoc](architectural-review-minutes.adoc)**: Full 2-hour meeting minutes with detailed analysis
-- **[architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc)**: Detailed ratings and comparison matrix
-- **[expert-panel-review.adoc](expert-panel-review.adoc)**: Individual expert perspectives (Architect, Professor, Developer, Assembly Programmer)
-- **[architecture-visual-reference.adoc](architecture-visual-reference.adoc)**: Visual diagrams and flowcharts
+- **[2026-01-23-02_architectural_review_minutes.adoc](2026-01-23-02_architectural_review_minutes.adoc)**: Full 2-hour meeting minutes with detailed analysis
+- **[2026-01-23-03_architecture_alternatives_summary.adoc](2026-01-23-03_architecture_alternatives_summary.adoc)**: Detailed ratings and comparison matrix
+- **[2026-01-23-05_expert_panel_review.adoc](2026-01-23-05_expert_panel_review.adoc)**: Individual expert perspectives (Architect, Professor, Developer, Assembly Programmer)
+- **[2026-01-23-04_architecture_visual_reference.adoc](2026-01-23-04_architecture_visual_reference.adoc)**: Visual diagrams and flowcharts
 - **[simd-architecture-rfc.adoc](simd-architecture-rfc.adoc)**: Original RFC proposal
-- **[simd-architecture-adr.adoc](simd-architecture-adr.adoc)**: Architecture Decision Record
+- **[2026-01-28-02_simd_architecture_adr.adoc](2026-01-28-02_simd_architecture_adr.adoc)**: Architecture Decision Record
 
 == Approval
 

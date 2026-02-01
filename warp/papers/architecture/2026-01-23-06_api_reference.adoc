@@ -722,8 +722,8 @@ end
 === Related Documentation
 
 * link:../GUIDE.md[Project Guide] - Development workflow
-* link:todos.adoc[TODOs] - Implementation roadmap
-* link:reference-architecture.adoc[Architecture] - System design
+* link:2026-01-23-11_2026-01-23-11_todos.adoc[TODOs] - Implementation roadmap
+* link:2026-01-28-01_reference_architecture.adoc[Architecture] - System design
 * link:../README.md[README] - Quick start
 
 ---

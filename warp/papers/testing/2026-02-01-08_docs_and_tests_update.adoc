@@ -3,7 +3,7 @@
 :toc: left
 :toclevels: 3
 
-**Date:** January 31, 2026
+**Date:** February 1, 2026
 **Changes:** CST-Based Transpiler Improvements
 
 == Overview
@@ -37,7 +37,7 @@ Updated documentation and integration tests to reflect the shift from regex-base
 
 === 2. New Documentation
 
-==== TRANSPILER_IMPROVEMENTS.adoc
+==== 2026-01-31-07_transpiler_improvements.adoc
 
 Comprehensive guide to CST-based transpiler architecture:
 
@@ -52,7 +52,7 @@ Comprehensive guide to CST-based transpiler architecture:
 * Migration guide from regex to CST
 * Future enhancements
 
-==== INTEGRATION_TEST_STATUS.adoc
+==== 2026-02-01-05_integration_test_status.adoc
 
 Status document for integration tests:
 
@@ -156,12 +156,12 @@ Status document for integration tests:
 
 === Quick References
 
-1. **TRANSPILER_IMPROVEMENTS.adoc**
+1. **2026-01-31-07_transpiler_improvements.adoc**
 ** For: Understanding CST architecture
 ** Audience: Contributors, maintainers
 ** Length: ~350 lines
 
-2. **INTEGRATION_TEST_STATUS.adoc**
+2. **2026-02-01-05_integration_test_status.adoc**
 ** For: Verification and test coverage
 ** Audience: QA, developers
 ** Length: ~200 lines
@@ -174,26 +174,26 @@ Status document for integration tests:
 
 === For Contributors
 
-1. Read `TRANSPILER_IMPROVEMENTS.adoc` to understand architecture
+1. Read `2026-01-31-07_transpiler_improvements.adoc` to understand architecture
 2. Review `analyze_*` functions in `analyzer.cr` for examples
-3. Check `INTEGRATION_TEST_STATUS.adoc` for coverage
+3. Check `2026-02-01-05_integration_test_status.adoc` for coverage
 4. Run `crystal spec` to verify changes
 
 === For Reviewers
 
-1. Check `INTEGRATION_TEST_STATUS.adoc` for test coverage
+1. Check `2026-02-01-05_integration_test_status.adoc` for test coverage
 2. Verify all tests pass before merging
-3. Review `TRANSPILER_IMPROVEMENTS.adoc` sections on comparison
+3. Review `2026-01-31-07_transpiler_improvements.adoc` sections on comparison
 
 === For Troubleshooting
 
 1. Check "Key Improvements vs Regex Approach" section
-2. Review test cases in `INTEGRATION_TEST_STATUS.adoc`
+2. Review test cases in `2026-02-01-05_integration_test_status.adoc`
 3. Examine analyzer code in `src/warp/lang/ruby/analyzer.cr`
 
 == Integration with Existing Docs
 
 These new documents complement existing documentation:
 
-* **CST_IMPLEMENTATION_COMPLETE.adoc** - Parser implementation details
-* **CST_VS_AST_COMPARISON.adoc** - Design decisions
+* **2026-01-31-04_cst_implementation_complete.adoc** - Parser implementation details
+* **2026-01-31-06_cst_vs_ast_comparison.adoc** - Design decisions

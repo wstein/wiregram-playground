@@ -10,46 +10,58 @@ Comprehensive documentation is organized into the following categories:
 
 Detailed technical designs, design documents, and ADRs (Architecture Decision Records).
 
-- [Reference Architecture](papers/architecture/reference-architecture.adoc)
-- [Architecture Alternatives](papers/architecture/architecture-alternatives-summary.adoc)
-- [CST Transpiler Design](papers/architecture/cst-transpiler-design.adoc)
-- [CST vs AST Comparison](papers/architecture/CST_VS_AST_COMPARISON.adoc)
-- [CST Output Format](papers/architecture/CST_OUTPUT_FORMAT.adoc)
+- [Reference Architecture](papers/architecture/2026-01-28-01_reference_architecture.adoc)
+- [Architecture Alternatives](papers/architecture/2026-01-23-03_architecture_alternatives_summary.adoc)
+- [CST Transpiler Design](papers/architecture/2026-01-31-03_cst_transpiler_design.adoc)
+- [CST vs AST Comparison](papers/architecture/2026-01-31-06_cst_vs_ast_comparison.adoc)
+- [CST Output Format](papers/architecture/2026-01-31-05_cst_output_format.adoc)
+- [Architecture Analysis & Recommendations](papers/architecture/2026-01-31-01_architecture_analysis_recommendations.adoc)
+- [Crystal to Ruby Transpilation Architecture](papers/architecture/2026-01-31-02_crystal_to_ruby_transpilation_architecture.adoc)
+- [SIMD Architecture ADR](papers/architecture/2026-01-28-02_simd_architecture_adr.adoc)
+- [Project Structure ADR](papers/architecture/2026-01-29-01_adr_project_structure.adoc)
+- [Whitespace & Structurals ADR](papers/architecture/2026-01-29-02_adr_stage2_whitespace_structurals.adoc)
 
 ### [Implementation](papers/implementation/)
 
 Plans, refactoring summaries, and completion reports.
 
-- [Implementation Plan](papers/implementation/implementation-plan.adoc)
-- [Quick Start Guide](papers/implementation/QUICKSTART.adoc)
-- [Refactoring Summary](papers/implementation/REFACTORING-SUMMARY.adoc)
-- [CST Implementation Complete](papers/implementation/CST_IMPLEMENTATION_COMPLETE.adoc)
+- [Implementation Plan](papers/implementation/2026-01-30-06_implementation_plan.adoc)
+- [Quick Start Guide](papers/implementation/2026-01-23-07_quickstart.adoc)
+- [Refactoring Summary](papers/implementation/2026-02-01-06_refactoring_summary.adoc)
+- [CST Implementation Complete](papers/implementation/2026-01-31-04_cst_implementation_complete.adoc)
+- [JSONC Support Notes](papers/implementation/2026-01-30-02_jsonc_support_notes.adoc)
+- [Ruby-Crystal Pipeline](papers/implementation/2026-01-30-04_ruby_crystal_language_pipeline.adoc)
+- [Transpiler Proposal](papers/implementation/2026-02-01-04_crystal_ruby_transpiler_proposal.adoc)
+- [Completion Report](papers/implementation/2026-02-01-07_completion_report.adoc)
 
 ### [Performance](papers/performance/)
 
 SIMD optimizations, hardware-specific notes, and research papers.
 
-- [SIMD Optimization Notes](papers/performance/simd-optimization-notes.adoc)
-- [AMD AVX-512 Optimization](papers/performance/amd-avx512-optimization.adoc)
-- [Raspberry Pi Optimization](papers/performance/raspberry-pi-optimization.adoc)
-- [Performance Analysis](papers/performance/performance.adoc)
+- [SIMD Optimization Notes](papers/performance/2026-02-01-01_simd_optimization_notes.adoc)
+- [AMD AVX-512 Optimization](papers/performance/2026-02-01-02_amd_avx512_optimization.adoc)
+- [Raspberry Pi Optimization](papers/performance/2026-02-01-03_raspberry_pi_optimization.adoc)
+- [Performance Analysis](papers/performance/2026-01-30-01_performance_study.adoc)
+- [Formatting Performance Study](papers/performance/2026-01-30-03_formatting_performance_study.adoc)
 
 ### [Testing](papers/testing/)
 
 Test plans, status reports, and coverage documentation.
 
-- [Testing Strategy](papers/testing/testing.adoc)
-- [Integration Test Status](papers/testing/INTEGRATION_TEST_STATUS.adoc)
-- [Docs and Tests Update](papers/testing/DOCS_AND_TESTS_UPDATE.adoc)
+- [Testing Strategy](papers/testing/2026-01-23-08_testing_strategy.adoc)
+- [Integration Test Status](papers/testing/2026-02-01-05_integration_test_status.adoc)
+- [Docs and Tests Update](papers/testing/2026-02-01-08_docs_and_tests_update.adoc)
 
 ### [Guides](papers/guides/)
 
 User guides, contributor guides, and executive summaries.
 
-- [Project Guide](papers/guides/project-guide.adoc)
-- [Contributing Guide](papers/guides/CONTRIBUTING_GUIDE.adoc)
-- [Transpiler Improvements](papers/guides/TRANSPILER_IMPROVEMENTS.adoc)
-- [Multi-Language Guide](papers/guides/multi-language-guide.adoc)
+- [Executive Summary](papers/architecture/2026-01-23-01_executive_summary.adoc)
+- [Project Guide](papers/guides/2026-01-23-10_project_guide.adoc)
+- [Contributing Guide](papers/guides/2026-01-23-09_contributing_guide.adoc)
+- [Multi-Language Guide](papers/guides/2026-01-30-05_multi_language_guide.adoc)
+- [Transpiler Improvements](papers/guides/2026-01-31-07_transpiler_improvements.adoc)
+- [Todos](papers/guides/2026-01-23-11_todos.adoc)
 
 ## Quick Start
 
@@ -118,14 +130,14 @@ output:
 This project provides a complete transpilation pipeline between Ruby and Crystal, including:
 
 - Zero-copy, SIMD-accelerated lexing and parsing
-- Bidirectional Ruby ↔ Crystal transpilation
+- Bidirectional Ruby ↔ Crystal transpilation (CST-to-CST mapping)
 - Sorbet/RBS type signature generation and injection
 - Round-trip validation
 - Incremental compilation with caching
 
 ## Architecture Overview
 
-Warp follows a lexer + IR parsing pipeline optimized for performance while maintaining zero-copy semantics.
+Warp follows a lexer + IR parsing pipeline optimized for performance while maintaining zero-copy semantics, transitioning from simple token-level rewrites to a robust Concrete Syntax Tree (CST) transpilation strategy.
 
 ### Stage 1a: SIMD Scan (Structural Scanning)
 
@@ -195,6 +207,20 @@ graph LR
 | **Alternative 2** | Layered Runtime Selection | ⭐⭐⭐⭐⭐ (9/10) | ✅ Approved (Fallback) |
 | **Alternative 3** | Compile-Time Specialization | ⭐⭐⭐ (6/10) | ❌ Rejected |
 | **Alternative 4** | **Hybrid Approach** | ⭐⭐⭐⭐⭐ (9/10) | ✅ **PRIMARY RECOMMENDATION** |
+
+### Supported Backend Hierarchy
+
+Warp uses a tiered backend system to ensure maximum performance across all hardware:
+
+| Platform | Instruction Set | Backend Name | Priority | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **x86_64** | AVX-512 (Full) | `avx512` | 1 | Best on Zen 5+, Intel Ice Lake+ |
+| **x86_64** | AVX2 | `avx2` | 2 | Recommended for Zen 4 (double-pumped) |
+| **ARM64** | NEON | `neon` | 1 | Native ARM64 acceleration |
+| **ARMv6** | SIMD/Scalar | `armv6` | 2 | Raspberry Pi zero/1 fallback |
+| **Generic** | Scalar | `scalar` | Fallback | Portable implementation |
+
+For detailed implementation details, see [SIMD Optimization Notes](papers/performance/2026-02-01-01_simd_optimization_notes.adoc).
 
 ### Component Architecture
 

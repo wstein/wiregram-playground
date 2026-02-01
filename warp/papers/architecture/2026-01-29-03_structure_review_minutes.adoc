@@ -7,8 +7,8 @@
 :revdate: 2026-02-01
 :revnumber: 1.0
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Meeting Information
 
 [cols="1,3"]

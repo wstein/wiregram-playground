@@ -1,8 +1,8 @@
 = Performance Considerations for Warp (Crystal)
 Werner Stein
 
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+include::2026-01-28-01_reference_architecture.adoc[tag=pipeline]
+include::2026-01-28-01_reference_architecture.adoc[tag=scenarios]
 == Abstract
 This paper summarizes the performance techniques currently present in the Warp (Crystal) codebase, evaluates their alignment with the Crystal 1.19 performance guide, and proposes further optimizations with an emphasis on SIMD and low-level tuning. The goal is to balance throughput, correctness, and maintainability on Apple Silicon while keeping the code portable to non-AArch64 targets.
 

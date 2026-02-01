@@ -203,8 +203,8 @@ end
 
 == References
 
-- [Implementation Plan](implementation-plan.adoc) - Detailed multi-phase roadmap
-- [Ruby-Crystal Language Pipeline](ruby-crystal-language-pipeline.adoc) - High-level vision
+- [Implementation Plan](2026-01-30-06_implementation_plan.adoc) - Detailed multi-phase roadmap
+- [Ruby-Crystal Language Pipeline](2026-01-30-04_ruby_crystal_language_pipeline.adoc) - High-level vision
 - `src/warp/cst/types.cr` - Core CST types (JSON-based, shared across languages)
 - `src/warp/lang/json/types.cr` - JSON-specific type definitions
 - `src/warp/lang/ruby/types.cr` - Ruby-specific type definitions
