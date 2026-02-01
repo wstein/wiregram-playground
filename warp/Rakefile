@@ -1,0 +1,270 @@
+# Rakefile for Warp Crystal Transpiler
+# Provides common development tasks
+
+require "rake/clean"
+
+# Build artifacts to clean
+CLEAN.include("bin/warp", ".warp/", "out/", "tmp/", "*.dwarf")
+CLOBBER.include("coverage/", "docs/api/")
+
+# Configuration
+CRYSTAL = ENV["CRYSTAL"] || "crystal"
+SPEC_OPTS = ENV["SPEC_OPTS"] || ""
+RELEASE_FLAGS = "--release --no-debug"
+SOURCE_FILES = FileList["src/**/*.cr", "bin/**/*.cr"]
+SPEC_FILES = FileList["spec/**/*_spec.cr"]
+
+desc "Show available tasks"
+task :default do
+  sh "rake -T"
+end
+
+namespace :build do
+  desc "Build debug binary"
+  task :debug do
+    sh "#{CRYSTAL} build bin/warp.cr -o bin/warp"
+    puts "✓ Built debug binary: bin/warp"
+  end
+
+  desc "Build release binary with optimizations"
+  task :release do
+    sh "#{CRYSTAL} build bin/warp.cr -o bin/warp #{RELEASE_FLAGS}"
+    puts "✓ Built release binary: bin/warp"
+  end
+
+  desc "Build with static linking (Linux)"
+  task :static do
+    sh "#{CRYSTAL} build bin/warp.cr -o bin/warp #{RELEASE_FLAGS} --static"
+    puts "✓ Built static binary: bin/warp"
+  end
+end
+
+desc "Build default (debug) binary"
+task :build => ["build:debug"]
+
+namespace :test do
+  desc "Run all specs"
+  task :all do
+    sh "#{CRYSTAL} spec #{SPEC_OPTS}"
+  end
+
+  desc "Run unit tests only"
+  task :unit do
+    sh "#{CRYSTAL} spec spec/unit/ #{SPEC_OPTS}"
+  end
+
+  desc "Run integration tests only"
+  task :integration do
+    sh "#{CRYSTAL} spec spec/integration/ #{SPEC_OPTS}"
+  end
+
+  desc "Run specs with coverage (requires kcov)"
+  task :coverage do
+    sh "rm -rf coverage/"
+    sh "crystal build spec/spec_helper.cr -o spec_runner"
+    sh "kcov --exclude-pattern=/usr,/lib coverage/ ./spec_runner"
+    puts "✓ Coverage report: coverage/index.html"
+  end
+
+  desc "Run specs with verbose output"
+  task :verbose do
+    sh "#{CRYSTAL} spec --verbose #{SPEC_OPTS}"
+  end
+
+  desc "Run a specific spec file"
+  task :file, [:path] do |t, args|
+    path = args[:path] || raise("Usage: rake test:file[path/to/spec.cr]")
+    sh "#{CRYSTAL} spec #{path} #{SPEC_OPTS}"
+  end
+end
+
+desc "Run all tests (alias for test:all)"
+task :test => ["test:all"]
+task :spec => ["test:all"]
+
+namespace :benchmark do
+  desc "Run transpiler benchmarks"
+  task :transpiler do
+    sh "#{CRYSTAL} run spec/benchmarks/transpiler_bench.cr --release"
+  end
+
+  desc "Run lexer benchmarks"
+  task :lexer do
+    sh "#{CRYSTAL} run spec/benchmarks/lexer_bench.cr --release"
+  end
+
+  desc "Run all benchmarks"
+  task :all => [:transpiler, :lexer] do
+    puts "✓ All benchmarks complete"
+  end
+end
+
+desc "Run benchmarks (alias for benchmark:all)"
+task :benchmark => ["benchmark:all"]
+
+namespace :install do
+  desc "Install to /usr/local/bin"
+  task :local => ["build:release"] do
+    sh "install -m 755 bin/warp /usr/local/bin/warp"
+    puts "✓ Installed to /usr/local/bin/warp"
+  end
+
+  desc "Install to custom prefix"
+  task :prefix, [:prefix] => ["build:release"] do |t, args|
+    prefix = args[:prefix] || raise("Usage: rake install:prefix[/custom/path]")
+    bindir = File.join(prefix, "bin")
+    sh "mkdir -p #{bindir}"
+    sh "install -m 755 bin/warp #{bindir}/warp"
+    puts "✓ Installed to #{bindir}/warp"
+  end
+end
+
+desc "Install to /usr/local/bin"
+task :install => ["install:local"]
+
+namespace :docs do
+  desc "Generate Crystal API documentation"
+  task :api do
+    sh "#{CRYSTAL} docs"
+    puts "✓ Generated docs: docs/index.html"
+  end
+
+  desc "View documentation in browser"
+  task :view => [:api] do
+    sh "open docs/index.html" if RUBY_PLATFORM =~ /darwin/
+    sh "xdg-open docs/index.html" if RUBY_PLATFORM =~ /linux/
+  end
+end
+
+desc "Generate API documentation"
+task :docs => ["docs:api"]
+
+namespace :format do
+  desc "Check code formatting"
+  task :check do
+    sh "#{CRYSTAL} tool format --check"
+  end
+
+  desc "Auto-format code"
+  task :fix do
+    sh "#{CRYSTAL} tool format"
+    puts "✓ Code formatted"
+  end
+end
+
+desc "Format code (alias for format:fix)"
+task :format => ["format:fix"]
+
+namespace :lint do
+  desc "Run ameba linter"
+  task :ameba do
+    if File.exist?("bin/ameba")
+      sh "#{CRYSTAL} run bin/ameba.cr"
+    else
+      puts "⚠ Ameba not found. Install with: shards install"
+    end
+  end
+end
+
+desc "Run linter"
+task :lint => ["lint:ameba"]
+
+namespace :run do
+  desc "Run warp CLI with arguments"
+  task :cli, [:args] do |t, args|
+    cmd_args = args.extras.join(" ")
+    sh "#{CRYSTAL} run bin/warp.cr -- #{cmd_args}"
+  end
+
+  desc "Show warp version"
+  task :version do
+    sh "#{CRYSTAL} run bin/warp.cr -- --version"
+  end
+
+  desc "Transpile Ruby -> Crystal (example)"
+  task :example_crystal do
+    sh "#{CRYSTAL} run bin/warp.cr -- transpile crystal -s corpus/ruby/00_simple.rb --stdout"
+  end
+
+  desc "Transpile Crystal -> Ruby (example)"
+  task :example_ruby do
+    sh "#{CRYSTAL} run bin/warp.cr -- transpile ruby -s spec/fixtures/cli/cr_simple.cr --stdout"
+  end
+end
+
+namespace :corpus do
+  desc "Transpile entire corpus to Crystal"
+  task :transpile do
+    sh "#{CRYSTAL} run bin/warp.cr -- transpile crystal -s corpus/ruby/ -o out/crystal/"
+    puts "✓ Transpiled corpus to out/crystal/"
+  end
+
+  desc "Validate round-trip on corpus"
+  task :roundtrip do
+    sh "#{CRYSTAL} run bin/warp.cr -- transpile round-trip -s corpus/ruby/"
+  end
+end
+
+namespace :dev do
+  desc "Quick development check (format + test:unit)"
+  task :check => ["format:check", "test:unit"] do
+    puts "✓ Development checks passed"
+  end
+
+  desc "Full quality check (format + lint + test + build)"
+  task :full => ["format:check", "lint", "test:all", "build:release"] do
+    puts "✓ Full quality checks passed"
+  end
+
+  desc "Watch and run specs on file changes"
+  task :watch do
+    puts "Watching for changes... (Ctrl+C to stop)"
+    loop do
+      system("#{CRYSTAL} spec #{SPEC_OPTS}")
+      sleep 2
+    end
+  end
+end
+
+desc "Run development checks"
+task :dev => ["dev:check"]
+
+namespace :init do
+  desc "Setup development environment"
+  task :setup do
+    sh "shards install" if File.exist?("shard.yml")
+    sh "mkdir -p out/ .warp/cache/"
+    puts "✓ Development environment ready"
+  end
+end
+
+desc "Setup development environment"
+task :setup => ["init:setup"]
+
+# Version task
+desc "Show version information"
+task :version do
+  sh "#{CRYSTAL} run bin/warp.cr -- --version"
+end
+
+# Help task
+desc "Show detailed help"
+task :help do
+  puts <<~HELP
+    Warp Crystal Transpiler - Rake Tasks
+
+    Common workflows:
+      rake build               # Build debug binary
+      rake build:release       # Build optimized release binary
+      rake test                # Run all specs
+      rake test:unit           # Run only unit tests
+      rake benchmark           # Run performance benchmarks
+      rake install             # Install to /usr/local/bin
+      rake docs                # Generate API documentation
+      rake format              # Auto-format code
+      rake dev:check           # Quick pre-commit check
+      rake dev:full            # Full quality validation
+
+    For detailed task list: rake -T
+  HELP
+end

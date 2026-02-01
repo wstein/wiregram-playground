@@ -86,6 +86,16 @@ targets:
     description: "Transpile Sorbet annotations to RBS format (Ruby → Ruby)"
     target_path: "ports/ruby/" # Output directory for transpiled Ruby files
 
+    # File to exclude from transpilation
+    exclude_files:
+      - "ports/ruby/lib/warp/backend/*.rb" # All backend files by default
+
+    # Files to include in transpilation
+    include_files:
+      - "ports/ruby/lib/warp/backend/backend.rb"
+      - "ports/ruby/lib/warp/backend/selector.rb"
+      - "ports/ruby/lib/warp/backend/scalar_backend.rb"
+
     libraries:
       sorbet-runtime:
         action: "keep"
@@ -105,6 +115,32 @@ settings:
   # Logging
   verbose: false
   debug: false
+
+# Operational section (Legacy compatibility for current implementation)
+transpiler:
+  include:
+    - "bin/*.cr"
+    - "src/**/*.cr"
+    - "spec/**/*.cr"
+  exclude:
+    - "vendor/**"
+
+output:
+  directory: "ports"
+  ruby_directory: "ports/ruby"
+  crystal_directory: "ports/crystal"
+  rbs_directory: "ports/ruby/rbs"
+  rbi_directory: "ports/ruby/rbi"
+  generate_rbs: true
+  generate_rbi: false
+  folder_mappings:
+    "src/": "lib/"
+    "bin/": "exe/"
+
+annotations:
+  rbs_paths: []
+  rbi_paths: []
+  inline_rbs: true
 
 # Examples
 examples:

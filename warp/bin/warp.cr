@@ -1,5 +1,6 @@
 #!/usr/bin/env crystal
 require "../src/warp"
+require "../src/warp/version"
 require "../src/warp/cli/config"
 require "../src/warp/cli/runner"
 require "../src/warp/lang/ruby/annotations/annotation_extractor"
