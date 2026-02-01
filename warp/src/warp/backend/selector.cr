@@ -26,7 +26,7 @@ module Warp
       private def self.select_arm_backend : Base
         # ARM backend selection with Raspberry Pi optimization
         arm_version = Warp::Parallel::CPUDetector.detect_arm_version
-        
+
         case arm_version
         when Warp::Parallel::ARMVersion::ARMv6
           # ARMv6 (Raspberry Pi 1/Zero) - no NEON support
@@ -50,12 +50,10 @@ module Warp
         vendor = Warp::Parallel::CPUDetector.detect_vendor
         microarch = Warp::Parallel::CPUDetector.detect_microarchitecture
 
-        # Skip AVX-512 for AMD Zen2/Zen3 due to double-pumping performance penalty
-        # AVX2 will be faster in these cases
-        if vendor == Warp::Parallel::CPUVendor::AMD &&
-           (microarch == Warp::Parallel::Microarchitecture::Zen2 ||
-           microarch == Warp::Parallel::Microarchitecture::Zen3)
-          # For AMD Zen2/Zen3, skip AVX-512 and go straight to AVX2
+        # Skip AVX-512 for AMD microarchitectures that are double-pumped
+        # (Zen2/Zen3/Zen4) because AVX2 will be faster in those cases.
+        if vendor == Warp::Parallel::CPUVendor::AMD && microarch.has_double_pumped_avx512?
+          # For AMD double-pumped microarchitectures, skip AVX-512 and go straight to AVX2
           if can_use_avx2?
             return Avx2Backend.new
           end

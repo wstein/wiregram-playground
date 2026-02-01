@@ -60,10 +60,23 @@ module Warp::Parallel
       end
     end
 
-    # Check if this architecture has double-pumped AVX-512 (AMD Zen 2/3)
+    # Check if this architecture has double-pumped AVX-512 (AMD Zen 2/3/4)
     def has_double_pumped_avx512? : Bool
       case self
-      when Zen2, Zen3
+      when Zen2, Zen3, Zen4
+        true
+      else
+        false
+      end
+    end
+
+    # Check if this architecture implements a full 512-bit AVX-512 datapath
+    # (e.g., AMD Zen5 and Intel IceLake). Architectures with a full datapath
+    # can execute 512-bit instructions in a single cycle, offering higher
+    # throughput for 512-bit floating-point workloads.
+    def has_full_avx512? : Bool
+      case self
+      when Zen5, IceLake
         true
       else
         false
@@ -156,7 +169,7 @@ module Warp::Parallel
       {% if flag?(:aarch64) || flag?(:arm) %}
         # ARM architecture - detect NEON based on version
         arm_arch = detect_arm_version
-        
+
         case arm_arch
         when ARMVersion::ARMv6
           # ARMv6 (Pi 1/Zero) - no NEON support, use scalar
@@ -204,7 +217,7 @@ module Warp::Parallel
         if File.exists?("/proc/device-tree/model")
           begin
             model_info = File.read("/proc/device-tree/model").strip.downcase
-            
+
             # Match Raspberry Pi models
             case model_info
             when .includes?("raspberry pi 5")
@@ -236,7 +249,7 @@ module Warp::Parallel
           File.each_line("/proc/cpuinfo") do |line|
             if line.starts_with?("Hardware")
               hardware = line.split(":", 2)[1].strip.downcase rescue ""
-              
+
               case hardware
               when .includes?("bcm2835")
                 @@pi_model = RaspberryPiModel::Pi1
@@ -251,7 +264,7 @@ module Warp::Parallel
               else
                 next
               end
-              
+
               return @@pi_model.not_nil!
             end
           end
@@ -267,7 +280,7 @@ module Warp::Parallel
       return @@memory_bandwidth_limited.not_nil! if @@memory_bandwidth_limited
 
       pi_model = detect_pi_model
-      
+
       # Raspberry Pi systems have limited memory bandwidth
       case pi_model
       when RaspberryPiModel::Pi1, RaspberryPiModel::PiZero, RaspberryPiModel::PiZeroW
@@ -370,21 +383,21 @@ module Warp::Parallel
             if line.starts_with?("CPU part")
               # Parse CPU part: typical values are 0xc07 (ARMv7), 0xd03 (ARMv8), etc.
               cpu_part = line.split(":", 2)[1].strip.downcase rescue ""
-              
+
               # ARMv8 identifiers (0xd0x range)
               return ARMVersion::ARMv8 if cpu_part.includes?("0xd0") || cpu_part.includes?("0xd1") || cpu_part.includes?("0xd2")
-              
+
               # ARMv7 identifiers (0xc0x range)
               return ARMVersion::ARMv7 if cpu_part.includes?("0xc0") || cpu_part.includes?("0xc1")
-              
+
               # ARMv6 identifiers (0xb76)
               return ARMVersion::ARMv6 if cpu_part.includes?("0xb76") || cpu_part.includes?("0xb47")
             end
-            
+
             # Also check CPU implementer and architecture
             if line.starts_with?("CPU architecture")
               arch_str = line.split(":", 2)[1].strip rescue ""
-              
+
               # Architecture field format: "ARMv8" or numeric like "8"
               return ARMVersion::ARMv8 if arch_str.includes?("ARMv8") || arch_str.includes?(" 8")
               return ARMVersion::ARMv7 if arch_str.includes?("ARMv7") || arch_str.includes?(" 7")
@@ -563,7 +576,7 @@ module Warp::Parallel
     def summary : String
       String.build do |io|
         io << "CPU: #{cpu_count} cores, "
-        
+
         {% if flag?(:aarch64) || flag?(:arm) %}
           io << "ARM: #{detect_arm_version}, "
           if is_raspberry_pi?
@@ -574,7 +587,7 @@ module Warp::Parallel
           io << "Vendor: #{detect_vendor}, "
           io << "Microarch: #{detect_microarchitecture}, "
         {% end %}
-        
+
         io << "Model: #{cpu_model}, "
         io << "SIMD: #{detect_simd}, "
         io << "P-core: #{is_performance_core?}"

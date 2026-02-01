@@ -42,9 +42,9 @@ module Warp
 
           # Character classification
           case c
-          when 0x20_u8, 0x09_u8  # Space, tab
+          when 0x20_u8, 0x09_u8 # Space, tab
             whitespace |= bit
-          when 0x0a_u8, 0x0d_u8  # Newline, carriage return
+          when 0x0a_u8, 0x0d_u8 # Newline, carriage return
             op |= bit
           when '['.ord, ']'.ord, '{'.ord, '}'.ord, ':'.ord, ','.ord
             op |= bit

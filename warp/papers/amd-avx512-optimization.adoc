@@ -291,7 +291,7 @@ Similar to Zen2 - AVX2 preferred due to double-pumping penalty.
 
 ==== AMD Zen4+ Systems
 
-Zen4 improved AVX-512 implementation. Detection currently conservative (still prefers AVX2), but can be updated when Zen4 benchmark results confirm true 512-bit performance.
+Zen4 used a dual-pumped 256-bit FPU to execute AVX-512 workloads, meaning it effectively carried out 512-bit operations in two cycles (double-pumped). Zen5, by contrast, implements a true 512-bit datapath that can execute AVX-512 instructions in a single cycle, yielding significantly better throughput for 512-bit floating-point workloads (expected ~20–40% improvement over Zen4 for 512-bit workloads). Detection and selection remain conservative: systems that are double-pumped still prefer AVX2, while full 512-bit architectures (Zen5, IceLake) can use AVX-512 safely.
 
 ==== Intel Systems
 
