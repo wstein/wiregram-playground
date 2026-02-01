@@ -166,9 +166,15 @@ YAML
              else
                [".rb", ".cr"]
              end
-      files = includes.flat_map { |g| Dir.glob(g) }.select { |f| exts.any? { |ext| f.ends_with?(ext) } }
+
+      base_dir = File.directory?(source_path) ? source_path : nil
+      files = includes.flat_map do |glob|
+        pattern = base_dir ? File.join(base_dir, glob) : glob
+        Dir.glob(pattern)
+      end
+      files = files.select { |f| File.file?(f) && exts.any? { |ext| f.ends_with?(ext) } }
       files = files.reject { |f| excludes.any? { |ex| File.match?(ex, f) } }
-      files
+      files.uniq
     end
 
     private def self.process_file(
