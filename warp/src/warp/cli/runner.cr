@@ -85,9 +85,11 @@ annotations:
   rbi_paths: []
   inline_rbs: true
 output:
-  directory: "out"
-  ruby_directory: "out/ruby"
-  crystal_directory: "out/crystal"
+  directory: "ports"
+  crystal_directory: "ports/crystal"
+  ruby_directory: "ports/ruby"
+  generate_rbs: true
+  generate_rbi: false
 YAML
       if File.exists?(config_path)
         puts "Config already exists: #{config_path}"
@@ -125,6 +127,8 @@ YAML
       extra_rbs = [] of String
       extra_rbi = [] of String
       inline_rbs = true
+      generate_rbs = false
+      generate_rbi = false
       stdout = false
       parallel_workers : Int32? = nil
 
@@ -136,6 +140,8 @@ YAML
         p.on("--rbs=PATH", "RBS file to load (repeatable)") { |v| extra_rbs << v }
         p.on("--rbi=PATH", "RBI file to load (repeatable)") { |v| extra_rbi << v }
         p.on("--inline-rbs=BOOL", "Parse inline # @rbs comments (default true)") { |v| inline_rbs = (v != "false") }
+        p.on("--generate-rbs=BOOL", "Generate .rbs signature files (default false)") { |v| generate_rbs = (v != "false") }
+        p.on("--generate-rbi=BOOL", "Generate .rbi annotation files (default false)") { |v| generate_rbi = (v != "false") }
         p.on("--parallel=N", "Use N parallel workers (default: CPU cores)") do |v|
           parallel_workers = v.to_i? || Warp::Parallel::CPUDetector.cpu_count
         end
@@ -145,16 +151,53 @@ YAML
       parser.parse(args || [] of String)
 
       config = ConfigLoader.load(config_path)
+
+      # Announce which config file is being used (or if none found)
+      used_config : String? = nil
+      if config_path
+        cp = config_path.not_nil!
+        unless File.exists?(cp)
+          puts "Config file specified (#{cp}) not found. Falling back to other config sources or defaults."
+        else
+          used_config = cp
+        end
+      end
+
+      if used_config.nil?
+        if File.exists?(".warp.yaml")
+          used_config = ".warp.yaml"
+        elsif File.exists?("warp.yaml")
+          used_config = "warp.yaml"
+        end
+      end
+
+      if used_config
+        puts "Using config: #{used_config}"
+      else
+        puts "No config file found; using defaults"
+      end
+
       output_root = (out_dir || config.output_dir).not_nil!
+      rbs_output_root = config.rbs_output_dir
+      rbi_output_root = config.rbi_output_dir
+      
       if out_dir.nil?
         output_root = case target
                       when TranspileTarget::Ruby
                         config.ruby_output_dir
                       when TranspileTarget::Crystal
                         config.crystal_output_dir
+                      when TranspileTarget::Rbs
+                        config.rbs_output_dir
+                      when TranspileTarget::Rbi
+                        config.rbi_output_dir
                       else
                         config.output_dir
                       end
+      else
+        # When --out is provided, adjust RBS/RBI output dirs to be under --out/rbs and --out/rbi
+        rbs_output_root = File.join(out_dir.not_nil!, "rbs")
+        rbi_output_root = File.join(out_dir.not_nil!, "rbi")
       end
 
       files = collect_files(source_path, config, target)
@@ -191,13 +234,13 @@ YAML
         processor.process_files(files) do |path|
           current = idx.add(1)
           progress.try(&.update(current, path))
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, stdout)
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root)
         end
       else
         # Sequential processing
         files.each_with_index do |path, i|
           progress.try(&.update(i + 1, path))
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, stdout)
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root)
         end
       end
 
@@ -240,10 +283,18 @@ YAML
       extra_rbs : Array(String),
       extra_rbi : Array(String),
       inline_rbs : Bool,
+      generate_rbs : Bool,
+      generate_rbi : Bool,
       stdout : Bool,
+      rbs_output_root : String? = nil,
+      rbi_output_root : String? = nil,
     )
       source = File.read(path)
       bytes = source.to_slice
+      
+      # Use provided RBS/RBI output roots, or fall back to config
+      rbs_output_dir = rbs_output_root || config.rbs_output_dir
+      rbi_output_dir = rbi_output_root || config.rbi_output_dir
       case target
       when TranspileTarget::Ruby
         result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes)
@@ -256,7 +307,30 @@ YAML
         if stdout
           puts result.output
         else
-          write_or_print(path, output_root, result.output, ".rb", stdout)
+          write_or_print(path, output_root, result.output, ".rb", stdout, config.folder_mappings)
+
+          # Generate accompanying RBS/RBI files if requested
+          if (generate_rbs || config.generate_rbs) && !stdout
+            ruby_bytes = result.output.to_slice
+            tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
+            if lex_error == Warp::Core::ErrorCode::Success
+              extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(ruby_bytes, tokens)
+              sigs = extractor.extract
+              rbs_content = build_rbs(sigs)
+              write_output(path, rbs_output_dir, rbs_content, ".rbs", config.folder_mappings)
+            end
+          end
+
+          if (generate_rbi || config.generate_rbi) && !stdout
+            ruby_bytes = result.output.to_slice
+            tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
+            if lex_error == Warp::Core::ErrorCode::Success
+              extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(ruby_bytes, tokens)
+              sigs = extractor.extract
+              rbi_content = build_rbi(sigs)
+              write_output(path, rbi_output_dir, rbi_content, ".rbi", config.folder_mappings)
+            end
+          end
         end
         return
       when TranspileTarget::RoundTrip
@@ -317,18 +391,29 @@ YAML
       end
     end
 
-    private def self.output_path_for(source_path : String, output_root : String, ext : String) : String
+    private def self.output_path_for(source_path : String, output_root : String, ext : String, folder_mappings : Hash(String, String)? = nil) : String
       rel = source_path
       rel = rel.sub(%r{^\./}, "")
+
+      # Apply folder mappings if provided
+      if folder_mappings
+        folder_mappings.each do |src_dir, dest_dir|
+          if rel.starts_with?(src_dir)
+            rel = dest_dir + rel[src_dir.size..-1]
+            break
+          end
+        end
+      end
+
       # Normalize common source extensions (.cr or .rb) to the requested output extension
       File.join(output_root, rel).sub(/\.(?:rb|cr)$/, ext)
     end
 
-    private def self.write_or_print(source_path : String, output_root : String, content : String, ext : String, stdout : Bool)
+    private def self.write_or_print(source_path : String, output_root : String, content : String, ext : String, stdout : Bool, folder_mappings : Hash(String, String)? = nil)
       if stdout
         puts content
       else
-        write_output(source_path, output_root, content, ext)
+        write_output(source_path, output_root, content, ext, folder_mappings)
       end
     end
 
@@ -380,8 +465,8 @@ YAML
       store
     end
 
-    private def self.write_output(source_path : String, output_root : String, content : String, ext : String)
-      out_path = output_path_for(source_path, output_root, ext)
+    private def self.write_output(source_path : String, output_root : String, content : String, ext : String, folder_mappings : Hash(String, String)? = nil)
+      out_path = output_path_for(source_path, output_root, ext, folder_mappings)
       FileUtils.mkdir_p(File.dirname(out_path))
       File.write(out_path, content)
     end
