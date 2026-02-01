@@ -320,7 +320,8 @@ YAML
     private def self.output_path_for(source_path : String, output_root : String, ext : String) : String
       rel = source_path
       rel = rel.sub(%r{^\./}, "")
-      File.join(output_root, rel).sub(/\.rb$/, ext)
+      # Normalize common source extensions (.cr or .rb) to the requested output extension
+      File.join(output_root, rel).sub(/\.(?:rb|cr)$/, ext)
     end
 
     private def self.write_or_print(source_path : String, output_root : String, content : String, ext : String, stdout : Bool)
