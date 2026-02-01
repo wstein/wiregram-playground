@@ -92,11 +92,11 @@ YAML
       end
 
       target = case target_name
-               when "crystal", "cr"   then TranspileTarget::Crystal
-               when "ruby", "rb"      then TranspileTarget::Ruby
-               when "rbs"             then TranspileTarget::Rbs
-               when "rbi"             then TranspileTarget::Rbi
-               when "inject-rbs"      then TranspileTarget::InjectRbs
+               when "crystal", "cr"    then TranspileTarget::Crystal
+               when "ruby", "rb"       then TranspileTarget::Ruby
+               when "rbs"              then TranspileTarget::Rbs
+               when "rbi"              then TranspileTarget::Rbi
+               when "inject-rbs"       then TranspileTarget::InjectRbs
                when "round-trip", "rt" then TranspileTarget::RoundTrip
                else
                  puts "Unknown transpile target: #{target_name}"
