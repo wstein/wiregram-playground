@@ -111,13 +111,12 @@ Error in corpus/ruby/complex.rb:45:12
 Unexpected token 'end' - expected expression
 ----
 
-==== [.green]#✓# Add progress indicators
-*Status:* Completed +
+==== [.yellow]#~# Progress indicators updated
+*Status:* Updated (interactive CLI progress removed) +
 *Files:* `src/warp/cli/progress.cr`, `src/warp/cli/runner.cr` +
-*Description:* Show progress bar when transpiling multiple files +
+*Description:* An interactive progress bar was previously added but caused contention in parallel runs. The CLI now avoids interactive per-file progress output and uses batched updates and synchronized logging to report progress safely. The `Warp::CLI::ProgressBar` remains for programmatic use.
 *Dependencies:* None +
-*Effort:* 3/10 +
-*Example Output:*
+*Effort:* 1/10 +
 ----
 Transpiling [===>    ] 5/12 files (42%)
   Current: src/models/user.rb

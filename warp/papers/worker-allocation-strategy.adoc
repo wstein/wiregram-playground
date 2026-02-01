@@ -1,0 +1,362 @@
+= Worker Allocation Strategy for Parallel Transpilation
+:date: 2026-02-01
+:author: Warp Team
+:toc: left
+:numbered:
+
+== Overview
+
+The Warp transpiler uses intelligent core allocation to optimize parallel transpilation performance across different CPU architectures. This document describes the strategies employed for allocating worker threads to CPU cores, with emphasis on maximizing throughput for heterogeneous and homogeneous multi-core systems.
+
+== Architecture-Specific Strategies
+
+=== ARM (Heterogeneous Cores - Apple Silicon)
+
+==== P-cores + E-cores Architecture
+
+Apple Silicon M-series chips (M1, M2, M3, M4, etc.) feature a heterogeneous architecture combining performance and efficiency cores:
+- **M1/M2**: 4 P-cores + 4 E-cores
+- **M3/M4**: 4 P-cores + 6 E-cores
+- **Future**: Likely to expand core counts
+
+**Detection Method:**
+The Warp transpiler queries the macOS sysctl interface to detect P and E core counts:
+```bash
+# P-core count
+sysctl -n hw.perflevel0.physicalcpu
+
+# E-core count
+sysctl -n hw.perflevel1.physicalcpu
+```
+
+**Allocation Strategy:**
+Same as x86_64 hybrid (Intel Alder Lake+):
+1. All workers preferentially assigned to P-cores first
+2. E-cores used only when more workers requested than P-cores available
+3. Sequential assignment within each core type
+
+**Example: Apple Silicon M4 (4 P-cores + 6 E-cores)**
+
+For 4 workers (all P-cores):
+```
+Worker 1: Core 0 (P-core, neon)
+Worker 2: Core 1 (P-core, neon)
+Worker 3: Core 2 (P-core, neon)
+Worker 4: Core 3 (P-core, neon)
+```
+
+For 10 workers (all P and E cores):
+```
+Worker 1: Core 0 (P-core, neon)
+Worker 2: Core 1 (P-core, neon)
+Worker 3: Core 2 (P-core, neon)
+Worker 4: Core 3 (P-core, neon)
+Worker 5: Core 4 (E-core, neon)
+Worker 6: Core 5 (E-core, neon)
+Worker 7: Core 6 (E-core, neon)
+Worker 8: Core 7 (E-core, neon)
+Worker 9: Core 8 (E-core, neon)
+Worker 10: Core 9 (E-core, neon)
+```
+
+==== Uniform ARM Systems (Raspberry Pi, etc.)
+
+ARM systems like Raspberry Pi present a uniform core topology where all cores are identical.
+
+**Allocation Strategy:**
+- All worker threads are allocated to available cores in sequential order (core 0, 1, 2, ...)
+- No prioritization is needed since all cores are identical
+- Workers are distributed across all available cores up to the requested worker count
+
+**Example: Raspberry Pi 5 (4 cores)**
+```
+Worker 1: Core 0 (P-core, neon)
+Worker 2: Core 1 (P-core, neon)
+Worker 3: Core 2 (P-core, neon)
+Worker 4: Core 3 (P-core, neon)
+```
+
+=== x86_64 - Homogeneous (Pre-Alder Lake)
+
+==== All P-cores (No Efficiency Cores)
+
+Intel architectures prior to Alder Lake (12th gen) and AMD Zen architectures feature uniform core topologies where all cores are performance cores.
+
+**Allocation Strategy:**
+- Workers are allocated to cores 0-N sequentially
+- All cores have identical performance characteristics
+- No preference ordering is necessary
+
+**Example: Intel i7-11700K (8 cores)**
+```
+Worker 1: Core 0 (P-core, avx2)
+Worker 2: Core 1 (P-core, avx2)
+...
+Worker 8: Core 7 (P-core, avx2)
+```
+
+==== SIMD Support
+
+- SSE2: Baseline support
+- SSE4.1: For streaming operations
+- AVX: For higher throughput vectorization
+- AVX2: Standard for modern x86_64
+- AVX-512: Available on select high-end processors
+
+=== x86_64 - Heterogeneous (Alder Lake and Newer)
+
+==== P-cores + E-cores Mixed Topology
+
+Intel's hybrid architecture (Alder Lake, Raptor Lake, Meteor Lake) combines:
+- **P-cores (Performance)**: Full-featured cores with advanced instruction sets
+- **E-cores (Efficiency)**: Simplified cores optimized for power efficiency
+
+**Allocation Strategy:**
+[source,crystal]
+----
+def allocate_workers_to_cores(num_workers : Int32) : Array(CoreInfo)
+  cores = build_core_list
+
+  # Sort by performance (P-cores first), then by core ID
+  cores.sort! do |a, b|
+    if a.is_performance_core != b.is_performance_core
+      b.is_performance_core ? -1 : 1
+    else
+      a.core_id <=> b.core_id
+    end
+  end
+
+  # Take only the requested number of workers on most capable cores
+  cores[0, num_workers]
+end
+----
+
+**Key Principles:**
+1. **P-core Prioritization**: All worker threads are preferentially assigned to P-cores first
+2. **Sequential Assignment**: Within each core type, workers are assigned in sequential order
+3. **No Over-subscription**: Workers are not pinned; the OS scheduler handles actual placement
+4. **Fallback to E-cores**: If more workers are requested than P-cores available, E-cores are used
+
+**Example: Intel Alder Lake (8 P-cores + 8 E-cores)**
+
+For 8 workers:
+```
+Worker 1: Core 0 (P-core, avx2)
+Worker 2: Core 1 (P-core, avx2)
+Worker 3: Core 2 (P-core, avx2)
+Worker 4: Core 3 (P-core, avx2)
+Worker 5: Core 4 (P-core, avx2)
+Worker 6: Core 5 (P-core, avx2)
+Worker 7: Core 6 (P-core, avx2)
+Worker 8: Core 7 (P-core, avx2)
+```
+
+For 16 workers (all P-cores + E-cores):
+```
+Worker 1-8:  Core 0-7 (P-core, avx2)
+Worker 9-16: Core 8-15 (E-core, avx2)
+```
+
+For 10 workers (exceeds P-cores):
+```
+Worker 1-8:   Core 0-7 (P-core, avx2)
+Worker 9-10:  Core 8-9 (E-core, avx2)
+```
+
+=== AMD Zen Architectures
+
+==== Uniform Cores with Cache Hierarchy
+
+AMD Zen (all versions) present a homogeneous core topology with optional CCX (Core Complex) awareness. For the purposes of worker allocation, we treat all cores as equal.
+
+**Allocation Strategy:**
+- Sequential allocation across all available cores
+- Future optimization: Respect CCX boundaries to improve cache locality
+
+**Example: AMD Ryzen 7 5700X (8 cores)**
+```
+Worker 1: Core 0 (P-core, avx2)
+Worker 2: Core 1 (P-core, avx2)
+...
+Worker 8: Core 7 (P-core, avx2)
+```
+
+==== SIMD Support
+
+- AVX2: Standard support
+- AVX-512: Limited support (double-pumped on Zen 2-4, full on Zen 5)
+
+== Default Behavior (No -v Flag)
+
+When verbose mode is not enabled, the CLI displays:
+```
+CPU: 10 cores, ARM: armv8, Model: Apple M4, SIMD: neon, P-core: true
+Using 10 parallel workers
+```
+
+This provides basic system information without detailed core allocation.
+
+== Verbose Mode (-v / --verbose)
+
+When verbose mode is enabled, the CLI shows detailed worker allocation:
+
+```
+CPU: 10 cores, ARM: armv8, Model: Apple M4, SIMD: neon, P-core: true
+Using 8 parallel workers
+Worker Allocation:
+  Worker 1: Core 0 (P-core, neon)
+  Worker 2: Core 1 (P-core, neon)
+  Worker 3: Core 2 (P-core, neon)
+  Worker 4: Core 3 (P-core, neon)
+  Worker 5: Core 4 (P-core, neon)
+  Worker 6: Core 5 (P-core, neon)
+  Worker 7: Core 6 (P-core, neon)
+  Worker 8: Core 7 (P-core, neon)
+
+SIMD Capabilities:
+  ✓ NEON
+```
+
+This helps users:
+- Verify worker placement matches expectations
+- Understand which cores are being used
+- Diagnose performance issues related to core allocation
+- Make informed decisions about worker count
+
+== Transpilation Performance Implications
+
+=== Throughput Optimization
+
+The core allocation strategy directly impacts transpilation throughput:
+
+1. **P-core Preference**: Assigns work to fastest cores first
+2. **Cache Efficiency**: Sequential core allocation respects L3 cache sharing
+3. **Power Efficiency**: E-cores used only when necessary, reducing power draw
+
+=== Latency Considerations
+
+- **Single File**: Uses 1 worker on fastest available core
+- **Multiple Files**: Parallelizes across P-cores first, then E-cores if needed
+- **System-Limited**: If requested workers exceed available cores, OS handles oversubscription
+
+== Future Enhancements
+
+=== NUMA Awareness
+
+For high-core-count systems (32+ cores), future versions may implement NUMA (Non-Uniform Memory Architecture) awareness to:
+- Group workers on NUMA nodes with shared memory controllers
+- Reduce cross-node memory traffic
+- Improve memory bandwidth utilization
+
+=== CCX Locality (AMD Zen)
+
+AMD Zen systems benefit from cache locality awareness:
+- Group workers on cores within the same Core Complex
+- Reduce L3 cache misses
+- Improve sustained throughput
+
+=== Frequency Scaling Hints
+
+Future versions may:
+- Query CPU frequency scaling information
+- Suggest optimal worker counts for power-constrained environments
+- Provide "turbo mode" recommendations
+
+=== Thermal Awareness
+
+For systems with thermal monitoring:
+- Monitor package temperature
+- Dynamically reduce workers if thermal limits approached
+- Provide thermal throttling warnings
+
+== Configuration Options
+
+Users can control parallelism with:
+
+```bash
+# Use specific worker count
+./bin/warp transpile crystal --source=. --parallel=4
+
+# Use all available cores (default)
+./bin/warp transpile crystal --source=.
+
+# Single-threaded for debugging
+./bin/warp transpile crystal --source=. --parallel=1
+
+# Verbose mode to see core allocation
+./bin/warp transpile crystal --source=. -v
+```
+
+== Recommendations by Use Case
+
+=== Development/Testing
+- **Single Worker**: `--parallel=1` for consistent, reproducible builds
+- **With Verbose**: `-v` to print detailed system and worker allocation information (note: no live per-file progress bar is shown by default)
+
+=== Production Transpilation
+- **Default Parallelism**: Recommended for balanced throughput
+- **Conservative**: `--parallel=<physical-cores>` to avoid E-core overhead (Intel hybrid only)
+- **Aggressive**: `--parallel=<all-cores>` for maximum throughput on long batches
+
+=== Heterogeneous Systems (Apple Silicon, Intel Hybrid)
+- **Default Strategy** is optimal: use all P-cores, then E-cores as needed
+- **Adjust for Workload**: CPU-intensive transpilation benefits from P-core focus
+
+== Implementation Details
+
+=== Core Detection
+
+**ARM (Apple Silicon - aarch64):**
+[source,crystal]
+----
+# Query P-core count from sysctl
+p_core_str = `sysctl -n hw.perflevel0.physicalcpu`.strip
+p_core_count = p_core_str.to_i? || (total_cores / 2)
+
+# Assign first N cores as P-cores, rest as E-cores
+total_cores.times do |i|
+  is_p_core = i < p_core_count
+  cores << CoreInfo.new(i, is_p_core, simd)
+end
+----
+
+**ARM (Other systems):**
+All cores detected as P-cores (uniform topology).
+
+**Intel Hybrid (Alder Lake, Raptor Lake):**
+First half of cores assumed to be P-cores (heuristic).
+
+**AMD and other x86_64:**
+All cores detected as P-cores (uniform topology).
+
+=== CoreInfo Structure
+
+[source,crystal]
+----
+struct CoreInfo
+  property core_id : Int32
+  property is_performance_core : Bool
+  property simd_level : SIMDCapability
+
+  def core_type : String
+    is_performance_core ? "P-core" : "E-core"
+  end
+end
+----
+
+=== Detection Logic
+
+- **ARM**: All cores detected as P-cores with NEON support
+- **Intel Hybrid**: First N cores are P-cores (heuristic based on microarchitecture)
+- **AMD**: All cores detected as P-cores with appropriate SIMD level
+- **Fallback**: Conservative detection for unknown architectures
+
+== Conclusion
+
+The Warp transpiler's core allocation strategy balances:
+- **Performance**: Prioritizing capable cores
+- **Simplicity**: Sequential, predictable allocation
+- **Compatibility**: Works across diverse architectures
+- **Transparency**: Verbose mode shows exact allocation
+
+This approach ensures optimal transpilation throughput across heterogeneous and homogeneous multi-core systems while remaining simple to understand and tune.

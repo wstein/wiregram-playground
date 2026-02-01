@@ -315,9 +315,12 @@ output:
 
 === Progress Indicators
 
+NOTE: The CLI no longer displays an interactive progress bar during transpilation to avoid contention in parallel runs. The terminal-facing interactive progress indicator was removed; the CLI now uses batched updates and synchronized logging to report progress without blocking workers.
+
 [source,crystal]
 ----
 class Warp::CLI::ProgressBar
+  # NOTE: This class remains available for programmatic use, but is no longer used by the CLI by default.
   def initialize(total : Int32)
   def update(current : Int32, file : String? = nil)
   def increment(file : String? = nil)
@@ -327,10 +330,10 @@ end
 
 *Features*:
 
-* Real-time progress visualization
-* ETA calculation
-* Current file display
-* Automatic CI detection (disabled in CI)
+* **Programmatic** progress API (class available for consumers)
+* Batched progress reporting and synchronized logging in the CLI
+* ETA calculation (when used programmatically)
+* Automatic CI detection (disabled in CI when used)
 
 == Parallel Processing
 
@@ -690,7 +693,7 @@ A: Check `CPUDetector.summary` output. Some VMs don't expose SIMD flags.
 
 Set environment variables:
 
-* `NO_PROGRESS=1` - Disable progress bars
+* `NO_PROGRESS=1` - Deprecated: previously disabled interactive progress bars. Interactive progress bars have been removed from the CLI; this environment variable is now a no-op.
 * `WARP_DEBUG=1` - Enable verbose logging (future)
 * `CI=1` - Disable interactive features
 

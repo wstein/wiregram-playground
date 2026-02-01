@@ -15,9 +15,10 @@ module Warp::Lang::Ruby
 
     @config : Hash(YAML::Any, YAML::Any)
 
-    def initialize(config_path : String = "warp-transpile.yaml")
-      if File.exists?(config_path)
-        parsed = YAML.parse(File.read(config_path))
+    def initialize(config_path : String? = nil)
+      path = config_path || (File.exists?(".warp.yaml") ? ".warp.yaml" : "warp-transpile.yaml")
+      if File.exists?(path)
+        parsed = YAML.parse(File.read(path))
         @config = parsed.as_h
       else
         @config = {} of YAML::Any => YAML::Any

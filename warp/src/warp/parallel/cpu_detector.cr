@@ -1,4 +1,22 @@
 module Warp::Parallel
+  # Core information: index, type, and capabilities
+  struct CoreInfo
+    property core_id : Int32
+    property is_performance_core : Bool
+    property simd_level : SIMDCapability
+
+    def initialize(@core_id, @is_performance_core = true, @simd_level = SIMDCapability::None)
+    end
+
+    def core_type : String
+      is_performance_core ? "P-core" : "E-core"
+    end
+
+    def to_s(io : IO)
+      io << "Core #{core_id} (#{core_type}, #{simd_level})"
+    end
+  end
+
   # CPU vendor classification
   enum CPUVendor
     Unknown # Unknown or no vendor detected
@@ -592,6 +610,111 @@ module Warp::Parallel
         io << "SIMD: #{detect_simd}, "
         io << "P-core: #{is_performance_core?}"
       end
+    end
+
+    # Get detailed SIMD capabilities as a hash
+    def simd_capabilities : Hash(String, Bool)
+      capabilities = {} of String => Bool
+
+      {% if flag?(:aarch64) || flag?(:arm) %}
+        capabilities["NEON"] = true
+        arm_v = detect_arm_version
+        capabilities["NEON"] = (arm_v == ARMVersion::ARMv8 || arm_v == ARMVersion::ARMv7)
+      {% else %}
+        simd = detect_simd
+        capabilities["SSE2"] = true # Baseline for x86_64
+        capabilities["SSE4.1"] = (simd == SIMDCapability::SSE42 || simd == SIMDCapability::AVX || simd == SIMDCapability::AVX2 || simd == SIMDCapability::AVX512)
+        capabilities["AVX"] = (simd == SIMDCapability::AVX || simd == SIMDCapability::AVX2 || simd == SIMDCapability::AVX512)
+        capabilities["AVX2"] = (simd == SIMDCapability::AVX2 || simd == SIMDCapability::AVX512)
+        capabilities["AVX-512"] = (simd == SIMDCapability::AVX512)
+      {% end %}
+
+      capabilities
+    end
+
+    # Allocate worker IDs to cores based on CPU capability
+    # Prioritizes P-cores on heterogeneous systems (Intel Alder Lake+, etc.)
+    def allocate_workers_to_cores(num_workers : Int32) : Array(CoreInfo)
+      cores = build_core_list
+
+      # Sort by performance (P-cores first), then by core ID
+      # P-cores should come before E-cores in the result
+      cores.sort! do |a, b|
+        if a.is_performance_core != b.is_performance_core
+          # Put P-cores (true) before E-cores (false)
+          a.is_performance_core ? -1 : 1
+        else
+          a.core_id <=> b.core_id
+        end
+      end
+
+      # Take only the requested number of workers, all on most capable cores
+      cores[0, num_workers].map_with_index do |core, idx|
+        CoreInfo.new(core.core_id, core.is_performance_core, core.simd_level)
+      end
+    end
+
+    # Build a list of all available cores with their properties
+    private def build_core_list : Array(CoreInfo)
+      cores = [] of CoreInfo
+      total_cores = cpu_count
+
+      {% if flag?(:aarch64) %}
+        # Apple Silicon (M1, M2, M3, M4, etc.) - Query sysctl for P/E core count
+        p_core_count = query_apple_p_core_count
+        simd = detect_simd
+
+        total_cores.times do |i|
+          is_p_core = i < p_core_count
+          cores << CoreInfo.new(i, is_p_core, simd)
+        end
+      {% elsif flag?(:arm) %}
+        # Other ARM systems (Raspberry Pi, etc.) - typically uniform
+        simd = detect_simd
+        total_cores.times do |i|
+          cores << CoreInfo.new(i, true, simd)
+        end
+      {% else %}
+        # x86_64: Determine P/E core distribution
+        vendor = detect_vendor
+        microarch = detect_microarchitecture
+        simd = detect_simd
+
+        # Alder Lake and newer have heterogeneous cores
+        has_heterogeneous_cores = (vendor == CPUVendor::Intel &&
+          (microarch == Microarchitecture::AlderLake ||
+           microarch == Microarchitecture::RaptorLake))
+
+        if has_heterogeneous_cores
+          # Typical distribution: 8 P-cores + 8 E-cores on Alder Lake
+          # For now, assume first half are P-cores (this is approximate)
+          p_core_count = (total_cores / 2).to_i32
+          total_cores.times do |i|
+            is_p_core = i < p_core_count
+            cores << CoreInfo.new(i, is_p_core, simd)
+          end
+        else
+          # Homogeneous cores (all performance)
+          total_cores.times do |i|
+            cores << CoreInfo.new(i, true, simd)
+          end
+        end
+      {% end %}
+
+      cores
+    end
+
+    # Query Apple Silicon P-core count using sysctl
+    private def query_apple_p_core_count : Int32
+      {% if flag?(:aarch64) %}
+        # Try to read hw.perflevel0.physicalcpu (P-core count on Apple Silicon)
+        p_core_str = `sysctl -n hw.perflevel0.physicalcpu 2>/dev/null`.strip rescue ""
+        if p_core = p_core_str.to_i?
+          return p_core.to_i32
+        end
+      {% end %}
+      # Fallback: conservative estimate (half of total cores)
+      (cpu_count / 2).to_i32
     end
   end
 end

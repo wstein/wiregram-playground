@@ -1,6 +1,5 @@
 require "option_parser"
 require "file_utils"
-require "./progress"
 require "../parallel/cpu_detector"
 require "../parallel/file_processor"
 
@@ -67,12 +66,39 @@ Options:
   --inline-rbs=BOOL       Parse inline # @rbs comments (default true)
   --parallel=N            Use N parallel workers (default: CPU cores)
   --stdout                Write output to stdout
+  --verbose               Print detailed system and worker information
 TXT
     end
 
     private def self.run_init(args : Array(String)) : Int32
       config_path = ".warp.yaml"
       template = <<-YAML
+# Warp Transpiler Configuration
+version: 1.0
+
+# Target languages and their configurations
+targets:
+  crystal:
+    description: "Transpile Ruby (Sorbet) to Crystal"
+    target_path: "ports/crystal/"
+    include_files:
+      - "src/**/*.rb"
+      - "bin/*.rb"
+
+  ruby:
+    description: "Transpile Sorbet annotations to RBS"
+    target_path: "ports/ruby/"
+    include_files:
+      - "src/**/*.rb"
+
+# Global settings
+settings:
+  preserve_comments: true
+  preserve_formatting: true
+  preserve_whitespace: true
+  minimal_changes: true
+
+# Operational section (Legacy compatibility)
 transpiler:
   include:
     - "**/*.rb"
@@ -80,16 +106,21 @@ transpiler:
   exclude:
     - "spec/**"
     - "vendor/**"
-annotations:
-  rbs_paths: []
-  rbi_paths: []
-  inline_rbs: true
+
 output:
   directory: "ports"
   crystal_directory: "ports/crystal"
   ruby_directory: "ports/ruby"
   generate_rbs: true
   generate_rbi: false
+  folder_mappings:
+    "src/": "lib/"
+    "bin/": "exe/"
+
+annotations:
+  rbs_paths: []
+  rbi_paths: []
+  inline_rbs: true
 YAML
       if File.exists?(config_path)
         puts "Config already exists: #{config_path}"
@@ -131,11 +162,12 @@ YAML
       generate_rbi = false
       stdout = false
       parallel_workers : Int32? = nil
+      verbose = false
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
         p.on("-s PATH", "--source=PATH", "Source file or directory") { |v| source_path = v }
-        p.on("-c PATH", "--config=PATH", "Config file (default .warp.yaml or warp.yaml)") { |v| config_path = v }
+        p.on("-c PATH", "--config=PATH", "Config file (default .warp.yaml)") { |v| config_path = v }
         p.on("-o DIR", "--out=DIR", "Output directory") { |v| out_dir = v }
         p.on("--rbs=PATH", "RBS file to load (repeatable)") { |v| extra_rbs << v }
         p.on("--rbi=PATH", "RBI file to load (repeatable)") { |v| extra_rbi << v }
@@ -146,6 +178,7 @@ YAML
           parallel_workers = v.to_i? || Warp::Parallel::CPUDetector.cpu_count
         end
         p.on("--stdout", "Write output to stdout") { stdout = true }
+        p.on("-v", "--verbose", "Print detailed information about system and workers") { verbose = true }
       end
 
       parser.parse(args || [] of String)
@@ -157,7 +190,7 @@ YAML
       if config_path
         cp = config_path.not_nil!
         unless File.exists?(cp)
-          puts "Config file specified (#{cp}) not found. Falling back to other config sources or defaults."
+          puts "Config file specified (#{cp}) not found; will use .warp.yaml if present, otherwise defaults."
         else
           used_config = cp
         end
@@ -167,7 +200,8 @@ YAML
         if File.exists?(".warp.yaml")
           used_config = ".warp.yaml"
         elsif File.exists?("warp.yaml")
-          used_config = "warp.yaml"
+          # Legacy config detected but we only support .warp.yaml
+          puts "Found legacy config 'warp.yaml' but only '.warp.yaml' is supported. Rename it to '.warp.yaml' to use it."
         end
       end
 
@@ -180,7 +214,7 @@ YAML
       output_root = (out_dir || config.output_dir).not_nil!
       rbs_output_root = config.rbs_output_dir
       rbi_output_root = config.rbi_output_dir
-      
+
       if out_dir.nil?
         output_root = case target
                       when TranspileTarget::Ruby
@@ -216,35 +250,29 @@ YAML
                 end
       workers = 1 if stdout # No parallel when using stdout
 
-      # Show CPU info if using parallel processing
-      if workers > 1
+      # Show system info (always when verbose, or when using parallel)
+      if verbose || workers > 1
         puts Warp::Parallel::CPUDetector.summary
-        puts "Using #{workers} parallel workers"
+        puts "Using #{workers} parallel worker#{'s' if workers != 1}"
+        if verbose
+          print_verbose_worker_info(workers)
+        end
         puts
       end
-
-      # Show progress for multiple files (unless using stdout)
-      progress = stdout ? nil : (files.size > 1 ? ProgressBar.new(files.size) : nil)
 
       if workers > 1
         # Parallel processing
         processor = Warp::Parallel::FileProcessor.new(workers)
-        idx = Atomic(Int32).new(0)
 
         processor.process_files(files) do |path|
-          current = idx.add(1)
-          progress.try(&.update(current, path))
           process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root)
         end
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          progress.try(&.update(i + 1, path))
           process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root)
         end
       end
-
-      progress.try(&.finish)
 
       0
     end
@@ -254,8 +282,25 @@ YAML
         return [source_path]
       end
 
-      includes = config.include
-      excludes = config.exclude
+      # Prioritize target-specific includes/excludes from the new config format
+      includes = case target
+                 when TranspileTarget::Ruby    then config.ruby_include || config.include
+                 when TranspileTarget::Crystal then config.crystal_include || config.include
+                 when TranspileTarget::Rbs, TranspileTarget::Rbi, TranspileTarget::InjectRbs
+                   config.ruby_include || config.include
+                 else
+                   config.include
+                 end
+
+      excludes = case target
+                 when TranspileTarget::Ruby    then config.ruby_exclude || config.exclude
+                 when TranspileTarget::Crystal then config.crystal_exclude || config.exclude
+                 when TranspileTarget::Rbs, TranspileTarget::Rbi, TranspileTarget::InjectRbs
+                   config.ruby_exclude || config.exclude
+                 else
+                   config.exclude
+                 end
+
       exts = case target
              when TranspileTarget::Crystal, TranspileTarget::Rbs, TranspileTarget::Rbi, TranspileTarget::InjectRbs
                [".rb"]
@@ -267,12 +312,36 @@ YAML
 
       base_dir = File.directory?(source_path) ? source_path : nil
       files = includes.flat_map do |glob|
-        pattern = base_dir ? File.join(base_dir, glob) : glob
+        if base_dir
+          # If the include glob starts with a top-level segment that is an ancestor of the base dir
+          # drop that leading segment and evaluate the glob relative to the base dir.
+          first_segment = glob.split("/", 2)[0]
+          base_segments = base_dir.split(File::SEPARATOR)
+          if base_segments.includes?(first_segment)
+            remainder = glob.split("/", 2)[1] || ""
+            pattern = remainder.empty? ? base_dir : File.join(base_dir, remainder)
+          else
+            pattern = File.join(base_dir, glob)
+          end
+        else
+          pattern = glob
+        end
         Dir.glob(pattern)
       end
       files = files.select { |f| File.file?(f) && exts.any? { |ext| f.ends_with?(ext) } }
       files = files.reject { |f| excludes.any? { |ex| File.match?(ex, f) } }
       files.uniq
+
+      # If no files matched the configured includes (common when includes are for the other language),
+      # fall back to scanning the source directory for files with the target extensions.
+      if files.empty? && base_dir
+        files = exts.flat_map do |ext|
+          Dir.glob(File.join(base_dir, "**/*#{ext}"))
+        end.select { |f| File.file?(f) }
+        files.uniq
+      else
+        files
+      end
     end
 
     private def self.process_file(
@@ -291,7 +360,7 @@ YAML
     )
       source = File.read(path)
       bytes = source.to_slice
-      
+
       # Use provided RBS/RBI output roots, or fall back to config
       rbs_output_dir = rbs_output_root || config.rbs_output_dir
       rbi_output_dir = rbi_output_root || config.rbi_output_dir
@@ -336,20 +405,20 @@ YAML
       when TranspileTarget::RoundTrip
         if path.ends_with?(".rb")
           result = Warp::Testing::BidirectionalValidator.ruby_to_crystal_to_ruby(source)
-          puts "Round-trip Ruby: #{path} (delta=#{result.formatting_delta})"
-          result.diagnostics.each { |d| puts "  - #{d}" }
+          print_with_progress_clear("Round-trip Ruby: #{path} (delta=#{result.formatting_delta})")
+          result.diagnostics.each { |d| print_with_progress_clear("  - #{d}") }
         elsif path.ends_with?(".cr")
           result = Warp::Testing::BidirectionalValidator.crystal_to_ruby_to_crystal(source)
-          puts "Round-trip Crystal: #{path} (delta=#{result.formatting_delta})"
-          result.diagnostics.each { |d| puts "  - #{d}" }
+          print_with_progress_clear("Round-trip Crystal: #{path} (delta=#{result.formatting_delta})")
+          result.diagnostics.each { |d| print_with_progress_clear("  - #{d}") }
         else
-          puts "Skipping unsupported file: #{path}"
+          print_with_progress_clear("Skipping unsupported file: #{path}")
         end
         return
       else
         tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(bytes)
         if lex_error != Warp::Core::ErrorCode::Success
-          puts "Lex error (Ruby): #{path}"
+          print_with_progress_clear("Lex error (Ruby): #{path}")
           return
         end
       end
@@ -369,23 +438,23 @@ YAML
                   end
 
         ext = target == TranspileTarget::Rbs ? ".rbs" : (target == TranspileTarget::Rbi ? ".rbi" : ".rb")
-        write_or_print(path, output_root, content, ext, stdout)
+        write_or_print(path, output_root, content, ext, stdout, config.folder_mappings)
       else
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
         result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations)
         if result.error != Warp::Core::ErrorCode::Success
-          puts "Transpile error (Ruby->Crystal): #{path}"
-          result.diagnostics.each { |d| puts "  - #{d}" }
+          print_with_progress_clear("Transpile error (Ruby->Crystal): #{path}")
+          result.diagnostics.each { |d| print_with_progress_clear("  - #{d}") }
           return
         end
         if stdout
           puts result.output
         else
-          out_path = output_path_for(path, output_root, ".cr")
+          out_path = output_path_for(path, output_root, ".cr", config.folder_mappings)
           if result.crystal_doc
             Warp::Lang::Crystal::Serializer.emit_to_file(result.crystal_doc.not_nil!, out_path)
           else
-            write_output(path, output_root, result.output, ".cr")
+            write_output(path, output_root, result.output, ".cr", config.folder_mappings)
           end
         end
       end
@@ -414,6 +483,30 @@ YAML
         puts content
       else
         write_output(source_path, output_root, content, ext, folder_mappings)
+      end
+    end
+
+    private def self.print_with_progress_clear(message : String)
+      puts message
+    end
+
+    private def self.print_verbose_worker_info(worker_count : Int32)
+      # Get core allocation for this worker count
+      cores = Warp::Parallel::CPUDetector.allocate_workers_to_cores(worker_count)
+
+      # Print detailed information about each worker with core assignment
+      puts "Worker Allocation:"
+      cores.each_with_index do |core, idx|
+        worker_id = idx + 1
+        puts "  Worker #{worker_id}: #{core}"
+      end
+      puts
+      # Print SIMD capabilities
+      puts "SIMD Capabilities:"
+      simd_info = Warp::Parallel::CPUDetector.simd_capabilities
+      simd_info.each do |capability, supported|
+        status = supported ? "✓" : "✗"
+        puts "  #{status} #{capability}"
       end
     end
 
