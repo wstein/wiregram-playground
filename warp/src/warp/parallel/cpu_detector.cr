@@ -71,6 +71,52 @@ module Warp::Parallel
     end
   end
 
+  # ARM architecture version detection
+  enum ARMVersion
+    ARMv6      # ARM v6 (Pi 1/Zero)
+    ARMv7      # ARM v7 (Pi 2, Pi 3 32-bit mode)
+    ARMv8      # ARM v8 (Pi 3/4/5 64-bit)
+    Unknown    # Unknown ARM version
+
+    def to_s(io : IO)
+      io << case self
+      when ARMv6   then "armv6"
+      when ARMv7   then "armv7"
+      when ARMv8   then "armv8"
+      when Unknown then "unknown"
+      else              "unknown"
+      end
+    end
+  end
+
+  # Raspberry Pi model detection
+  enum RaspberryPiModel
+    Pi1        # Raspberry Pi 1 (ARMv6)
+    PiZero     # Raspberry Pi Zero (ARMv6)
+    PiZeroW    # Raspberry Pi Zero W (ARMv6)
+    Pi2        # Raspberry Pi 2 (ARMv7)
+    Pi3        # Raspberry Pi 3 (ARMv8 32-bit capable)
+    Pi3B       # Raspberry Pi 3B+
+    Pi4        # Raspberry Pi 4 (ARMv8 64-bit)
+    Pi5        # Raspberry Pi 5 (ARMv8 64-bit)
+    Unknown    # Not a Raspberry Pi
+
+    def to_s(io : IO)
+      io << case self
+      when Pi1       then "pi1"
+      when PiZero    then "pi-zero"
+      when PiZeroW   then "pi-zero-w"
+      when Pi2       then "pi2"
+      when Pi3       then "pi3"
+      when Pi3B      then "pi3b+"
+      when Pi4       then "pi4"
+      when Pi5       then "pi5"
+      when Unknown   then "unknown"
+      else                "unknown"
+      end
+    end
+  end
+
   # SIMD capability detection and classification
   enum SIMDCapability
     None   # No SIMD support
@@ -100,13 +146,28 @@ module Warp::Parallel
     @@cpu_model : String?
     @@cpu_vendor : CPUVendor?
     @@microarch : Microarchitecture?
+    @@arm_version : ARMVersion?
+    @@pi_model : RaspberryPiModel?
+    @@memory_bandwidth_limited : Bool?
 
     def detect_simd : SIMDCapability
       return @@capability.not_nil! if @@capability
 
       {% if flag?(:aarch64) || flag?(:arm) %}
-        # ARM architecture - assume NEON support
-        @@capability = SIMDCapability::NEON
+        # ARM architecture - detect NEON based on version
+        arm_arch = detect_arm_version
+        
+        case arm_arch
+        when ARMVersion::ARMv6
+          # ARMv6 (Pi 1/Zero) - no NEON support, use scalar
+          @@capability = SIMDCapability::None
+        when ARMVersion::ARMv7, ARMVersion::ARMv8
+          # ARMv7/v8 have NEON support
+          @@capability = SIMDCapability::NEON
+        else
+          # Conservative fallback
+          @@capability = SIMDCapability::None
+        end
       {% elsif flag?(:x86_64) || flag?(:i686) %}
         # x86/x64 architecture - detect via runtime inspection
         @@capability = detect_x86_simd
@@ -115,6 +176,120 @@ module Warp::Parallel
       {% end %}
 
       @@capability.not_nil!
+    end
+
+    # Detect ARM CPU architecture version
+    def detect_arm_version : ARMVersion
+      return @@arm_version.not_nil! if @@arm_version
+
+      {% if flag?(:aarch64) %}
+        # 64-bit ARM is definitely ARMv8+
+        @@arm_version = ARMVersion::ARMv8
+      {% elsif flag?(:arm) %}
+        # 32-bit ARM - need to detect exact version
+        @@arm_version = detect_arm_version_from_cpu
+      {% else %}
+        @@arm_version = ARMVersion::Unknown
+      {% end %}
+
+      @@arm_version.not_nil!
+    end
+
+    # Detect Raspberry Pi model
+    def detect_pi_model : RaspberryPiModel
+      return @@pi_model.not_nil! if @@pi_model
+
+      {% if flag?(:linux) %}
+        # Try to detect Raspberry Pi using /proc/device-tree/model
+        if File.exists?("/proc/device-tree/model")
+          begin
+            model_info = File.read("/proc/device-tree/model").strip.downcase
+            
+            # Match Raspberry Pi models
+            case model_info
+            when .includes?("raspberry pi 5")
+              @@pi_model = RaspberryPiModel::Pi5
+            when .includes?("raspberry pi 4")
+              @@pi_model = RaspberryPiModel::Pi4
+            when .includes?("raspberry pi 3 model b+")
+              @@pi_model = RaspberryPiModel::Pi3B
+            when .includes?("raspberry pi 3")
+              @@pi_model = RaspberryPiModel::Pi3
+            when .includes?("raspberry pi 2")
+              @@pi_model = RaspberryPiModel::Pi2
+            when .includes?("raspberry pi zero w")
+              @@pi_model = RaspberryPiModel::PiZeroW
+            when .includes?("raspberry pi zero")
+              @@pi_model = RaspberryPiModel::PiZero
+            when .includes?("raspberry pi 1") || .includes?("raspberry pi model")
+              @@pi_model = RaspberryPiModel::Pi1
+            else
+              @@pi_model = RaspberryPiModel::Unknown
+            end
+            return @@pi_model.not_nil! if @@pi_model != RaspberryPiModel::Unknown
+          rescue
+          end
+        end
+
+        # Fallback: check /proc/cpuinfo for BCM2xxx markers
+        if File.exists?("/proc/cpuinfo")
+          File.each_line("/proc/cpuinfo") do |line|
+            if line.starts_with?("Hardware")
+              hardware = line.split(":", 2)[1].strip.downcase rescue ""
+              
+              case hardware
+              when .includes?("bcm2835")
+                @@pi_model = RaspberryPiModel::Pi1
+              when .includes?("bcm2836")
+                @@pi_model = RaspberryPiModel::Pi2
+              when .includes?("bcm2837")
+                @@pi_model = RaspberryPiModel::Pi3
+              when .includes?("bcm2711")
+                @@pi_model = RaspberryPiModel::Pi4
+              when .includes?("bcm2712")
+                @@pi_model = RaspberryPiModel::Pi5
+              else
+                next
+              end
+              
+              return @@pi_model.not_nil!
+            end
+          end
+        end
+      {% end %}
+
+      @@pi_model = RaspberryPiModel::Unknown
+      @@pi_model.not_nil!
+    end
+
+    # Check if system has limited memory bandwidth (Pi systems, embedded)
+    def memory_bandwidth_limited? : Bool
+      return @@memory_bandwidth_limited.not_nil! if @@memory_bandwidth_limited
+
+      pi_model = detect_pi_model
+      
+      # Raspberry Pi systems have limited memory bandwidth
+      case pi_model
+      when RaspberryPiModel::Pi1, RaspberryPiModel::PiZero, RaspberryPiModel::PiZeroW
+        @@memory_bandwidth_limited = true  # ~450 MB/s
+      when RaspberryPiModel::Pi2
+        @@memory_bandwidth_limited = true  # ~800 MB/s
+      when RaspberryPiModel::Pi3, RaspberryPiModel::Pi3B
+        @@memory_bandwidth_limited = true  # ~1400 MB/s
+      when RaspberryPiModel::Pi4
+        @@memory_bandwidth_limited = true  # ~3500 MB/s (still limited vs modern x86)
+      when RaspberryPiModel::Pi5
+        @@memory_bandwidth_limited = true  # ~5000 MB/s
+      else
+        @@memory_bandwidth_limited = false
+      end
+
+      @@memory_bandwidth_limited.not_nil!
+    end
+
+    # Check if this is a Raspberry Pi system
+    def is_raspberry_pi? : Bool
+      detect_pi_model != RaspberryPiModel::Unknown
     end
 
     # Detect CPU vendor (Intel, AMD, ARM)
@@ -186,6 +361,51 @@ module Warp::Parallel
       {% end %}
 
       "Unknown"
+    end
+
+    private def detect_arm_version_from_cpu : ARMVersion
+      {% if flag?(:linux) %}
+        if File.exists?("/proc/cpuinfo")
+          File.each_line("/proc/cpuinfo") do |line|
+            if line.starts_with?("CPU part")
+              # Parse CPU part: typical values are 0xc07 (ARMv7), 0xd03 (ARMv8), etc.
+              cpu_part = line.split(":", 2)[1].strip.downcase rescue ""
+              
+              # ARMv8 identifiers (0xd0x range)
+              return ARMVersion::ARMv8 if cpu_part.includes?("0xd0") || cpu_part.includes?("0xd1") || cpu_part.includes?("0xd2")
+              
+              # ARMv7 identifiers (0xc0x range)
+              return ARMVersion::ARMv7 if cpu_part.includes?("0xc0") || cpu_part.includes?("0xc1")
+              
+              # ARMv6 identifiers (0xb76)
+              return ARMVersion::ARMv6 if cpu_part.includes?("0xb76") || cpu_part.includes?("0xb47")
+            end
+            
+            # Also check CPU implementer and architecture
+            if line.starts_with?("CPU architecture")
+              arch_str = line.split(":", 2)[1].strip rescue ""
+              
+              # Architecture field format: "ARMv8" or numeric like "8"
+              return ARMVersion::ARMv8 if arch_str.includes?("ARMv8") || arch_str.includes?(" 8")
+              return ARMVersion::ARMv7 if arch_str.includes?("ARMv7") || arch_str.includes?(" 7")
+              return ARMVersion::ARMv6 if arch_str.includes?("ARMv6") || arch_str.includes?(" 6")
+            end
+          end
+        end
+      {% elsif flag?(:darwin) %}
+        # On macOS ARM (Apple Silicon), it's definitely ARMv8+
+        return ARMVersion::ARMv8
+      {% end %}
+
+      # Default fallback based on compile-time flags
+      {% if flag?(:aarch64) %}
+        ARMVersion::ARMv8
+      {% elsif flag?(:arm) %}
+        # Conservative fallback for 32-bit ARM
+        ARMVersion::ARMv7
+      {% else %}
+        ARMVersion::Unknown
+      {% end %}
     end
 
     private def detect_x86_vendor : CPUVendor
@@ -343,8 +563,18 @@ module Warp::Parallel
     def summary : String
       String.build do |io|
         io << "CPU: #{cpu_count} cores, "
-        io << "Vendor: #{detect_vendor}, "
-        io << "Microarch: #{detect_microarchitecture}, "
+        
+        {% if flag?(:aarch64) || flag?(:arm) %}
+          io << "ARM: #{detect_arm_version}, "
+          if is_raspberry_pi?
+            io << "Pi: #{detect_pi_model}, "
+            io << "Bandwidth: #{"limited" if memory_bandwidth_limited?}, "
+          end
+        {% else %}
+          io << "Vendor: #{detect_vendor}, "
+          io << "Microarch: #{detect_microarchitecture}, "
+        {% end %}
+        
         io << "Model: #{cpu_model}, "
         io << "SIMD: #{detect_simd}, "
         io << "P-core: #{is_performance_core?}"

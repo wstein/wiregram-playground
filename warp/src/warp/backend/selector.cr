@@ -12,13 +12,37 @@ module Warp
 
         # Auto-select based on architecture and capabilities
         {% if flag?(:aarch64) %}
-          NeonBackend.new
+          select_arm_backend
+        {% elsif flag?(:arm) %}
+          select_arm_backend
         {% elsif flag?(:x86_64) %}
           # x86_64: Prefer AVX2 if available, fall back to SSE2, then scalar
           select_x86_backend
         {% else %}
           ScalarBackend.new
         {% end %}
+      end
+
+      private def self.select_arm_backend : Base
+        # ARM backend selection with Raspberry Pi optimization
+        arm_version = Warp::Parallel::CPUDetector.detect_arm_version
+        
+        case arm_version
+        when Warp::Parallel::ARMVersion::ARMv6
+          # ARMv6 (Raspberry Pi 1/Zero) - no NEON support
+          # Use ARMv6-optimized scalar backend
+          return ARMv6Backend.new
+        when Warp::Parallel::ARMVersion::ARMv7
+          # ARMv7 (Raspberry Pi 2) - has NEON but with limitations
+          # Use NEON for better performance
+          return NeonBackend.new
+        when Warp::Parallel::ARMVersion::ARMv8
+          # ARMv8 (Raspberry Pi 3/4/5, Apple Silicon) - full NEON/SIMD support
+          return NeonBackend.new
+        else
+          # Unknown ARM - use NEON as safe default
+          return NeonBackend.new
+        end
       end
 
       private def self.select_x86_backend : Base
@@ -127,8 +151,14 @@ module Warp
         case name
         when "scalar"
           ScalarBackend.new
+        when "armv6"
+          {% if flag?(:arm) %}
+            ARMv6Backend.new
+          {% else %}
+            nil
+          {% end %}
         when "neon"
-          {% if flag?(:aarch64) %}
+          {% if flag?(:aarch64) || flag?(:arm) %}
             NeonBackend.new
           {% else %}
             nil
