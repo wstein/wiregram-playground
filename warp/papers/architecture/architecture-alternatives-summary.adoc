@@ -14,27 +14,27 @@ This document provides a quick-reference summary of the four architectural alter
 
 [cols="1,2,1,1"]
 |===
-|Alternative |Description |Rating |Recommendation
+|Alternative |Description |Rating |Decision
 
-|*Alternative 1*
-|Monolithic Backend Approach
+|Alternative 1
+|Monolithic Backend
 |⭐⭐⭐⭐ (7/10)
-|Not Recommended
+|❌ Rejected
 
-|*Alternative 2*
-|Layered Abstraction with Runtime Selection
+|Alternative 2
+|Layered Runtime Selection
 |⭐⭐⭐⭐⭐ (9/10)
-|Recommended (Fallback)
+|✅ Approved (Fallback)
 
-|*Alternative 3*
+|Alternative 3
 |Compile-Time Specialization
 |⭐⭐⭐ (6/10)
-|Not Recommended
+|❌ Rejected
 
-|*Alternative 4*
+|Alternative 4
 |Hybrid Approach
 |⭐⭐⭐⭐⭐ (9/10)
-|*PRIMARY RECOMMENDATION*
+|✅ **PRIMARY RECOMMENDATION**
 |===
 
 == Detailed Ratings

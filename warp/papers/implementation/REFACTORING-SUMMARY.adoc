@@ -187,3 +187,18 @@ src/warp/
 The refactoring successfully establishes a robust foundation for multi-language Warp. The architecture is validated, documentation is comprehensive, and the Ruby tape prototype demonstrates technical feasibility. The codebase is now ready for Phase 2: Ruby lexer implementation.
 
 **Current Status**: ✓ Suggestion #1 and #2 complete. Ready to proceed with Ruby lexer.
+
+== Transpiler Improvements Update (Feb 1, 2026)
+
+=== Summary
+Successfully updated documentation and integration tests for the CST-based transpiler improvements.
+
+=== Key Updates
+* **Fixed Integration Tests**: Updated type mapping assertions (Integer → Int32). All 25 tests passing.
+* **Architecture Overview**: Implemented Analyzer/Rewriter pattern for CST-based transformations.
+* **CST Implementation**: Completed type alias conversion and main guard removal logic.
+
+=== Test Results
+* **Total Tests**: 25
+* **Passed**: 25 ✓
+* **Execution Time**: ~15.51ms

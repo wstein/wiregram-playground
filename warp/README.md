@@ -11,9 +11,10 @@ Comprehensive documentation is organized into the following categories:
 Detailed technical designs, design documents, and ADRs (Architecture Decision Records).
 
 - [Reference Architecture](papers/architecture/reference-architecture.adoc)
-- [Multi-language Guide](papers/architecture/multi-language-guide.adoc)
+- [Architecture Alternatives](papers/architecture/architecture-alternatives-summary.adoc)
 - [CST Transpiler Design](papers/architecture/cst-transpiler-design.adoc)
-- [CST vs AST Comparison](papers/architecture/CST_VS_AST_COMPARISON.md)
+- [CST vs AST Comparison](papers/architecture/CST_VS_AST_COMPARISON.adoc)
+- [CST Output Format](papers/architecture/CST_OUTPUT_FORMAT.adoc)
 
 ### [Implementation](papers/implementation/)
 
@@ -22,7 +23,7 @@ Plans, refactoring summaries, and completion reports.
 - [Implementation Plan](papers/implementation/implementation-plan.adoc)
 - [Quick Start Guide](papers/implementation/QUICKSTART.adoc)
 - [Refactoring Summary](papers/implementation/REFACTORING-SUMMARY.adoc)
-- [CST Implementation Status](papers/implementation/CST_IMPLEMENTATION_COMPLETE.md)
+- [CST Implementation Complete](papers/implementation/CST_IMPLEMENTATION_COMPLETE.adoc)
 
 ### [Performance](papers/performance/)
 
@@ -31,24 +32,24 @@ SIMD optimizations, hardware-specific notes, and research papers.
 - [SIMD Optimization Notes](papers/performance/simd-optimization-notes.adoc)
 - [AMD AVX-512 Optimization](papers/performance/amd-avx512-optimization.adoc)
 - [Raspberry Pi Optimization](papers/performance/raspberry-pi-optimization.adoc)
-- [Performance Study](papers/performance/performance.adoc)
+- [Performance Analysis](papers/performance/performance.adoc)
 
 ### [Testing](papers/testing/)
 
 Test plans, status reports, and coverage documentation.
 
-- [Integration Test Status](papers/testing/INTEGRATION_TEST_STATUS.md)
-- [Testing Overview](papers/testing/testing.adoc)
-- [Docs and Tests Updates](papers/testing/DOCS_AND_TESTS_UPDATE.md)
+- [Testing Strategy](papers/testing/testing.adoc)
+- [Integration Test Status](papers/testing/INTEGRATION_TEST_STATUS.adoc)
+- [Docs and Tests Update](papers/testing/DOCS_AND_TESTS_UPDATE.adoc)
 
 ### [Guides](papers/guides/)
 
 User guides, contributor guides, and executive summaries.
 
-- [Project Guide](papers/guides/GUIDE.md)
+- [Project Guide](papers/guides/project-guide.adoc)
 - [Contributing Guide](papers/guides/CONTRIBUTING_GUIDE.adoc)
-- [Transpiler Improvements](papers/guides/TRANSPILER_IMPROVEMENTS.md)
-- [Executive Summary](papers/guides/executive-summary.adoc)
+- [Transpiler Improvements](papers/guides/TRANSPILER_IMPROVEMENTS.adoc)
+- [Multi-Language Guide](papers/guides/multi-language-guide.adoc)
 
 ## Quick Start
 
@@ -175,6 +176,7 @@ graph LR
     E --> F[Stage2: Tape Building]
     F --> G[Document: Tape + Original Bytes]
     G --> H[Parser API]
+    G --> H[Parser API]
     H --> I[Token Iterator]
     H --> J[Document Iterator]
 
@@ -184,6 +186,15 @@ graph LR
     F --> N[Container Linking]
     F --> O[Scalar Validation]
 ```
+
+### Architecture Decision Summary
+
+| Alternative | Description | Rating | Decision |
+| :--- | :--- | :--- | :--- |
+| **Alternative 1** | Monolithic Backend | ⭐⭐⭐⭐ (7/10) | ❌ Rejected |
+| **Alternative 2** | Layered Runtime Selection | ⭐⭐⭐⭐⭐ (9/10) | ✅ Approved (Fallback) |
+| **Alternative 3** | Compile-Time Specialization | ⭐⭐⭐ (6/10) | ❌ Rejected |
+| **Alternative 4** | **Hybrid Approach** | ⭐⭐⭐⭐⭐ (9/10) | ✅ **PRIMARY RECOMMENDATION** |
 
 ### Component Architecture
 

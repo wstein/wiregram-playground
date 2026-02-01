@@ -190,6 +190,18 @@ Implement transpilation logic:
 - Tag lossy transformations (eval, refinements, etc.)
 - Emit CST with trivia preserved
 
+== Project Timeline (MVP)
+
+[cols="10,40"]
+|===
+| Week | Deliverable
+| Week 1 | Semantic Analyzer + Crystal CST Builder
+| Week 2 | Serializer + integration tests
+| Week 3 | Project-aware CLI (init, transpile, analyze)
+| Week 4 | Documentation + distribution (Homebrew)
+| End of Month | Production-ready MVP
+|===
+
 === Crystal Support (Future)
 
 Once Ruby is complete, Crystal support will follow the same pattern:
