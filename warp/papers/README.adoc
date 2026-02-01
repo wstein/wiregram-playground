@@ -1,409 +1,69 @@
-= Warp SIMD Architecture Review - Documentation Index
+= Warp Documentation Index
 :doctype: article
 :toc: left
-:toclevels: 2
+:toclevels: 3
 
 == Overview
 
-This index provides a guide to the comprehensive SIMD architecture review documentation. The review evaluated four architectural alternatives for implementing multi-platform SIMD support in the Warp (Crystal) library.
+This directory contains the comprehensive technical documentation for the Warp SIMD project, ranging from architectural proposals and ADRs to performance studies and implementation guides.
 
-**Review Date**: January 28, 2026
+== Documentation Hierarchy
 
-**Participants**: Senior Software Architect, Computer Science Professor, Ruby/Crystal Developer, Assembly Programmer
+=== 🏗️ Architecture
+*Core design decisions, proposals, and reviews.*
 
-**Decision**: Implement Alternative 4 (Hybrid Approach) - Unanimous approval (4/4)
+* **Executive Summary**: [architecture/executive-summary.adoc](architecture/executive-summary.adoc) - High-level decision summary for stakeholders.
+* **Reference Architecture**: [architecture/reference-architecture.adoc](architecture/reference-architecture.adoc) - Current system design and pipeline.
+* **Analysis & Recommendations (2026-01-31)**: [architecture/2026-01-31-architecture-analysis-recommendations.adoc](architecture/2026-01-31-architecture-analysis-recommendations.adoc) - Latest architectural health check.
+* **Architecture Alternatives**: [architecture/architecture-alternatives-summary.adoc](architecture/architecture-alternatives-summary.adoc) - Comparison of SIMD approaches.
+* **Visual Reference**: [architecture/architecture-visual-reference.adoc](architecture/architecture-visual-reference.adoc) - Diagrams and flowcharts.
+* **Architectural Review Minutes**: [architecture/architectural-review-minutes.adoc](architecture/architectural-review-minutes.adoc) - Detailed meeting records.
+* **Expert Panel Review**: [architecture/expert-panel-review.adoc](architecture/expert-panel-review.adoc) - Deep dives from specialist perspectives.
+* **Original SIMD ADR**: [architecture/simd-architecture-adr.adoc](architecture/simd-architecture-adr.adoc) - Foundation decision records.
 
-== Architecture Alignment
-include::reference-architecture.adoc[tag=pipeline]
-include::reference-architecture.adoc[tag=scenarios]
+=== 🛠️ Implementation
+*Technical specs, transpiler design, and project structure.*
 
-== Quick Start
+* **Implementation Plan**: [implementation/implementation-plan.adoc](implementation/implementation-plan.adoc) - Roadmaps and milestones.
+* **Crystal <=> Ruby Transpiler**: [implementation/crystal-ruby-transpiler-proposal.adoc](implementation/crystal-ruby-transpiler-proposal.adoc) - Bidirectional transpilation design.
+* **CST Transpiler Design**: [implementation/cst-transpiler-design.adoc](implementation/cst-transpiler-design.adoc) - Concrete Implementation of the CST mapper.
+* **Language Pipeline**: [implementation/ruby-crystal-language-pipeline.adoc](implementation/ruby-crystal-language-pipeline.adoc) - Unified CST/AST/Tape flow.
+* **JSONC Support**: [implementation/jsonc-support-notes.adoc](implementation/jsonc-support-notes.adoc) - Handling comments and extensions.
+* **Project Structure ADR**: [implementation/adr-project-structure.adoc](implementation/adr-project-structure.adoc) - Rationale for the current directory layout.
+* **Stage 2 ADR**: [implementation/adr-stage2-whitespace-structurals.adoc](implementation/adr-stage2-whitespace-structurals.adoc) - Handling structural elements.
+* **Structure Review Minutes**: [implementation/structure-review-minutes.adoc](implementation/structure-review-minutes.adoc) - Reorganization meeting notes.
 
-**New to this review?** Start here:
+=== ⚡ Performance
+*Benchmarks, optimization notes, and comparative studies.*
 
-1. Read the **Executive Summary** (5 minutes) - [executive-summary.adoc](executive-summary.adoc)
-2. Review **Architecture Alternatives Summary** (10 minutes) - [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc)
-3. Browse **Visual Reference** (5 minutes) - [architecture-visual-reference.adoc](architecture-visual-reference.adoc)
+* **Performance Analysis**: [performance/performance.adoc](performance/performance.adoc) - General SIMD and GC optimization notes.
+* **SIMD Optimization Notes**: [performance/simd-optimization-notes.adoc](performance/simd-optimization-notes.adoc) - Deep dive into backend-specific optimizations.
+* **Formatting Performance Study**: [performance/formatting-performance-study.adoc](performance/formatting-performance-study.adoc) - Comparative study of DOM vs Tape vs CST.
 
-**Need details?**
+=== 🧪 Testing
+*Validation strategies and quality assurance.*
 
-- Full meeting minutes: [architectural-review-minutes.adoc](architectural-review-minutes.adoc)
-- Expert perspectives: [expert-panel-review.adoc](expert-panel-review.adoc)
+* **Testing Strategy**: [testing/testing.adoc](testing/testing.adoc) - Overview of unit, integration, and fuzz testing.
 
-**Original proposals**:
+=== 📖 Guides
+*Developer onboarding and multi-language support.*
 
-- RFC: [simd-architecture-rfc.adoc](simd-architecture-rfc.adoc)
-- ADR: [simd-architecture-adr.adoc](simd-architecture-adr.adoc)
-- ADR: [adr-stage2-whitespace-structurals.adoc](adr-stage2-whitespace-structurals.adoc)
-- ADR: [adr-project-structure.adoc](adr-project-structure.adoc)
-- Minutes: [structure-review-minutes.adoc](structure-review-minutes.adoc)
+* **Multi-Language Guide**: [guides/multi-language-guide.adoc](guides/multi-language-guide.adoc) - Working with Ruby and Crystal concurrently.
 
-== Document Descriptions
+== Quick Start Paths
 
-=== Executive Summary
-**File**: [executive-summary.adoc](executive-summary.adoc)
+=== New Stakeholders (15m)
+1. [Executive Summary](architecture/executive-summary.adoc)
+2. [Visual Reference](architecture/architecture-visual-reference.adoc)
 
-**Length**: ~5 pages
+=== Core Developers (1h)
+1. [Reference Architecture](architecture/reference-architecture.adoc)
+2. [Implementation Plan](implementation/implementation-plan.adoc)
+3. [Language Pipeline](implementation/ruby-crystal-language-pipeline.adoc)
 
-**Purpose**: High-level decision summary for stakeholders
-
-**Contents**:
-- Quick decision matrix
-- Performance comparison
-- Implementation plan (8 weeks)
-- Risk assessment
-- Success metrics
-- Approval signatures
-
-**Audience**: Project managers, stakeholders, decision makers
-
-**Reading Time**: 5 minutes
-
----
-
-=== Architecture Alternatives Summary
-**File**: [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc)
-
-**Length**: ~15 pages
-
-**Purpose**: Detailed ratings and comparison of all four alternatives
-
-**Contents**:
-- Alternative 1: Monolithic Backend (7/10)
-- Alternative 2: Layered Runtime Selection (9/10)
-- Alternative 3: Compile-Time Specialization (6/10)
-- Alternative 4: Hybrid Approach (9/10) ✅ RECOMMENDED
-- Comparison matrices
-- Decision tree
-- Use case recommendations
-
-**Audience**: Technical leads, architects, senior developers
-
-**Reading Time**: 15-20 minutes
-
----
-
-=== Architectural Review Minutes
-**File**: [architectural-review-minutes.adoc](architectural-review-minutes.adoc)
-
-**Length**: ~40 pages
-
-**Purpose**: Complete meeting transcript with detailed analysis
-
-**Contents**:
-- Current state analysis
-- Detailed evaluation of each alternative
-- Board ratings and recommendations
-- Implementation priorities (phased approach)
-- Risk analysis & mitigation
-- Open questions & decisions
-- Success metrics
-- Action items
-
-**Audience**: Implementation team, future maintainers, technical auditors
-
-**Reading Time**: 60-90 minutes
-
----
-
-=== Expert Panel Review
-**File**: [expert-panel-review.adoc](expert-panel-review.adoc)
-
-**Length**: ~35 pages
-
-**Purpose**: Individual expert perspectives on each alternative
-
-**Contents**:
-
-**Senior Software Architect's Analysis**:
-- Production readiness
-- Deployment considerations
-- Operational excellence
-- Monitoring & observability
-
-**Computer Science Professor's Analysis**:
-- Theoretical soundness
-- Complexity analysis (Big-O notation)
-- Formal verification
-- Educational value
-
-**Ruby/Crystal Developer's Analysis**:
-- Crystal idioms and best practices
-- Compile-time macro usage
-- Developer experience
-- Ecosystem fit
-
-**Assembly Programmer's Analysis**:
-- Instruction-level performance
-- SIMD efficiency
-- Cache behavior
-- Register allocation
-- Benchmarks
-
-**Audience**: Technical specialists, performance engineers, language experts
-
-**Reading Time**: 45-60 minutes
-
----
-
-=== Architecture Visual Reference
-**File**: [architecture-visual-reference.adoc](architecture-visual-reference.adoc)
-
-**Length**: ~12 pages
-
-**Purpose**: Visual diagrams and flowcharts for all alternatives
-
-**Contents**:
-- Architecture comparison diagrams (ASCII art)
-- Performance flow diagrams
-- Data flow diagrams (1MB JSON processing)
-- Performance vs Complexity chart
-- Flexibility vs Performance chart
-- Decision tree flowchart
-- Implementation roadmap
-
-**Audience**: Visual learners, presentations, quick reference
-
-**Reading Time**: 10-15 minutes
-
----
-
-=== Warp SIMD Architecture RFC (Original)
-**File**: [simd-architecture-rfc.adoc](simd-architecture-rfc.adoc)
-
-**Length**: ~30 pages
-
-**Purpose**: Original Request for Comments proposing the SIMD architecture
-
-**Contents**:
-- Current architecture analysis
-- Limitations for AVX512 support
-- Proposed three-layer design
-- Layer 1: SIMD Interface Layer
-- Layer 2: Hardware Abstraction Layer
-- Layer 3: SIMD Length Optimization
-- Architecture alternatives
-- Performance analysis
-
-**Audience**: Original proposal readers, historical context
-
-**Reading Time**: 30-45 minutes
-
----
-
-=== Warp SIMD Architecture ADR (Original)
-**File**: [simd-architecture-adr.adoc](simd-architecture-adr.adoc)
-
-**Length**: ~10 pages
-
-**Purpose**: Original Architecture Decision Record
-
-**Contents**:
-- Context and problem statement
-- Proposed decision (three-layer architecture)
-- Rationale
-- Implications (positive and negative)
-- Alternatives considered
-- Success metrics
-- Review criteria
-
-**Audience**: Architecture decision history, context for reviewers
-
-**Reading Time**: 15-20 minutes
-
----
-
-=== Crystal <=> Ruby Transpiler Proposal
-**File**: [crystal-ruby-transpiler-proposal.adoc](crystal-ruby-transpiler-proposal.adoc)
-
-**Length**: ~6 pages
-
-**Purpose**: Non-destructive bidirectional transpiler proposal
-
-**Contents**:
-- Goals and non-goals
-- Lossless CST + semantic IR architecture
-- Translation strategy and fallbacks
-- Diagnostics and testing plan
-
-**Audience**: Language tooling engineers, compiler/tooling architects
-
-**Reading Time**: 10-15 minutes
-
----
-
-=== Formatting Performance Study
-**File**: [formatting-performance-study.adoc](formatting-performance-study.adoc)
-
-**Length**: ~6 pages
-
-**Purpose**: Tape vs DOM vs CST vs AST formatting performance comparison (PoC)
-
-**Contents**:
-- Benchmark methodology
-- Results on two datasets
-- Recommendations with ratings
-
-**Audience**: Performance engineers, tooling developers
-
-**Reading Time**: 10-15 minutes
-
----
-
-=== Performance Considerations
-**File**: [performance.adoc](performance.adoc)
-
-**Length**: ~8 pages
-
-**Purpose**: SIMD, GC, and parser optimization notes with current improvements
-
-**Contents**:
-- SIMD backends summary
-- Recent SIMD improvements (escape scan, number scan, JSONC scanning)
-- SoA view notes and suggested benchmarks
-
-**Audience**: Performance engineers, core contributors
-
-**Reading Time**: 10-15 minutes
-
----
-
-=== Ruby/Crystal Language Pipeline
-**File**: [ruby-crystal-language-pipeline.adoc](ruby-crystal-language-pipeline.adoc)
-
-**Length**: ~8 pages
-
-**Purpose**: Unified parsing/CST/AST/tape architecture and lossless transpilation
-
-**Contents**:
-- Green/red CST design
-- Tape IR for formatter and scanners
-- Linter design and inline Sorbet annotation strategy
-- Lossless Ruby <-> Crystal transpiler plan
-
-**Audience**: Language tooling engineers, compiler architects
-
-**Reading Time**: 10-15 minutes
-
----
-
-=== JSONC Support Notes
-**File**: [jsonc-support-notes.adoc](jsonc-support-notes.adoc)
-
-**Length**: ~3 pages
-
-**Purpose**: JSONC support guidance and ratings (PoC)
-
-**Contents**:
-- CST vs tape/DOM behavior
-- Comment preservation notes
-- Suggestions with ratings
-
-**Audience**: Tooling engineers, formatter authors
-
-**Reading Time**: 5-10 minutes
-
----
-
-== Reading Paths
-
-=== Path 1: Executive Quick Read (15 minutes)
-
-For busy executives and decision makers:
-
-1. [executive-summary.adoc](executive-summary.adoc) - Read "Quick Decision Summary" and "Why Alternative 4 Wins"
-2. [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc) - Skim ratings overview
-3. [architecture-visual-reference.adoc](architecture-visual-reference.adoc) - Review decision tree
-
-**Outcome**: Understand the decision and rationale
-
----
-
-=== Path 2: Technical Review (1 hour)
-
-For technical leads and architects:
-
-1. [executive-summary.adoc](executive-summary.adoc) - Full read
-2. [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc) - Full read with comparison matrices
-3. [architectural-review-minutes.adoc](architectural-review-minutes.adoc) - Skim "Board Recommendations" section
-4. [architecture-visual-reference.adoc](architecture-visual-reference.adoc) - Review diagrams
-
-**Outcome**: Deep understanding of alternatives, tradeoffs, and recommendation
-
----
-
-=== Path 3: Implementation Deep-Dive (2-3 hours)
-
-For implementation team members:
-
-1. [executive-summary.adoc](executive-summary.adoc) - Full read
-2. [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc) - Full read
-3. [architectural-review-minutes.adoc](architectural-review-minutes.adoc) - Full read, focus on:
-   - Implementation Priorities
-   - Phase 1-4 breakdown
-   - Risk Analysis & Mitigation
-4. [expert-panel-review.adoc](expert-panel-review.adoc) - Read relevant expert sections:
-   - Crystal Developer's Perspective (for language-specific guidance)
-   - Assembly Programmer's Perspective (for performance optimization)
-5. Current codebase: [src/warp/lexer/structural_scan.cr](../src/warp/lexer/structural_scan.cr), [src/warp/backend/neon_masks.cr](../src/warp/backend/neon_masks.cr)
-
-**Outcome**: Ready to begin implementation
-
----
-
-=== Path 4: Performance Analysis (1.5 hours)
-
-For performance engineers:
-
-1. [expert-panel-review.adoc](expert-panel-review.adoc) - Assembly Programmer's Perspective (full section)
-2. [architectural-review-minutes.adoc](architectural-review-minutes.adoc) - Performance Analysis section
-3. [architecture-visual-reference.adoc](architecture-visual-reference.adoc) - Data flow diagrams
-4. [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc) - Performance comparison tables
-
-**Outcome**: Understand performance implications and optimization opportunities
-
----
-
-=== Path 5: Academic/Research (2 hours)
-
-For students, researchers, or those interested in the theory:
-
-1. [expert-panel-review.adoc](expert-panel-review.adoc) - Computer Science Professor's Perspective
-2. [architectural-review-minutes.adoc](architectural-review-minutes.adoc) - Alternatives analysis
-3. [simd-architecture-rfc.adoc](simd-architecture-rfc.adoc) - Original RFC with detailed layer descriptions
-4. [architecture-alternatives-summary.adoc](architecture-alternatives-summary.adoc) - Comparison matrices
-
-**Outcome**: Understand theoretical foundations and academic merit
-
----
-
-== Key Takeaways by Document
-
-[cols="1,3"]
-|===
-|Document |Key Takeaway
-
-|**Executive Summary**
-|Alternative 4 is unanimously recommended. 8-week implementation, 4-8x performance gain.
-
-|**Alternatives Summary**
-|Alternative 4 (9/10) balances performance, flexibility, and complexity better than others.
-
-|**Review Minutes**
-|Comprehensive analysis identified Alternative 4 as Pareto optimal solution.
-
-|**Expert Panel**
-|All four experts independently arrived at the same conclusion from different perspectives.
-
-|**Visual Reference**
-|Alternative 4 architecture is clean, understandable, and efficient.
-
-|**RFC**
-|Three-layer architecture provides necessary abstraction for multi-platform SIMD.
-
-|**ADR**
-|Original decision to pursue layered architecture was sound and well-justified.
-|===
+=== Performance Engineers (45m)
+1. [SIMD Optimization Notes](performance/simd-optimization-notes.adoc)
+2. [Expert Panel (Assembly section)](architecture/expert-panel-review.adoc)
 
 == Decision Summary
 
@@ -432,133 +92,6 @@ For students, researchers, or those interested in the theory:
 |✅ **PRIMARY RECOMMENDATION**
 |===
 
-**Board Vote**: 4/4 unanimous approval for Alternative 4
-
-== Implementation Timeline
-
-[cols="1,2,1"]
-|===
-|Phase |Deliverables |Duration
-
-|Phase 1
-|CPU detection, Backend interface
-|2 weeks
-
-|Phase 2
-|SSE2, AVX2, NEON backends
-|2 weeks
-
-|Phase 3
-|AVX512 backend, Optimization
-|2 weeks
-
-|Phase 4
-|Testing, Documentation
-|2 weeks
-
-|**Total**
-|**Production ready**
-|**8 weeks**
-|===
-
-== Performance Expectations
-
-[cols="1,2,2"]
-|===
-|Platform |Current |With Alternative 4
-
-|Intel Xeon (AVX512)
-|85 ms
-|11.2 ms (7.6x faster)
-
-|AMD EPYC (AVX2)
-|85 ms
-|21.3 ms (4.0x faster)
-
-|Intel Core i5 (SSE2)
-|85 ms
-|42.5 ms (2.0x faster)
-
-|ARM Graviton (NEON)
-|12.5 ms
-|12.8 ms (no regression)
-|===
-
-== Related Files
-
-=== Source Code
-- [src/warp/lexer/structural_scan.cr](../src/warp/lexer/structural_scan.cr) - Structural scanning (Stage1a)
-- [src/warp/backend/neon_masks.cr](../src/warp/backend/neon_masks.cr) - NEON mask builder
-- [src/warp/ir/tape_builder.cr](../src/warp/ir/tape_builder.cr) - Tape building (Stage2)
-- [src/warp/core/types.cr](../src/warp/core/types.cr) - Type definitions
-
-=== Tests
-- [spec/unit/lexer_spec.cr](../spec/unit/lexer_spec.cr) - Lexer unit tests
-- [spec/integration/](../spec/integration/) - Integration tests
-
-=== Benchmarks
-- [bench/bench.cr](../bench/bench.cr) - Performance benchmarks
-
-=== Documentation
-- [README.md](../README.md) - Project README
-- [papers/performance.adoc](performance.adoc) - Performance analysis
-
-== Document Metadata
-
-[cols="1,2"]
-|===
-|Property |Value
-
-|Review Date
-|January 28, 2026
-
-|Review Duration
-|2 hours
-
-|Participants
-|4 experts (Architect, Professor, Developer, Assembly Programmer)
-
-|Alternatives Evaluated
-|4 architectural approaches
-
-|Decision
-|Alternative 4 (Hybrid Approach) - Unanimous approval
-
-|Implementation Timeline
-|8 weeks
-
-|Expected Performance Gain
-|4-8x on x86, no regression on ARM
-
-|Documentation Pages
-|~115 pages total
-
-|Status
-|Approved for Implementation
-|===
-
-== Contact & Questions
-
-For questions about this review or the implementation:
-
-- **Architecture questions**: Refer to [architectural-review-minutes.adoc](architectural-review-minutes.adoc)
-- **Performance questions**: Refer to [expert-panel-review.adoc](expert-panel-review.adoc) (Assembly Programmer's section)
-- **Implementation questions**: Refer to [architectural-review-minutes.adoc](architectural-review-minutes.adoc) (Implementation Priorities section)
-- **Crystal-specific questions**: Refer to [expert-panel-review.adoc](expert-panel-review.adoc) (Crystal Developer's section)
-
-== Version History
-
-[cols="1,1,3"]
-|===
-|Version |Date |Changes
-
-|1.0
-|2026-01-28
-|Initial release. Complete architectural review with all documentation.
-|===
-
 ---
-
-_Documentation Index v1.0_
-_Last Updated: January 28, 2026_
-_Status: Complete_
+_Documentation Index v1.1_
+_Last Updated: February 2026_

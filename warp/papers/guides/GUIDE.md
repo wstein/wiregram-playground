@@ -1,0 +1,43 @@
+# Warp Project Guide
+
+This guide captures how we steward the `ports/`, Ruby, and Crystal code in the Warp workspace, along with the lightweight `git`/vendor-style workflow we follow when syncing external artifacts.
+
+## 1. Directory Responsibilities
+
+- `ports/`: contains the Crystal/Ruby ports that were previously maintained upstream (e.g., any vendored C extensions, patched dependencies, or experimental drops). Keep changes in `ports/` isolated to discrete commits and describe the origin, patch, and rationale directly in the commit message.
+- `src/`: home to the Warp tooling (lexer, CST, transpiler, CLI, etc.). Treat this as the canonical Crystal implementation surface.
+- `spec/`/`corpus/`: Ruby/RBS fixtures and integration tests. Always update or add specs when you touch ports or Ruby annotations.
+- `bin/warp.cr` + `bin/warp`: entry points that bootstrap the CLI – keep them skinny and rely instead on `src/warp`.
+- `lib/`, `sorbet/`, `papers/`: documentation, supporting Ruby libraries, and research notes. Keep them synchronized with the code changes they document.
+
+## 2. Handling Ports and Ruby Code
+
+1. **Pin the source**: Whenever you copy an upstream Ruby or C library into `ports/`, document the origin (repo + commit/sha) in a short header comment or `README` inside that subdirectory. Prefer referencing the upstream issue/feature that requires the port.
+2. **Minimal diffs**: Rebase patches on `main`, reorganize only when necessary, and wrap Crystal/Ruby interop helpers (e.g., signature builders) with clear adapters so the port-specific logic doesn't drift.
+3. **Testing**: Run `crystal spec` after changing ports or Ruby code to ensure the round-trip validator, CLI integration, and corpus tests still pass. Use targeted specs (e.g., `crystal spec spec/integration/cli_spec.cr`) for faster feedback.
+4. **Documentation**: Update `docs/` or `GUIDE.md` when you change how ports interact with the CLI or validation tooling. Add RBS/RBI artifacts to `annotations/` or `sorbet/` if you expose new Ruby APIs.
+
+## 3. Git Workflow (Vendor-style Branches)
+
+We borrow the vendor branch pattern for port maintenance to isolate upstream syncs:
+
+1. **Create a vendor branch**: Start from `main` and create a branch named like `vendor/<port-name>` (e.g., `vendor/ameba-parsers`).
+2. **Import upstream**: Replace or update the contents of `ports/<port>` as needed. Keep a clean history by squashing formatting changes and capturing the origin commit in the branch name or final merge commit (e.g., `Import Ameba 3.4.2` with `ports/ameba` modifications).
+3. **Apply project patches**: Commit the Delta alongside a note describing why each change diverges from upstream (especially for `rb_simple.rb`-style fixtures or CLI helpers).
+4. **Test locally**: Run `crystal spec` (and any relevant integration harnesses) before merging the vendor branch back into `main`. If the vendor branch introduces large diffs, consider a temporary `ports/<component>-tmp` branch for experimentation.
+5. **Merge back with squash**: If the vendor branch is short-lived, perform a squashed merge into `main` to keep the history tidy; otherwise merge cleanly but tag the merge commit (e.g., `Merge vendor/ameba-parsers`).
+6. **Keep vendor archives**: Leave behind a small `README` or commit that records how to regenerate the port, in case another collaborator needs to repeat the process.
+
+## 4. Pull Request Etiquette
+
+- Always describe what part of the stack (Ruby corpus, Ruby→Crystal transpiler, CLI, ports) your PR touches. Mention any `spec/fixtures` you updated.
+- When touching ports or Ruby code, include regression tests that cover the new behaviour.
+- Reference the vendor branch if the PR flowed from one; mention the branch name in the PR description so reviewers can trace the upstream sync.
+
+## 5. Daily Workflow Tips
+
+- **Running the CLI**: Use `./bin/warp transpile ruby -s spec/fixtures/cli --stdout` or other fixture directories for quick smoke tests. The CLI respects `-s`/`-o` and default `.warp.yaml` config.
+- **Configuration**: The warp config loader prioritizes `.warp.yaml`, falls back to `warp.yaml`, and finally defaults to `out/` directories. Keep the CLI options (`--stdout`, `--rbs`, `--rbi`) in mind when automating ports.
+- **Round-trip verification**: The `Warp::Testing::BidirectionalValidator` helps bound regressions—run it against new corpus entries when updating ports.
+
+This guide should live with the code so new contributors can understand how we coordinate ports, Ruby, and Crystal work while keeping the git history predictable and aligned with a vendor-branch mentality.

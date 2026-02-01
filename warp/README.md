@@ -2,6 +2,54 @@
 
 A high-performance, bidirectional transpiler between Ruby and Crystal with SIMD-accelerated parsing.
 
+## Documentation
+
+Comprehensive documentation is organized into the following categories:
+
+### [Architecture](papers/architecture/)
+
+Detailed technical designs, design documents, and ADRs (Architecture Decision Records).
+
+- [Reference Architecture](papers/architecture/reference-architecture.adoc)
+- [Multi-language Guide](papers/architecture/multi-language-guide.adoc)
+- [CST Transpiler Design](papers/architecture/cst-transpiler-design.adoc)
+- [CST vs AST Comparison](papers/architecture/CST_VS_AST_COMPARISON.md)
+
+### [Implementation](papers/implementation/)
+
+Plans, refactoring summaries, and completion reports.
+
+- [Implementation Plan](papers/implementation/implementation-plan.adoc)
+- [Quick Start Guide](papers/implementation/QUICKSTART.adoc)
+- [Refactoring Summary](papers/implementation/REFACTORING-SUMMARY.adoc)
+- [CST Implementation Status](papers/implementation/CST_IMPLEMENTATION_COMPLETE.md)
+
+### [Performance](papers/performance/)
+
+SIMD optimizations, hardware-specific notes, and research papers.
+
+- [SIMD Optimization Notes](papers/performance/simd-optimization-notes.adoc)
+- [AMD AVX-512 Optimization](papers/performance/amd-avx512-optimization.adoc)
+- [Raspberry Pi Optimization](papers/performance/raspberry-pi-optimization.adoc)
+- [Performance Study](papers/performance/performance.adoc)
+
+### [Testing](papers/testing/)
+
+Test plans, status reports, and coverage documentation.
+
+- [Integration Test Status](papers/testing/INTEGRATION_TEST_STATUS.md)
+- [Testing Overview](papers/testing/testing.adoc)
+- [Docs and Tests Updates](papers/testing/DOCS_AND_TESTS_UPDATE.md)
+
+### [Guides](papers/guides/)
+
+User guides, contributor guides, and executive summaries.
+
+- [Project Guide](papers/guides/GUIDE.md)
+- [Contributing Guide](papers/guides/CONTRIBUTING_GUIDE.adoc)
+- [Transpiler Improvements](papers/guides/TRANSPILER_IMPROVEMENTS.md)
+- [Executive Summary](papers/guides/executive-summary.adoc)
+
 ## Quick Start
 
 ### Installation

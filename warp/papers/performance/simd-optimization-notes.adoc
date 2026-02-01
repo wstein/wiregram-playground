@@ -48,6 +48,12 @@ Priority Order:
 6. Scalar - universal fallback
 ----
 
+==== Performance vs Architecture (Zen4 vs Zen5)
+
+Zen4 use a dual-pumped 256-bit FPU to handle AVX-512 instructions (effectively processing 512-bit ops in two cycles), which is referred to as "double-pumped". Zen5 implements a true 512-bit datapath that can execute AVX-512 instructions in a single cycle.
+
+Zen5's full 512-bit FPU is expected to deliver approximately 20-40% faster performance for 512-bit floating-point workloads compared to Zen4. The Warp selector treats Zen4 as double-pumped and prefers AVX2 for consistency, while allowing AVX-512 on true 512-bit implementations like Zen5 and IceLake.
+
 === Runtime CPU Detection
 
 ==== Enhanced CPUDetector Module
@@ -276,6 +282,47 @@ Token throughput: ~40M tokens/sec
 - [simdjson Project](https://github.com/simdjson/simdjson) - Original architecture
 - [Intel 64 and IA-32 Architectures Software Developer's Manual](https://www.intel.com/content/dam/develop/external/us/en/documents/manuals/64-ia-32-architectures-software-developer-s-manual-combined-volumes-1-2a-2b-2c-2d-3a-3b-3c-3d.pdf)
 - [AMD64 Architecture Programmer's Manual](https://www.amd.com/en/support/tech-docs)
+
+=== Expected Performance Improvements
+
+[options="header"]
+|====
+| Backend | Scanning Width | Expected Improvement vs SSE2
+| AVX-512 | 64-byte | 2-3.5x
+| AVX2 | 32-byte | 2-3x
+| AVX | 16-byte | 1-1.5x
+| SSE2 | 16-byte | Baseline
+| Scalar | 1-byte | -70% ✗
+|====
+
+== Configuration
+
+=== Environment Variables
+
+The backend selection can be controlled or debugged using environment variables:
+
+[source,bash]
+----
+# Force specific backend (debugging)
+export WARP_BACKEND=avx2      # Force AVX2
+export WARP_BACKEND=scalar    # Force scalar (debugging)
+
+# Enable backend logging
+export WARP_BACKEND_LOG=1     # Log backend selection to stderr
+----
+
+=== Example Usage
+
+[source,bash]
+----
+$ export WARP_BACKEND_LOG=1
+$ ./bin/warp --version
+warp backend=avx2
+Warp 0.1.0 (Crystal 1.19.1)
+
+$ WARP_BACKEND=scalar ./bin/warp corpus/ruby/10_complex.rb
+# Forces scalar backend for comparison testing
+----
 
 == Conclusion
 

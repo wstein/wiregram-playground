@@ -1,0 +1,201 @@
+# Integration Test Status
+
+## Test Suite: Sorbet Transpiler Integration
+
+Last Updated: January 31, 2026
+
+### Summary
+
+**Status:** ✅ ALL PASSING
+
+- **Total Tests:** 25
+- **Passed:** 25
+- **Failed:** 0
+- **Errors:** 0
+- **Pending:** 0
+
+**Execution Time:** ~9.97ms
+
+### Test Categories
+
+#### 1. Sig Block Transformations ✅
+
+Removes Sorbet `sig` blocks and generates Crystal method signatures:
+
+- ✓ Basic sig block removal with type parameters
+- ✓ Void return types
+- ✓ Multiple parameters
+- ✓ Optional and default parameters
+- ✓ Block parameters
+- ✓ Union types
+
+**Example:**
+
+```ruby
+sig { params(x: String).returns(Integer) }
+def greet(x)
+  x.length
+end
+```
+
+Becomes:
+
+```crystal
+def greet(x : String) : Int32
+  x.length
+end
+```
+
+#### 2. T.let Transformations ✅
+
+Removes Sorbet's `T.let` wrapper while preserving values:
+
+- ✓ Basic T.let removal
+- ✓ T.let with type annotations (preserves value)
+- ✓ T.let with empty arrays (converts element types to Crystal)
+- ✓ T.let with nilable types
+- ✓ T.let with complex type expressions
+
+**Example:**
+
+```ruby
+@items = T.let([], T::Array[Integer])
+```
+
+Becomes:
+
+```crystal
+@items = [] of Int32
+```
+
+#### 3. Instance Variables ✅
+
+Handles Crystal instance variable syntax:
+
+- ✓ Instance variable initialization
+- ✓ Multiple instance variables
+- ✓ Instance variables with type annotations
+
+#### 4. T:: Type Conversions ✅
+
+Converts Sorbet's `T::` namespace types to Crystal:
+
+- ✓ `T::Array[T]` → `Array(T)`
+- ✓ `T::Hash[K, V]` → `Hash(K, V)`
+- ✓ `T::Set[T]` → `Set(T)`
+- ✓ `T::Boolean` → `Bool`
+
+#### 5. Type Alias Transformations ✅
+
+Converts `T.type_alias` to Crystal `alias` syntax:
+
+- ✓ Basic type aliases with `T.any`
+- ✓ Type aliases with complex types
+- ✓ Multiple type alias definitions
+
+**Example:**
+
+```ruby
+JsonType = T.type_alias { T.any(String, Integer, Float, T::Boolean, NilClass) }
+```
+
+Becomes:
+
+```crystal
+alias JsonType = String | Int32 | Float64 | Bool | Nil
+```
+
+#### 6. Main Guard Removal ✅
+
+Removes `if __FILE__ == $PROGRAM_NAME` guards (Crystal doesn't support global variables):
+
+- ✓ Main guard removal
+- ✓ Preserves method call before guard
+
+**Example:**
+
+```ruby
+SorbetExamples.main if __FILE__ == $PROGRAM_NAME
+```
+
+Becomes:
+
+```crystal
+# Removed entirely
+```
+
+#### 7. Rescue Clause Conversion ✅
+
+Converts Ruby rescue syntax to Crystal:
+
+- ✓ Basic rescue clauses with exception binding
+- ✓ Multiple exception types
+- ✓ Rescue in method definitions
+
+#### 8. Variable Reflection Calls ✅
+
+Converts Ruby reflection methods:
+
+- ✓ `instance_variable_get` conversions
+- ✓ `instance_variable_set` conversions
+
+#### 9. Complex Integration Scenarios ✅
+
+End-to-end transpilation of complex code:
+
+- ✓ Removes sig blocks completely without fragments
+- ✓ Preserves class structure
+- ✓ Handles nested classes
+- ✓ Handles generic classes
+
+### Recent Changes
+
+**Latest commit:** CST-based improvements
+
+1. **Re-enabled `analyze_type_aliases()`**
+   - Fixed infinite loop with proper `idx += 1` increment
+   - Uses CST-based analysis instead of regex post-processing
+   - Properly handles nested braces and complex type expressions
+
+2. **Fixed `analyze_main_guard()`**
+   - Now uses `next_non_trivia_index()` to skip whitespace
+   - Recognizes `__FILE__` as Identifier (not just Constant)
+   - Removes entire guard span safely without leaving fragments
+
+3. **Updated test expectations**
+   - `Integer` → `Int32` type mapping now active
+   - Generic context `T.untyped` → `T` (not `Object`)
+
+### Running Tests
+
+```bash
+# Full integration test suite
+crystal spec spec/integration/sorbet_transpiler_integration_test.cr
+
+# Run all specs
+crystal spec
+
+# Run with verbose output
+crystal spec spec/integration/sorbet_transpiler_integration_test.cr -v
+```
+
+### Known Limitations
+
+1. **Generics** - Limited support for complex generic constraints
+2. **Intersection types** - `T.all()` converted to `Object` as fallback
+3. **Proc bindings** - Complex proc.bind scenarios may need manual review
+
+### Future Test Coverage
+
+Planned additions:
+
+- [ ] Interface/abstract method conversion
+- [ ] Module mixin handling
+- [ ] Complex type alias combinations
+- [ ] Performance benchmarks for large files
+- [ ] Error recovery and partial transpilation
+
+### References
+
+- [Transpiler Improvements](TRANSPILER_IMPROVEMENTS.md)
+- [CST Implementation Complete](CST_IMPLEMENTATION_COMPLETE.md)

@@ -1,0 +1,160 @@
+= Quick Start: Understanding the Multi-Language Warp Architecture
+
+**Last Updated**: January 30, 2026
+
+== 30-Second Overview
+
+Warp is transitioning from JSON-only parser to multi-language pipeline:
+
+1. **Core Types** (`src/warp/cst/types.cr`) - Reusable Token, GreenNode, RedNode, Document
+2. **Language Modules** (`src/warp/lang/{language}/`) - Each language has:
+   - `types.cr` - TokenKind and NodeKind enums
+   - `lexer.cr` - Tokenizer (TODO for Ruby/Crystal)
+   - `parser.cr` - CST builder (TODO for Ruby/Crystal)
+   - `tape_builder.cr` - IR generator (TODO for Ruby/Crystal)
+3. **JSON** (fully implemented) - Reference implementation in `src/warp/lang/json/`
+4. **Ruby** (in progress) - Types done, prototype done, lexer next
+5. **Crystal** (planned) - Will follow same pattern as Ruby
+
+## For the Impatient
+
+**Read first**: [papers/multi-language-guide.adoc](papers/multi-language-guide.adoc) (10 min)
+
+**Run first**:
+```bash
+cd simdjson
+crystal build src/warp.cr --no-codegen
+# ✓ Should compile cleanly
+```
+
+**Explore**: Look at `src/warp/lang/ruby/types.cr` to see what Ruby token/node types look like.
+
+## Files to Know
+
+| File | Why | Read Time |
+|------|-----|-----------|
+| [papers/REFACTORING-SUMMARY.adoc](papers/REFACTORING-SUMMARY.adoc) | What changed and why | 15 min |
+| [papers/implementation-plan.adoc](papers/implementation-plan.adoc) | Full roadmap with phases | 20 min |
+| [papers/multi-language-guide.adoc](papers/multi-language-guide.adoc) | How to add languages | 15 min |
+| [src/warp/lang/ruby/tape_prototype.cr](src/warp/lang/ruby/tape_prototype.cr) | Ruby feasibility study | 20 min |
+| [src/warp/cst/types.cr](src/warp/cst/types.cr) | Core CST types | 5 min |
+
+## Architecture: Layers
+
+```
+Layer 5: Application        Formatter | Linter | Transpiler
+                                  ↑
+Layer 4: Semantic           AST (type-aware, lossy)
+                                  ↑
+Layer 3: Syntax             Tape IR (linear, formatted)
+                                  ↑
+Layer 2: Syntax             CST: RedNode (navigation)
+(lossless)                        ↑
+Layer 1: Syntax             CST: GreenNode (immutable)
+(lossless)                        ↑
+Layer 0: Lexical            Token stream (language-specific)
+```
+
+Each layer is language-independent. Language-specific implementations exist in `src/warp/lang/{language}/`.
+
+## The JSON Example
+
+JSON has all layers implemented:
+
+```
+[Source JSON]
+    ↓
+[Lexer: src/warp/lexer/token_scanner.cr]
+    → TokenKind enum from CST::TokenKind
+    → Array(Token)
+    ↓
+[Parser: src/warp/cst/parser.cr]
+    → NodeKind enum from CST::NodeKind
+    → GreenNode (immutable tree)
+    ↓
+[Red CST: src/warp/cst/types.cr]
+    → RedNode (parent pointers, navigation)
+    ↓
+[Tape Builder: src/warp/ir/tape_builder.cr]
+    → TapeType enum (JSON: StartObject, EndObject, String, Number, etc.)
+    → Entry array (linear IR)
+    ↓
+[Formatter: src/warp/format/formatter.cr]
+    → Pretty-print or minify JSON
+```
+
+## The Ruby Plan
+
+Ruby needs all layers (JSON already has them):
+
+```
+Phase 1: Types          [DONE] src/warp/lang/ruby/types.cr
+Phase 2: Lexer          [TODO] src/warp/lang/ruby/lexer.cr
+Phase 3: Parser         [TODO] src/warp/lang/ruby/parser.cr
+Phase 4: Tape Builder   [TODO] src/warp/lang/ruby/tape_builder.cr
+Phase 5: Formatter      [TODO] Extend src/warp/format/formatter.cr
+Phase 6: Transpiler     [TODO] Ruby ↔ Crystal transformations
+```
+
+See [papers/implementation-plan.adoc](papers/implementation-plan.adoc) for timeline.
+
+## Running Tests
+
+JSON tests (existing):
+```bash
+cd simdjson
+crystal spec spec/
+```
+
+Ruby tests (to be added):
+```bash
+crystal spec spec/ruby/
+```
+
+## Debugging
+
+**Print CST**:
+```crystal
+def print_cst(node, depth = 0)
+  puts "  " * depth + node.kind.to_s
+  node.children.each { |child| print_cst(child, depth + 1) }
+end
+
+doc = Warp::CST::Parser.parse(bytes)
+print_cst(doc.root)
+```
+
+**Print Tape**:
+```crystal
+doc = Warp::IR.parse(bytes)
+doc.each_entry { |entry| puts "#{entry.type}: a=#{entry.a}, b=#{entry.b}" }
+```
+
+## Common Questions
+
+**Q: Where's the Ruby parser?**
+A: Not implemented yet. Phase 2 (next). Start with lexer in `src/warp/lang/ruby/lexer.cr`.
+
+**Q: Will JSON break?**
+A: No. All changes are backward-compatible. Existing JSON tests should pass unchanged.
+
+**Q: How do I add Crystal?**
+A: Follow the Ruby pattern:
+1. Define `src/warp/lang/crystal/types.cr`
+2. Implement lexer, parser, tape builder
+3. Update `src/warp.cr` to require the module
+
+See [papers/multi-language-guide.adoc](papers/multi-language-guide.adoc) for step-by-step.
+
+**Q: What's the "Tape" for?**
+A: Linear IR optimized for fast iteration and formatting. Can represent source code as a sequence of records instead of a tree. For JSON it's proven fast; for Ruby, see prototype in `src/warp/lang/ruby/tape_prototype.cr`.
+
+**Q: Why not use generics?**
+A: Crystal's generic system is powerful but can hurt compile times and complicate things. Concrete types per language are clearer and simpler.
+
+## Contact / More Info
+
+- **Refactoring**: See [papers/REFACTORING-SUMMARY.adoc](papers/REFACTORING-SUMMARY.adoc)
+- **Next Steps**: See [papers/implementation-plan.adoc](papers/implementation-plan.adoc)
+- **How-To Guide**: See [papers/multi-language-guide.adoc](papers/multi-language-guide.adoc)
+- **Ruby Deep Dive**: See [src/warp/lang/ruby/tape_prototype.cr](src/warp/lang/ruby/tape_prototype.cr)
