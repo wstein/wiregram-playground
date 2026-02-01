@@ -22,6 +22,29 @@ module Warp
       end
 
       private def self.select_x86_backend : Base
+        # Special handling for AMD with double-pumped AVX-512 (Zen2/Zen3)
+        vendor = Warp::Parallel::CPUDetector.detect_vendor
+        microarch = Warp::Parallel::CPUDetector.detect_microarchitecture
+
+        # Skip AVX-512 for AMD Zen2/Zen3 due to double-pumping performance penalty
+        # AVX2 will be faster in these cases
+        if vendor == Warp::Parallel::CPUVendor::AMD &&
+           (microarch == Warp::Parallel::Microarchitecture::Zen2 ||
+           microarch == Warp::Parallel::Microarchitecture::Zen3)
+          # For AMD Zen2/Zen3, skip AVX-512 and go straight to AVX2
+          if can_use_avx2?
+            return Avx2Backend.new
+          end
+          if can_use_avx?
+            return AvxBackend.new
+          end
+          if can_use_sse2?
+            return Sse2Backend.new
+          end
+          return ScalarBackend.new
+        end
+
+        # For other systems (Intel, AMD Zen4/5+), use standard priority
         # Try AVX-512 first
         if can_use_avx512?
           return Avx512Backend.new

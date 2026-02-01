@@ -138,7 +138,7 @@ end
 
 private def self.cpu_supports_avx2? : Bool
   capability = Warp::Parallel::CPUDetector.detect_simd
-  capability == Warp::Parallel::SIMDCapability::AVX2 || 
+  capability == Warp::Parallel::SIMDCapability::AVX2 ||
   capability == Warp::Parallel::SIMDCapability::AVX512
 end
 ----
