@@ -68,4 +68,14 @@ describe "CLI Integration" do
     out.includes?("def ").should eq(true)
     out.includes?("end").should eq(true)
   end
+
+  it "does not emit duplicate slashes in require_relative paths" do
+    fixture_file = "spec/fixtures/cli/cr_simple.cr"
+    cmd = ["crystal", "run", "bin/warp.cr", "--", "transpile", "ruby", "-s", fixture_file, "--stdout"].join(" ")
+
+    out = %x(#{cmd})
+
+    out.includes?("require_relative \".//").should eq(false)
+    out.includes?("require_relative './/").should eq(false)
+  end
 end

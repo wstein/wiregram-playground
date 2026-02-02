@@ -52,9 +52,8 @@ module Warp
           # Also translate Crystal '&.method' shorthand to Ruby '&:method' (Proc shorthand)
           # This is a basic implementation; a full CST-based approach would traverse the tree
           # Only rewrite *bare* `require` invocations that use relative paths; leave `require_relative` unchanged
-          output = output.gsub(/\brequire(?!_relative)\s+(['"])\.\.\//, "require_relative \\1../")
-          output = output.gsub(/\brequire(?!_relative)\s+(['"])\./, "require_relative \\1./")
-          output = output.gsub(/\brequire(?!_relative)\s+(['"])\.\//, "require_relative \\1./")
+          output = output.gsub(%r{\brequire(?!_relative)\s+(['"])\.\./}, "require_relative \\1../")
+          output = output.gsub(%r{\brequire(?!_relative)\s+(['"])\./}, "require_relative \\1./")
 
           # Normalize accidental duplicate slashes produced by replacement (e.g., ".//" -> "./")
           output = output.gsub(/require_relative\s+(['"])\.\/+/, "require_relative \\1./")
