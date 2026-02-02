@@ -190,7 +190,43 @@ describe Warp::Parallel::CPUDetector do
 
     it "includes SIMD capability in summary" do
       summary = Warp::Parallel::CPUDetector.summary
-      summary.should contain("SIMD:")
+      # Should contain a SIMD entry like "NEON: 10 cores" or "AVX2: 8 cores"
+      summary.should match(/[A-Z0-9\-]+: \d+ cores/)
+    end
+  end
+
+  describe "deterministic formatting" do
+    it "formats simd counts deterministically" do
+      cores = [] of Warp::Parallel::CoreInfo
+
+      # 5 AVX2, 3 NEON, 2 NONE
+      5.times do |i|
+        cores << Warp::Parallel::CoreInfo.new(i, true, Warp::Parallel::SIMDCapability::AVX2)
+      end
+
+      3.times do |i|
+        cores << Warp::Parallel::CoreInfo.new(5 + i, true, Warp::Parallel::SIMDCapability::NEON)
+      end
+
+      2.times do |i|
+        cores << Warp::Parallel::CoreInfo.new(8 + i, true, Warp::Parallel::SIMDCapability::None)
+      end
+
+      summary = Warp::Parallel::CPUDetector.format_summary_from_cores(cores)
+      # Deterministic simd ordering should be AVX2, NEON, NONE
+      summary.should contain("AVX2: 5 cores, NEON: 3 cores, NONE: 2 cores")
+    end
+
+    it "reports P/E counts deterministically" do
+      cores = [] of Warp::Parallel::CoreInfo
+      cores << Warp::Parallel::CoreInfo.new(0, true, Warp::Parallel::SIMDCapability::None)
+      cores << Warp::Parallel::CoreInfo.new(1, true, Warp::Parallel::SIMDCapability::None)
+      cores << Warp::Parallel::CoreInfo.new(2, true, Warp::Parallel::SIMDCapability::None)
+      cores << Warp::Parallel::CoreInfo.new(3, false, Warp::Parallel::SIMDCapability::None)
+
+      summary = Warp::Parallel::CPUDetector.format_summary_from_cores(cores)
+      summary.should contain("P-cores: 3, E-cores: 1")
+      summary.should contain("CPU: 4 cores")
     end
   end
 

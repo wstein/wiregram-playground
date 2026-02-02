@@ -281,19 +281,66 @@ YAML
         puts
       end
 
+      success_count = 0
+      failure_count = 0
+      output_files_total = 0
+
       if workers > 1
         # Parallel processing
         processor = Warp::Parallel::FileProcessor.new(workers)
 
+        stats_chan = Channel(Tuple(Bool, Int32)).new(files.size)
         processor.process_files(files) do |path|
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
+          stats_chan.send({ok, out_count})
+        end
+
+        files.size.times do
+          ok, out_count = stats_chan.receive
+          if ok
+            success_count += 1
+          else
+            failure_count += 1
+          end
+          output_files_total += out_count
         end
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
+          if ok
+            success_count += 1
+          else
+            failure_count += 1
+          end
+          output_files_total += out_count
         end
       end
+
+      # Compute actual output files on disk (more accurate than internal counters)
+      actual_output_files = 0
+      if !stdout && output_root && File.exists?(output_root)
+        actual_output_files = Dir.glob(File.join(output_root, "**", "*")).select { |p| File.file?(p) }.size
+      end
+
+      # Print summary
+      puts
+      puts "Summary:"
+      puts "  Files processed: #{files.size}"
+      puts "  Successful: #{success_count}"
+      puts "  Failed: #{failure_count}"
+
+      if actual_output_files != 0
+        if actual_output_files != output_files_total
+          puts "  Output files generated: #{actual_output_files} (reported: #{output_files_total})"
+        else
+          puts "  Output files generated: #{actual_output_files}"
+        end
+      else
+        puts "  Output files generated: #{output_files_total}"
+      end
+
+      0
 
       0
     end
@@ -384,33 +431,33 @@ YAML
       dump_tape : Bool = false,
       dump_simd : Bool = false,
       verbose : Bool = false,
-    )
+    ) : Tuple(Bool, Int32)
       source = File.read(path)
       bytes = source.to_slice
 
       if dump_tokens
         Warp::Lang::Ruby::Inspector.dump_tokens(bytes)
-        return
+        return {true, 0}
       end
 
       if dump_cst
         Warp::Lang::Ruby::Inspector.dump_cst(bytes)
-        return
+        return {true, 0}
       end
 
       if dump_ast
         Warp::Lang::Ruby::Inspector.dump_ast(bytes)
-        return
+        return {true, 0}
       end
 
       if dump_tape
         Warp::Lang::Ruby::Inspector.dump_tape(bytes)
-        return
+        return {true, 0}
       end
 
       if dump_simd
         Warp::Lang::Ruby::Inspector.dump_simd(bytes)
-        return
+        return {true, 0}
       end
 
       # Use provided RBS/RBI output roots, or fall back to config
@@ -430,13 +477,15 @@ YAML
               puts "  #{idx.to_s.rjust(3)}: #{t.kind} #{txt.inspect}"
             end
           end
-          return
+          return {false, 0}
         end
 
+        output_count = 0
         if stdout
           puts result.output
         else
           write_or_print(path, output_root, result.output, ".rb", stdout, config.folder_mappings)
+          output_count += 1
 
           # Generate accompanying RBS/RBI files if requested
           if (generate_rbs || config.generate_rbs) && !stdout
@@ -447,6 +496,7 @@ YAML
               sigs = extractor.extract
               rbs_content = build_rbs(sigs)
               write_output(path, rbs_output_dir, rbs_content, ".rbs", config.folder_mappings)
+              output_count += 1
             end
           end
 
@@ -458,10 +508,11 @@ YAML
               sigs = extractor.extract
               rbi_content = build_rbi(sigs)
               write_output(path, rbi_output_dir, rbi_content, ".rbi", config.folder_mappings)
+              output_count += 1
             end
           end
         end
-        return
+        return {true, output_count}
       when TranspileTarget::RoundTrip
         if path.ends_with?(".rb")
           result = Warp::Testing::BidirectionalValidator.ruby_to_crystal_to_ruby(source)
@@ -474,7 +525,7 @@ YAML
         else
           print_with_progress_clear("Skipping unsupported file: #{path}")
         end
-        return
+        return {true, 0}
       else
         tokens, lex_error, lex_pos = Warp::Lang::Ruby::Lexer.scan(bytes)
         if lex_error != Warp::Core::ErrorCode::Success
@@ -488,7 +539,7 @@ YAML
               puts "  #{idx.to_s.rjust(3)}: #{t.kind} #{txt.inspect}"
             end
           end
-          return
+          return {false, 0}
         end
       end
 
@@ -508,6 +559,7 @@ YAML
 
         ext = target == TranspileTarget::Rbs ? ".rbs" : (target == TranspileTarget::Rbi ? ".rbi" : ".rb")
         write_or_print(path, output_root, content, ext, stdout, config.folder_mappings)
+        return {true, stdout ? 0 : 1}
       else
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
         result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations, path)
@@ -522,18 +574,22 @@ YAML
               puts "  #{idx.to_s.rjust(3)}: #{t.kind} #{txt.inspect}"
             end
           end
-          return
+          return {false, 0}
         end
+        output_count = 0
         if stdout
           puts result.output
         else
           out_path = output_path_for(path, output_root, ".cr", config.folder_mappings)
           if result.crystal_doc
             Warp::Lang::Crystal::Serializer.emit_to_file(result.crystal_doc.not_nil!, out_path)
+            output_count += 1
           else
             write_output(path, output_root, result.output, ".cr", config.folder_mappings)
+            output_count += 1
           end
         end
+        return {true, output_count}
       end
     end
 

@@ -591,9 +591,25 @@ module Warp::Parallel
       System.cpu_count.to_i32
     end
 
-    def summary : String
+    # Public helper for deterministic formatting from a core list (used by unit tests)
+    def format_summary_from_cores(cores : Array(CoreInfo)) : String
+      p_count = cores.count { |c| c.is_performance_core }
+      e_count = cores.size - p_count
+
+      simd_counts = {} of String => Int32
+      cores.each do |c|
+        key = c.simd_level.to_s.upcase
+        if simd_counts[key]?
+          simd_counts[key] = simd_counts[key].not_nil! + 1
+        else
+          simd_counts[key] = 1
+        end
+      end
+
+      simd_str = simd_counts.keys.sort.map { |k| "#{k}: #{simd_counts[k]} cores" }.join(", ")
+
       String.build do |io|
-        io << "CPU: #{cpu_count} cores, "
+        io << "CPU: #{cores.size} cores (P-cores: #{p_count}, E-cores: #{e_count}), "
 
         {% if flag?(:aarch64) || flag?(:arm) %}
           io << "ARM: #{detect_arm_version}, "
@@ -607,9 +623,13 @@ module Warp::Parallel
         {% end %}
 
         io << "Model: #{cpu_model}, "
-        io << "SIMD: #{detect_simd}, "
-        io << "P-core: #{is_performance_core?}"
+        io << simd_str
       end
+    end
+
+    def summary : String
+      cores = build_core_list
+      format_summary_from_cores(cores)
     end
 
     # Get detailed SIMD capabilities as a hash

@@ -101,6 +101,26 @@ crystal run bin/warp.cr -- --version
 ./bin/warp --help
 ```
 
+### CLI startup summary (example)
+
+When running the CLI with parallel workers or in verbose mode, the tool prints a short startup summary with the active config and detected system information:
+
+```text
+ fsh ❯ crystal bin/warp.cr transpile ruby -v
+Using config: .warp.yaml
+CPU: 10 cores (P-cores: 4, E-cores: 6), ARM: armv8, Model: Apple M4, NEON: 10 cores
+Using 10 parallel workers
+
+---
+
+<SUMMARY>
+Files processed: 113
+Successful: 113
+Failed: 0
+Output files generated: 225
+</SUMMARY>
+```
+
 ### Configuration
 
 Create a `.warp.yaml` file in your project root:

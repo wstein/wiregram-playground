@@ -37,6 +37,14 @@ We borrow the vendor branch pattern for port maintenance to isolate upstream syn
 ## 5. Daily Workflow Tips
 
 - **Running the CLI**: Use `./bin/warp transpile ruby -s spec/fixtures/cli --stdout` or other fixture directories for quick smoke tests. The CLI respects `-s`/`-o` and default `.warp.yaml` config.
+
+  *Tip:* pass `-v`/`--verbose` or `--parallel=N` to show a short startup summary containing which config was used and a short system report (CPU, SIMD, P/E cores). Example:
+
+  ```text
+  Using config: .warp.yaml
+  CPU: 10 cores, ARM: armv8, Model: Apple M4, SIMD: neon, P-core: true
+  Using 10 parallel workers
+  ```
 - **Configuration**: The warp config loader prioritizes `.warp.yaml`, falls back to `warp.yaml`, and finally defaults to `out/` directories. Keep the CLI options (`--stdout`, `--rbs`, `--rbi`) in mind when automating ports.
 - **Round-trip verification**: The `Warp::Testing::BidirectionalValidator` helps bound regressions—run it against new corpus entries when updating ports.
 
