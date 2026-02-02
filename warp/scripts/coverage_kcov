@@ -25,7 +25,7 @@ end.parse!(ARGV)
 verbose = options[:verbose]
 mono = options[:mono]
 
-backend_override = ENV["WARP_BACKEND"] || ENV["SIMDJSON_BACKEND"]
+backend_override = ENV["WARP_BACKEND"]
 if backend_override
   cpu = RbConfig::CONFIG["host_cpu"]
   arch = cpu.to_s.downcase

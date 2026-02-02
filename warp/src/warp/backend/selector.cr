@@ -3,7 +3,7 @@ module Warp
     class Selector
       def self.select : Base
         # First check for environment variable override
-        override = ENV["WARP_BACKEND"]? || ENV["SIMDJSON_BACKEND"]?
+        override = ENV["WARP_BACKEND"]?
         if override
           chosen = override.downcase
           backend = build_override_backend(chosen)

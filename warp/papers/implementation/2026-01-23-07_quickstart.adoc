@@ -21,11 +21,11 @@ Warp is transitioning from JSON-only parser to multi-language pipeline:
 **Read first**: [papers/2026-01-30-05_multi_language_guide.adoc](papers/2026-01-30-05_multi_language_guide.adoc) (10 min)
 
 **Run first**:
-```bash
-cd simdjson
+----
+cd warp
 crystal build src/warp.cr --no-codegen
 # ✓ Should compile cleanly
-```
+----
 
 **Explore**: Look at `src/warp/lang/ruby/types.cr` to see what Ruby token/node types look like.
 
@@ -102,7 +102,7 @@ See [papers/2026-01-30-06_implementation_plan.adoc](papers/2026-01-30-06_impleme
 
 JSON tests (existing):
 ```bash
-cd simdjson
+cd warp
 crystal spec spec/
 ```
 

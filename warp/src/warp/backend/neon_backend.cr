@@ -2,9 +2,7 @@ module Warp
   module Backend
     class NeonBackend < Base
       VERIFY_BACKEND = (ENV["WARP_VERIFY_BACKEND"]? == "1") ||
-        (ENV["WARP_VERIFY_NEON"]? == "1") ||
-        (ENV["SIMDJSON_VERIFY_BACKEND"]? == "1") ||
-        (ENV["SIMDJSON_VERIFY_NEON"]? == "1")
+                       (ENV["WARP_VERIFY_NEON"]? == "1")
 
       def name : String
         "neon"
@@ -117,10 +115,10 @@ module Warp
             uxtw x9, w8
             mov $0, x9
             )
-            : "=r"(any_invalid)
-            : "r"(ptr)
-            : "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "w8", "x9"
-            : "volatile"
+                  : "=r"(any_invalid)
+                  : "r"(ptr)
+                  : "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "w8", "x9"
+                  : "volatile"
           )
           any_invalid == 0_u32
         {% else %}
@@ -166,10 +164,10 @@ module Warp
             cmp w2, #0x7F
             cset $0, le
             )
-            : "=r"(is_ascii)
-            : "r"(ptr)
-            : "v0", "v1", "w2"
-            : "volatile"
+                  : "=r"(is_ascii)
+                  : "r"(ptr)
+                  : "v0", "v1", "w2"
+                  : "volatile"
           )
         {% else %}
           i = 0

@@ -72,7 +72,7 @@ User guides, contributor guides, and executive summaries.
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd simdjson
+cd warp
 
 # Build the release binary
 crystal build bin/warp.cr -o bin/warp --release

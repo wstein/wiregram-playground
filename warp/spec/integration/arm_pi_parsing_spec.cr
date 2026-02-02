@@ -6,7 +6,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({"name": "test", "value": 42})
         bytes = json.to_slice
         result = Warp::Lexer.index(bytes)
@@ -19,7 +19,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %([1, 2, 3, "four", true, false, null])
         bytes = json.to_slice
         result = Warp::Lexer.index(bytes)
@@ -32,7 +32,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({
           "users": [
             {"name": "Alice", "age": 30},
@@ -50,7 +50,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({
           "text": "Hello\nWorld",
           "path": "C:\\\\Users\\\\test",
@@ -67,7 +67,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({
           "int": 42,
           "negative": -123,
@@ -86,7 +86,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({
           "spaced" : "values"  ,
           "tabs"	:	"too"
@@ -103,12 +103,12 @@ describe "ARM/Pi JSON Parsing Integration" do
     it "parses complex JSON with NEON backend" do
       {% if flag?(:aarch64) || flag?(:arm) %}
         arm_version = Warp::Parallel::CPUDetector.detect_arm_version
-        
+
         case arm_version
         when Warp::Parallel::ARMVersion::ARMv7, Warp::Parallel::ARMVersion::ARMv8
           backend = Warp::Backend::NeonBackend.new
           Warp::Backend.reset(backend)
-          
+
           json = %({"test": [1, 2, {"nested": true}]})
           bytes = json.to_slice
           result = Warp::Lexer.index(bytes)
@@ -124,7 +124,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         arm_version = Warp::Parallel::CPUDetector.detect_arm_version
         backend = Warp::Backend::Selector.select
-        
+
         case arm_version
         when Warp::Parallel::ARMVersion::ARMv6
           backend.name.should eq("armv6")
@@ -156,9 +156,9 @@ describe "ARM/Pi JSON Parsing Integration" do
     it "reports memory bandwidth limit for Pi systems" do
       pi_model = Warp::Parallel::CPUDetector.detect_pi_model
       bandwidth_limited = Warp::Parallel::CPUDetector.memory_bandwidth_limited?
-      
+
       case pi_model
-      when Warp::Parallel::RaspberryPiModel::Pi1, 
+      when Warp::Parallel::RaspberryPiModel::Pi1,
            Warp::Parallel::RaspberryPiModel::PiZero,
            Warp::Parallel::RaspberryPiModel::Pi2,
            Warp::Parallel::RaspberryPiModel::Pi3,
@@ -192,7 +192,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         # Build a larger JSON document
         json = %({"items": [)
         100.times do |i|
@@ -200,7 +200,7 @@ describe "ARM/Pi JSON Parsing Integration" do
           json += "," if i < 99
         end
         json += %(]})
-        
+
         bytes = json.to_slice
         result = Warp::Lexer.index(bytes)
         result.error.should eq(Warp::ErrorCode::Success)
@@ -214,7 +214,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({
           "emoji": "\\u1F600",
           "chinese": "\\u4E2D\\u6587"
@@ -230,7 +230,7 @@ describe "ARM/Pi JSON Parsing Integration" do
       {% if flag?(:arm) %}
         backend = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend)
-        
+
         json = %({
           "backslash": "\\\\",
           "quote": "\\"",
@@ -256,50 +256,11 @@ describe "ARM/Pi JSON Parsing Integration" do
         ENV["WARP_BACKEND"] = "scalar"
         backend = Warp::Backend::Selector.select
         backend.name.should eq("scalar")
-        
+
         if previous
           ENV["WARP_BACKEND"] = previous
         else
           ENV.delete("WARP_BACKEND")
-        end
-      {% end %}
-    end
-
-    it "respects SIMDJSON_BACKEND environment variable" do
-      {% if flag?(:arm) %}
-        previous = ENV["SIMDJSON_BACKEND"]?
-        ENV["SIMDJSON_BACKEND"] = "scalar"
-        backend = Warp::Backend::Selector.select
-        backend.name.should eq("scalar")
-        
-        if previous
-          ENV["SIMDJSON_BACKEND"] = previous
-        else
-          ENV.delete("SIMDJSON_BACKEND")
-        end
-      {% end %}
-    end
-
-    it "prioritizes WARP_BACKEND over SIMDJSON_BACKEND" do
-      {% if flag?(:arm) %}
-        prev_warp = ENV["WARP_BACKEND"]?
-        prev_json = ENV["SIMDJSON_BACKEND"]?
-        
-        ENV["WARP_BACKEND"] = "scalar"
-        ENV["SIMDJSON_BACKEND"] = "neon"
-        backend = Warp::Backend::Selector.select
-        backend.name.should eq("scalar")
-        
-        if prev_warp
-          ENV["WARP_BACKEND"] = prev_warp
-        else
-          ENV.delete("WARP_BACKEND")
-        end
-        
-        if prev_json
-          ENV["SIMDJSON_BACKEND"] = prev_json
-        else
-          ENV.delete("SIMDJSON_BACKEND")
         end
       {% end %}
     end
@@ -309,20 +270,20 @@ describe "ARM/Pi JSON Parsing Integration" do
     it "handles sequential backend switching" do
       {% if flag?(:arm) %}
         json = %({"test": "value"})
-        
+
         # Parse with ARMv6
         backend1 = Warp::Backend::ARMv6Backend.new
         Warp::Backend.reset(backend1)
         bytes = json.to_slice
         result1 = Warp::Lexer.index(bytes)
         result1.error.should eq(Warp::ErrorCode::Success)
-        
+
         # Parse with Scalar
         backend2 = Warp::Backend::ScalarBackend.new
         Warp::Backend.reset(backend2)
         result2 = Warp::Lexer.index(bytes)
         result2.error.should eq(Warp::ErrorCode::Success)
-        
+
         # Results should be consistent
         result1.error.should eq(result2.error)
         Warp::Backend.reset

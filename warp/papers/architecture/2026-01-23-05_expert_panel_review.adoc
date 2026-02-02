@@ -425,7 +425,7 @@ end
 >
 > # your_app.cr
 > require "Warp"
-> result = Simdjson.parse(json_string)
+> result = Warp::Parser.new.parse_document(json_string.to_slice)
 > ```
 >
 > No configuration, no flags, no decisions. It just works optimally."

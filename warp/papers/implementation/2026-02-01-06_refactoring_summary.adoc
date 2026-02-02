@@ -75,7 +75,7 @@ Successfully refactored Warp from a JSON-only parser into a multi-language pipel
 === Compilation ✓
 
 ```bash
-$ cd simdjson
+$ cd warp
 $ crystal build src/warp.cr --no-codegen
 # Success: No compilation errors
 ```

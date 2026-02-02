@@ -117,7 +117,7 @@ struct BenchResult
   getter count : Int64
   getter size : Int32
   getter seconds : Float64
-  getter error : Simdjson::ErrorCode?
+  getter error : Warp::Core::ErrorCode?
   getter message : String?
 
   sig { void }
@@ -126,7 +126,7 @@ struct BenchResult
     @count : Int64,
     @size : Int32,
     @seconds : Float64,
-    @error : Simdjson::ErrorCode? = nil,
+    @error : Warp::Core::ErrorCode? = nil,
     @message : String? = nil,
   )
   end

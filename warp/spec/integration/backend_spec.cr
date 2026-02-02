@@ -40,20 +40,7 @@ describe Warp::Backend::Selector do
     end
   end
 
-  it "accepts SIMDJSON_BACKEND as an override source" do
-    previous = ENV["SIMDJSON_BACKEND"]?
-    begin
-      ENV["SIMDJSON_BACKEND"] = "scalar"
-      backend = Warp::Backend::Selector.select
-      backend.should be_a(Warp::Backend::ScalarBackend)
-    ensure
-      if previous
-        ENV["SIMDJSON_BACKEND"] = previous
-      else
-        ENV.delete("SIMDJSON_BACKEND")
-      end
-    end
-  end
+
 
   {% if flag?(:aarch64) %}
   it "selects neon backend when explicitly requested" do

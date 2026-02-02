@@ -1,4 +1,5 @@
 #!/usr/bin/env crystal
+
 require "../src/warp"
 require "../src/warp/version"
 require "../src/warp/cli/config"

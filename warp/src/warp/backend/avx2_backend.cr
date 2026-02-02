@@ -2,8 +2,7 @@ module Warp
   module Backend
     class Avx2Backend < Base
       VERIFY_BACKEND = (ENV["WARP_VERIFY_BACKEND"]? == "1") ||
-        (ENV["SIMDJSON_VERIFY_BACKEND"]? == "1") ||
-        (ENV["SIMDJSON_VERIFY_AVX2"]? == "1")
+                       (ENV["WARP_VERIFY_AVX2"]? == "1")
 
       def name : String
         "avx2"
@@ -81,10 +80,10 @@ module Warp
             setle %%dl
             movzbl %%dl, $0
             )
-            : "=r"(is_ascii)
-            : "S"(ptr)
-            : "xmm0", "xmm1", "xmm2", "rax", "rdx"
-            : "volatile"
+                  : "=r"(is_ascii)
+                  : "S"(ptr)
+                  : "xmm0", "xmm1", "xmm2", "rax", "rdx"
+                  : "volatile"
           )
           is_ascii != 0
         {% else %}

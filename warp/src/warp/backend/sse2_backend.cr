@@ -2,8 +2,7 @@ module Warp
   module Backend
     class Sse2Backend < Base
       VERIFY_BACKEND = (ENV["WARP_VERIFY_BACKEND"]? == "1") ||
-        (ENV["SIMDJSON_VERIFY_BACKEND"]? == "1") ||
-        (ENV["SIMDJSON_VERIFY_SSE2"]? == "1")
+                       (ENV["WARP_VERIFY_SSE2"]? == "1")
 
       def name : String
         "sse2"
@@ -99,10 +98,10 @@ module Warp
             setle %%dl
             movzbl %%dl, $0
             )
-            : "=r"(is_ascii)
-            : "S"(ptr)
-            : "xmm0", "xmm1", "rax", "rdx"
-            : "volatile"
+                  : "=r"(is_ascii)
+                  : "S"(ptr)
+                  : "xmm0", "xmm1", "rax", "rdx"
+                  : "volatile"
           )
           is_ascii != 0
         {% else %}

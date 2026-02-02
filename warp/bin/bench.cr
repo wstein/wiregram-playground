@@ -1,4 +1,4 @@
-# Benchmark runner for simdjson parser
+# Benchmark runner for warp parser
 #
 # Summary
 #
@@ -6,14 +6,14 @@
 # files and reports token counts, timing and throughput.
 
 require "option_parser"
-require "../src/simdjson"
+require "../src/warp"
 
 struct BenchResult
   getter path : String
   getter count : Int64
   getter size : Int32
   getter seconds : Float64
-  getter error : Simdjson::ErrorCode?
+  getter error : Warp::Core::ErrorCode?
   getter message : String?
 
   def initialize(
@@ -21,7 +21,7 @@ struct BenchResult
     @count : Int64,
     @size : Int32,
     @seconds : Float64,
-    @error : Simdjson::ErrorCode? = nil,
+    @error : Warp::Core::ErrorCode? = nil,
     @message : String? = nil,
   )
   end
@@ -30,16 +30,16 @@ end
 def bench_file(path : String) : BenchResult
   # Use the Crystal-managed padded Bytes to avoid manual malloc/free and
   # to allow NEON helpers to safely read 16-byte blocks.
-  bytes = Simdjson::Stage1.read_file_padded_bytes(path)
-  parser = Simdjson::Parser.new
+  bytes = Warp::Input.read_file_padded_bytes(path)
+  parser = Warp::Parser.new
 
   count = 0_i64
-  err = Simdjson::ErrorCode::Success
+  err = Warp::Core::ErrorCode::Success
 
   start = Time.monotonic
   elapsed = nil
   err = parser.each_token(bytes) do |tok|
-    #pp tok
+    # pp tok
     count += 1
   end
   elapsed = (Time.monotonic - start)
@@ -50,7 +50,7 @@ def bench_file(path : String) : BenchResult
     BenchResult.new(path, count, bytes.size, elapsed.total_seconds, err)
   end
 rescue ex
-  BenchResult.new(path, 0_i64, 0, 0.0, Simdjson::ErrorCode::IoError, ex.message)
+  BenchResult.new(path, 0_i64, 0, 0.0, Warp::Core::ErrorCode::IoError, ex.message)
 end
 
 paths = [] of String
