@@ -62,6 +62,7 @@ User guides, contributor guides, and executive summaries.
 - [Project Guide](papers/guides/2026-01-23-10_project_guide.adoc)
 - [Contributing Guide](papers/guides/2026-01-23-09_contributing_guide.adoc)
 - [Multi-Language Guide](papers/guides/2026-01-30-05_multi_language_guide.adoc)
+- [Pipeline Dump CLI Guide](papers/guides/2026-02-02-06_pipeline_dump_guide.adoc)
 - [Transpiler Improvements](papers/guides/2026-01-31-07_transpiler_improvements.adoc)
 - [Todos](papers/guides/2026-01-23-11_todos.adoc)
 
@@ -101,6 +102,14 @@ crystal run bin/warp.cr -- --version
 
 # Dry-run parse/validate without writing output
 ./bin/warp transpile ruby --dry-run -s myfile.cr
+
+# Inspect pipeline stages (pretty output)
+./bin/warp dump simd --lang json spec/fixtures/cli/sample.json
+./bin/warp dump tokens --lang auto spec/fixtures/cli/rb_simple.rb
+./bin/warp dump tape --lang ruby spec/fixtures/cli/rb_simple.rb
+./bin/warp dump cst -l json -f json spec/fixtures/cli/sample.json
+./bin/warp dump ast spec/fixtures/cli/sample.json
+./bin/warp dump full spec/fixtures/cli/rb_simple.rb
 
 # Show help
 ./bin/warp --help

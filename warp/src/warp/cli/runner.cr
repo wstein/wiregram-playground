@@ -1,5 +1,6 @@
 require "option_parser"
 require "file_utils"
+require "json"
 require "../parallel/cpu_detector"
 require "../parallel/file_processor"
 
@@ -13,10 +14,22 @@ module Warp::CLI
     RoundTrip
   end
 
+  enum DumpFormat
+    Pretty
+    Json
+  end
+
+  enum DumpLanguage
+    Json
+    Ruby
+    Crystal
+  end
+
   class Runner
     def self.run(args : Array(String)) : Int32
       return run_init(args[1..]) if args.first? == "init"
       return run_transpile(args[1..]) if args.first? == "transpile"
+      return run_dump(args[1..]) if args.first? == "dump"
       if args.first? == "version" || args.first? == "-v" || args.first? == "--version"
         puts Warp.version_string
         return 0
@@ -34,6 +47,7 @@ module Warp::CLI
 Usage:
   warp init
   warp transpile [target] [options]
+  warp dump <simd|tokens|tape|cst|ast|full> [options] <file>
   warp version
 
 Targets:
@@ -47,8 +61,43 @@ Targets:
 Commands:
   init          Create a default .warp.yaml configuration
   transpile     Transpile between Ruby and Crystal
+  dump          Inspect pipeline stages for a file
   version       Show version information
   help          Show this help message
+TXT
+    end
+
+    private def self.dump_usage : String
+      <<-TXT
+Usage:
+  warp dump <simd|tokens|tape|cst|ast|full> [options] <file>
+
+Options:
+  -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
+  -f, --format=FORMAT    Output format: pretty|json (default: pretty)
+  --jsonc                Enable JSONC parsing (JSON only)
+  -h, --help             Show this help message
+
+Examples:
+  warp dump simd --lang json data.json
+  warp dump tokens --lang auto spec/fixtures/cli/rb_simple.rb
+  warp dump tape --lang ruby spec/fixtures/cli/rb_simple.rb
+  warp dump cst -l json -f json spec/fixtures/rcl_test.json
+  warp dump ast spec/fixtures/rcl_test.json
+  warp dump full spec/fixtures/cli/rb_simple.rb
+TXT
+    end
+
+    private def self.dump_stage_usage(stage : String) : String
+      <<-TXT
+Usage:
+  warp dump #{stage} [options] <file>
+
+Options:
+  -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
+  -f, --format=FORMAT    Output format: pretty|json (default: pretty)
+  --jsonc                Enable JSONC parsing (JSON only)
+  -h, --help             Show this help message
 TXT
     end
 
@@ -333,6 +382,1258 @@ YAML
       0
 
       0
+    end
+
+    private def self.run_dump(args : Array(String)) : Int32
+      args = args || [] of String
+      if args.empty? || args.first? == "-h" || args.first? == "--help" || args.first? == "help"
+        puts dump_usage
+        return 0
+      end
+
+      stage = args[0]
+      stage = "full" if stage == "all"
+
+      unless ["simd", "tokens", "tape", "cst", "ast", "full"].includes?(stage)
+        puts "Unknown dump target: #{stage}"
+        puts dump_usage
+        return 1
+      end
+
+      run_dump_stage(stage, args[1..])
+    end
+
+    private def self.run_dump_stage(stage : String, args : Array(String)) : Int32
+      lang_name = "auto"
+      format_name = "pretty"
+      jsonc = false
+
+      parser = OptionParser.new do |p|
+        p.banner = dump_stage_usage(stage)
+        p.on("-l LANG", "--lang=LANG", "Language: auto|json|jsonc|ruby|crystal") { |v| lang_name = v }
+        p.on("-f FORMAT", "--format=FORMAT", "Output format: pretty|json") { |v| format_name = v }
+        p.on("--jsonc", "Enable JSONC parsing (JSON only)") { jsonc = true }
+        p.on("-h", "--help", "Show this help message") { puts dump_stage_usage(stage); exit 0 }
+      end
+
+      parser.parse(args)
+
+      if args.empty?
+        puts "Missing file argument."
+        puts dump_stage_usage(stage)
+        return 1
+      end
+
+      if args.size > 1
+        puts "Too many arguments. Expected a single file path."
+        puts dump_stage_usage(stage)
+        return 1
+      end
+
+      path = args[0]
+      unless File.exists?(path) && File.file?(path)
+        puts "File not found: #{path}"
+        return 1
+      end
+
+      bytes = File.read(path).to_slice
+      lang_tuple = resolve_dump_language(lang_name, path, bytes, jsonc)
+      return 1 unless lang_tuple
+
+      lang, jsonc_effective = lang_tuple
+      format = parse_dump_format(format_name)
+      unless format
+        puts "Unknown format: #{format_name}"
+        puts dump_stage_usage(stage)
+        return 1
+      end
+
+      case stage
+      when "simd"
+        return dump_simd_stage(lang, bytes, format, path)
+      when "tokens"
+        return dump_tokens_stage(lang, bytes, format, path, jsonc_effective)
+      when "tape"
+        return dump_tape_stage(lang, bytes, format, path, jsonc_effective)
+      when "cst"
+        return dump_cst_stage(lang, bytes, format, path, jsonc_effective)
+      when "ast"
+        return dump_ast_stage(lang, bytes, format, path, jsonc_effective)
+      when "full"
+        return dump_full_stage(lang, bytes, format, path, jsonc_effective)
+      else
+        puts "Unknown dump target: #{stage}"
+        return 1
+      end
+    end
+
+    private def self.parse_dump_format(name : String) : DumpFormat?
+      case name.downcase
+      when "pretty" then DumpFormat::Pretty
+      when "json"   then DumpFormat::Json
+      else
+        nil
+      end
+    end
+
+    private def self.resolve_dump_language(lang_name : String, path : String, bytes : Bytes, jsonc : Bool) : Tuple(DumpLanguage, Bool)?
+      name = lang_name.downcase
+      case name
+      when "auto"
+        detected = detect_dump_language(path, bytes)
+        return nil unless detected
+        lang, jsonc_detected = detected
+        return {lang, jsonc || jsonc_detected}
+      when "json"
+        return {DumpLanguage::Json, jsonc}
+      when "jsonc"
+        return {DumpLanguage::Json, true}
+      when "ruby", "rb"
+        if jsonc
+          puts "--jsonc is only supported for JSON inputs."
+          return nil
+        end
+        return {DumpLanguage::Ruby, false}
+      when "crystal", "cr"
+        if jsonc
+          puts "--jsonc is only supported for JSON inputs."
+          return nil
+        end
+        return {DumpLanguage::Crystal, false}
+      else
+        puts "Unknown language: #{lang_name}"
+        return nil
+      end
+    end
+
+    private def self.detect_dump_language(path : String, bytes : Bytes) : Tuple(DumpLanguage, Bool)?
+      ext = File.extname(path).downcase
+      case ext
+      when ".json"  then return {DumpLanguage::Json, false}
+      when ".jsonc" then return {DumpLanguage::Json, true}
+      when ".rb"    then return {DumpLanguage::Ruby, false}
+      when ".cr"    then return {DumpLanguage::Crystal, false}
+      end
+
+      first = first_nonspace_byte(bytes)
+      if first == '{'.ord || first == '['.ord
+        return {DumpLanguage::Json, false}
+      end
+
+      text = String.new(bytes)
+      crystal_hints = ["macro ", "lib ", "struct ", "enum ", "fun ", "annotation "]
+      if crystal_hints.any? { |hint| text.includes?(hint) }
+        return {DumpLanguage::Crystal, false}
+      end
+
+      ruby_hints = ["def ", "class ", "module ", "end", "elsif ", "unless ", "yield "]
+      if ruby_hints.any? { |hint| text.includes?(hint) }
+        return {DumpLanguage::Ruby, false}
+      end
+
+      puts "Unable to auto-detect language. Use --lang to specify json|ruby|crystal."
+      nil
+    end
+
+    private def self.first_nonspace_byte(bytes : Bytes) : UInt8?
+      i = 0
+      while i < bytes.size
+        c = bytes[i]
+        if c != ' '.ord && c != '\t'.ord && c != '\n'.ord && c != '\r'.ord
+          return c
+        end
+        i += 1
+      end
+      nil
+    end
+
+    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String) : Int32
+      if lang != DumpLanguage::Json
+        write_dump_error("simd", lang, format, "SIMD scan is only available for JSON inputs.")
+        return 1
+      end
+
+      result = Warp::Lexer.index(bytes)
+      unless result.error.success?
+        write_dump_error("simd", lang, format, "SIMD scan failed (#{result.error}) for #{path}.")
+        return 1
+      end
+
+      indices = result.buffer.backing || [] of UInt32
+
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "SIMD structural indices (#{indices.size})"
+        io.puts "index   offset   byte  char"
+        indices.each_with_index do |idx_u32, i|
+          idx = idx_u32.to_i
+          byte = idx < bytes.size ? bytes[idx] : 0_u8
+          char = idx < bytes.size ? bytes[idx].chr : '?'
+          io.puts "#{i.to_s.rjust(5)}  #{idx.to_s.rjust(6)}  #{byte.to_s.rjust(4)}  #{char.inspect}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "simd"
+            json.field "language", dump_language_label(lang)
+            json.field "count", indices.size
+            json.field "indices" do
+              json.array do
+                indices.each_with_index do |idx_u32, i|
+                  idx = idx_u32.to_i
+                  byte = idx < bytes.size ? bytes[idx] : 0_u8
+                  char = idx < bytes.size ? bytes[idx].chr : '?'
+                  json.object do
+                    json.field "index", i
+                    json.field "offset", idx
+                    json.field "byte", byte.to_i
+                    json.field "char", char.to_s
+                  end
+                end
+              end
+            end
+          end
+        end
+        STDOUT.puts
+      end
+
+      0
+    end
+
+    private def self.dump_tokens_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case lang
+      when DumpLanguage::Json
+        if jsonc
+          tokens, error = Warp::Lexer::TokenScanner.scan(bytes, true)
+          unless error.success?
+            write_dump_error("tokens", lang, format, "Token scan failed (#{error}) for #{path}.")
+            return 1
+          end
+          return dump_cst_token_list(tokens, bytes, format, "json", "tokens")
+        else
+          parser = Warp::Parser.new
+          case format
+          when DumpFormat::Pretty
+            io = STDOUT
+            io.puts "Tokens (json)"
+            io.puts "index   kind        start  length  text"
+            idx = 0
+            err = parser.each_token(bytes) do |tok|
+              text = slice_text(bytes, tok.start, tok.length)
+              io.puts "#{idx.to_s.rjust(5)}  #{tok.type.to_s.ljust(10)}  #{tok.start.to_s.rjust(5)}  #{tok.length.to_s.rjust(6)}  #{text.inspect}"
+              idx += 1
+            end
+            unless err.success?
+              write_dump_error("tokens", lang, format, "Token scan failed (#{err}) for #{path}.")
+              return 1
+            end
+          when DumpFormat::Json
+            count = 0
+            err = nil
+            JSON.build(STDOUT) do |json|
+              json.object do
+                json.field "stage", "tokens"
+                json.field "language", dump_language_label(lang)
+                json.field "tokens" do
+                  json.array do
+                    err = parser.each_token(bytes) do |tok|
+                      text = slice_text(bytes, tok.start, tok.length)
+                      json.object do
+                        json.field "index", count
+                        json.field "kind", tok.type.to_s
+                        json.field "start", tok.start
+                        json.field "length", tok.length
+                        json.field "text", text
+                      end
+                      count += 1
+                    end
+                  end
+                end
+                json.field "count", count
+              end
+            end
+            STDOUT.puts
+            if err && !err.not_nil!.success?
+              write_dump_error("tokens", lang, format, "Token scan failed (#{err.not_nil!}) for #{path}.")
+              return 1
+            end
+          end
+        end
+      when DumpLanguage::Ruby
+        tokens, error, pos = Warp::Lang::Ruby::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_dump_error("tokens", lang, format, diag.to_s)
+          return 1
+        end
+        return dump_ruby_token_list(tokens, bytes, format, "ruby", "tokens")
+      when DumpLanguage::Crystal
+        tokens, error, pos = Warp::Lang::Crystal::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_dump_error("tokens", lang, format, diag.to_s)
+          return 1
+        end
+        return dump_crystal_token_list(tokens, bytes, format, "crystal", "tokens")
+      end
+
+      0
+    end
+
+    private def self.dump_tape_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: jsonc)
+        unless result.error.success?
+          write_dump_error("tape", lang, format, "Tape parse failed (#{result.error}) for #{path}.")
+          return 1
+        end
+        doc = result.doc.not_nil!
+        return dump_json_tape(doc, bytes, format)
+      when DumpLanguage::Ruby
+        tokens, error, pos = Warp::Lang::Ruby::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_dump_error("tape", lang, format, diag.to_s)
+          return 1
+        end
+        root, parse_error = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
+        unless parse_error.success? && root
+          write_dump_error("tape", lang, format, "Ruby CST parse failed (#{parse_error}) for #{path}.")
+          return 1
+        end
+        red = Warp::Lang::Ruby::CST::RedNode.new(root.not_nil!)
+        tape = Warp::Lang::Ruby::Tape::Builder.build(bytes, red)
+        return dump_ruby_tape(tape, bytes, format)
+      when DumpLanguage::Crystal
+        write_dump_error("tape", lang, format, "Tape is not implemented for Crystal yet.")
+        return 1
+      end
+
+      0
+    end
+
+    private def self.dump_cst_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_cst(bytes, jsonc: jsonc)
+        unless result.error.success?
+          write_dump_error("cst", lang, format, "CST parse failed (#{result.error}) for #{path}.")
+          return 1
+        end
+        doc = result.doc.not_nil!
+        return dump_json_cst(doc, bytes, format)
+      when DumpLanguage::Ruby
+        tokens, error, pos = Warp::Lang::Ruby::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_dump_error("cst", lang, format, diag.to_s)
+          return 1
+        end
+        root, parse_error = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
+        unless parse_error.success? && root
+          write_dump_error("cst", lang, format, "Ruby CST parse failed (#{parse_error}) for #{path}.")
+          return 1
+        end
+        red = Warp::Lang::Ruby::CST::RedNode.new(root.not_nil!)
+        return dump_ruby_cst(red, bytes, format)
+      when DumpLanguage::Crystal
+        tokens, error, pos = Warp::Lang::Crystal::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_dump_error("cst", lang, format, diag.to_s)
+          return 1
+        end
+        root, parse_error = Warp::Lang::Crystal::CST::Parser.parse(bytes, tokens)
+        unless parse_error.success? && root
+          write_dump_error("cst", lang, format, "Crystal CST parse failed (#{parse_error}) for #{path}.")
+          return 1
+        end
+        doc = Warp::Lang::Crystal::CST::Document.new(bytes, Warp::Lang::Crystal::CST::RedNode.new(root.not_nil!))
+        return dump_crystal_cst(doc, bytes, format)
+      end
+
+      0
+    end
+
+    private def self.dump_ast_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_ast(bytes, jsonc: jsonc)
+        unless result.error.success?
+          write_dump_error("ast", lang, format, "AST parse failed (#{result.error}) for #{path}.")
+          return 1
+        end
+        node = result.node.not_nil!
+        return dump_json_ast(node, format)
+      when DumpLanguage::Ruby
+        result = Warp::Lang::Ruby::Parser.parse(bytes)
+        unless result.error.success? && result.node
+          write_dump_error("ast", lang, format, "Ruby AST parse failed (#{result.error}) for #{path}.")
+          return 1
+        end
+        return dump_ruby_ast(result.node.not_nil!, format)
+      when DumpLanguage::Crystal
+        write_dump_error("ast", lang, format, "AST is not implemented for Crystal yet.")
+        return 1
+      end
+
+      0
+    end
+
+    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        dump_full_stage_pretty(io, lang, bytes, path, jsonc)
+      when DumpFormat::Json
+        dump_full_stage_json(lang, bytes, path, jsonc)
+      end
+
+      0
+    end
+
+    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool)
+      io.puts "Full dump (#{dump_language_label(lang)})"
+
+      io.puts "\n== simd =="
+      if lang == DumpLanguage::Json
+        dump_simd_stage(lang, bytes, DumpFormat::Pretty, path)
+      else
+        io.puts "SIMD scan is not supported for #{dump_language_label(lang)}."
+      end
+
+      io.puts "\n== tokens =="
+      dump_tokens_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
+
+      io.puts "\n== tape =="
+      dump_tape_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
+
+      io.puts "\n== cst =="
+      dump_cst_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
+
+      io.puts "\n== ast =="
+      dump_ast_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
+    end
+
+    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool)
+      JSON.build(STDOUT) do |json|
+        json.object do
+          json.field "language", dump_language_label(lang)
+          json.field "stages" do
+            json.object do
+              json.field "simd" do
+                if lang == DumpLanguage::Json
+                  write_json_simd(json, bytes)
+                else
+                  write_json_error(json, "SIMD scan is not supported for #{dump_language_label(lang)}.")
+                end
+              end
+              json.field "tokens" do
+                write_json_tokens(json, lang, bytes, jsonc, path)
+              end
+              json.field "tape" do
+                write_json_tape(json, lang, bytes, jsonc, path)
+              end
+              json.field "cst" do
+                write_json_cst(json, lang, bytes, jsonc, path)
+              end
+              json.field "ast" do
+                write_json_ast(json, lang, bytes, jsonc, path)
+              end
+            end
+          end
+        end
+      end
+      STDOUT.puts
+    end
+
+    private def self.dump_language_label(lang : DumpLanguage) : String
+      case lang
+      when DumpLanguage::Json    then "json"
+      when DumpLanguage::Ruby    then "ruby"
+      when DumpLanguage::Crystal then "crystal"
+      else                            "unknown"
+      end
+    end
+
+    private def self.write_dump_error(stage : String, lang : DumpLanguage, format : DumpFormat, message : String)
+      if format == DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", stage
+            json.field "language", dump_language_label(lang)
+            json.field "error", message
+          end
+        end
+        STDOUT.puts
+      else
+        STDERR.puts message
+      end
+    end
+
+    private def self.slice_text(bytes : Bytes, start : Int32, length : Int32) : String
+      return "" if start < 0 || length <= 0 || start >= bytes.size
+      max_len = Math.min(length, bytes.size - start)
+      String.new(bytes[start, max_len])
+    end
+
+    private def self.dump_cst_token_list(tokens : Array(Warp::CST::Token), bytes : Bytes, format : DumpFormat, lang_label : String, stage : String) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "Tokens (#{lang_label})"
+        io.puts "index   kind            start  length  text"
+        tokens.each_with_index do |tok, idx|
+          text = slice_text(bytes, tok.start, tok.length)
+          io.puts "#{idx.to_s.rjust(5)}  #{tok.kind.to_s.ljust(14)}  #{tok.start.to_s.rjust(5)}  #{tok.length.to_s.rjust(6)}  #{text.inspect}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", stage
+            json.field "language", lang_label
+            json.field "tokens" do
+              json.array do
+                tokens.each_with_index do |tok, idx|
+                  text = slice_text(bytes, tok.start, tok.length)
+                  json.object do
+                    json.field "index", idx
+                    json.field "kind", tok.kind.to_s
+                    json.field "start", tok.start
+                    json.field "length", tok.length
+                    json.field "text", text
+                  end
+                end
+              end
+            end
+            json.field "count", tokens.size
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_ruby_token_list(tokens : Array(Warp::Lang::Ruby::Token), bytes : Bytes, format : DumpFormat, lang_label : String, stage : String) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "Tokens (#{lang_label})"
+        io.puts "index   kind            start  length  text"
+        tokens.each_with_index do |tok, idx|
+          text = slice_text(bytes, tok.start, tok.length)
+          io.puts "#{idx.to_s.rjust(5)}  #{tok.kind.to_s.ljust(14)}  #{tok.start.to_s.rjust(5)}  #{tok.length.to_s.rjust(6)}  #{text.inspect}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", stage
+            json.field "language", lang_label
+            json.field "tokens" do
+              json.array do
+                tokens.each_with_index do |tok, idx|
+                  text = slice_text(bytes, tok.start, tok.length)
+                  json.object do
+                    json.field "index", idx
+                    json.field "kind", tok.kind.to_s
+                    json.field "start", tok.start
+                    json.field "length", tok.length
+                    json.field "text", text
+                  end
+                end
+              end
+            end
+            json.field "count", tokens.size
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_crystal_token_list(tokens : Array(Warp::Lang::Crystal::Token), bytes : Bytes, format : DumpFormat, lang_label : String, stage : String) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "Tokens (#{lang_label})"
+        io.puts "index   kind            start  length  text"
+        tokens.each_with_index do |tok, idx|
+          text = slice_text(bytes, tok.start, tok.length)
+          io.puts "#{idx.to_s.rjust(5)}  #{tok.kind.to_s.ljust(14)}  #{tok.start.to_s.rjust(5)}  #{tok.length.to_s.rjust(6)}  #{text.inspect}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", stage
+            json.field "language", lang_label
+            json.field "tokens" do
+              json.array do
+                tokens.each_with_index do |tok, idx|
+                  text = slice_text(bytes, tok.start, tok.length)
+                  json.object do
+                    json.field "index", idx
+                    json.field "kind", tok.kind.to_s
+                    json.field "start", tok.start
+                    json.field "length", tok.length
+                    json.field "text", text
+                  end
+                end
+              end
+            end
+            json.field "count", tokens.size
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_json_tape(doc : Warp::IR::Document, bytes : Bytes, format : DumpFormat) : Int32
+      tape = doc.tape
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "Tape (json)"
+        io.puts "index   type         a       b       text"
+        tape.each_with_index do |entry, idx|
+          text = json_tape_text(bytes, entry)
+          io.puts "#{idx.to_s.rjust(5)}  #{entry.type.to_s.ljust(10)}  #{entry.a.to_s.rjust(5)}  #{entry.b.to_s.rjust(5)}  #{text.inspect}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "tape"
+            json.field "language", "json"
+            json.field "entries" do
+              json.array do
+                tape.each_with_index do |entry, idx|
+                  text = json_tape_text(bytes, entry)
+                  json.object do
+                    json.field "index", idx
+                    json.field "type", entry.type.to_s
+                    json.field "a", entry.a
+                    json.field "b", entry.b
+                    json.field "text", text
+                  end
+                end
+              end
+            end
+            json.field "count", tape.size
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.json_tape_text(bytes : Bytes, entry : Warp::IR::Entry) : String
+      case entry.type
+      when Warp::IR::TapeType::Key, Warp::IR::TapeType::String, Warp::IR::TapeType::Number,
+           Warp::IR::TapeType::True, Warp::IR::TapeType::False, Warp::IR::TapeType::Null
+        slice_text(bytes, entry.a, entry.b)
+      else
+        ""
+      end
+    end
+
+    private def self.dump_ruby_tape(tape : Array(Warp::Lang::Ruby::Tape::Entry), bytes : Bytes, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "Tape (ruby)"
+        io.puts "index   type         trivia  start   end     text"
+        tape.each_with_index do |entry, idx|
+          text = slice_text(bytes, entry.lexeme_start, entry.lexeme_end - entry.lexeme_start)
+          io.puts "#{idx.to_s.rjust(5)}  #{entry.type.to_s.ljust(10)}  #{entry.trivia_start.to_s.rjust(6)}  #{entry.lexeme_start.to_s.rjust(6)}  #{entry.lexeme_end.to_s.rjust(6)}  #{text.inspect}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "tape"
+            json.field "language", "ruby"
+            json.field "entries" do
+              json.array do
+                tape.each_with_index do |entry, idx|
+                  text = slice_text(bytes, entry.lexeme_start, entry.lexeme_end - entry.lexeme_start)
+                  json.object do
+                    json.field "index", idx
+                    json.field "type", entry.type.to_s
+                    json.field "trivia_start", entry.trivia_start
+                    json.field "lexeme_start", entry.lexeme_start
+                    json.field "lexeme_end", entry.lexeme_end
+                    json.field "text", text
+                  end
+                end
+              end
+            end
+            json.field "count", tape.size
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_json_cst(doc : Warp::CST::Document, bytes : Bytes, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "CST (json)"
+        write_json_cst_pretty(io, doc.root, bytes, 0)
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "cst"
+            json.field "language", "json"
+            json.field "root" do
+              write_json_cst_json(json, doc.root, bytes)
+            end
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_ruby_cst(root : Warp::Lang::Ruby::CST::RedNode, bytes : Bytes, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "CST (ruby)"
+        write_ruby_cst_pretty(io, root, bytes, 0)
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "cst"
+            json.field "language", "ruby"
+            json.field "root" do
+              write_ruby_cst_json(json, root, bytes)
+            end
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_crystal_cst(doc : Warp::Lang::Crystal::CST::Document, bytes : Bytes, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "CST (crystal)"
+        write_crystal_cst_pretty(io, doc.root, bytes, 0)
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "cst"
+            json.field "language", "crystal"
+            json.field "root" do
+              write_crystal_cst_json(json, doc.root, bytes)
+            end
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_json_ast(node : Warp::AST::Node, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "AST (json)"
+        write_json_ast_pretty(io, node, 0)
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "ast"
+            json.field "language", "json"
+            json.field "root" do
+              write_json_ast_json(json, node)
+            end
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_ruby_ast(node : Warp::Lang::Ruby::AST::Node, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "AST (ruby)"
+        write_ruby_ast_pretty(io, node, 0)
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "ast"
+            json.field "language", "ruby"
+            json.field "root" do
+              write_ruby_ast_json(json, node)
+            end
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.write_json_cst_pretty(io : IO, node : Warp::CST::RedNode, bytes : Bytes, depth : Int32)
+      indent = "  " * depth
+      token = node.token
+      if token
+        text = slice_text(bytes, token.start, token.length)
+        io.puts "#{indent}- #{node.kind} [#{token.start}, #{token.length}] #{text.inspect}"
+      else
+        io.puts "#{indent}- #{node.kind}"
+      end
+      node.children.each do |child|
+        write_json_cst_pretty(io, child, bytes, depth + 1)
+      end
+    end
+
+    private def self.write_json_cst_json(json : JSON::Builder, node : Warp::CST::RedNode, bytes : Bytes)
+      json.object do
+        json.field "kind", node.kind.to_s
+        if tok = node.token
+          json.field "token" do
+            json.object do
+              json.field "kind", tok.kind.to_s
+              json.field "start", tok.start
+              json.field "length", tok.length
+              json.field "text", slice_text(bytes, tok.start, tok.length)
+            end
+          end
+        end
+        json.field "leading_trivia" do
+          json.array do
+            node.leading_trivia.each do |tr|
+              json.object do
+                json.field "kind", tr.kind.to_s
+                json.field "start", tr.start
+                json.field "length", tr.length
+                json.field "text", slice_text(bytes, tr.start, tr.length)
+              end
+            end
+          end
+        end
+        json.field "children" do
+          json.array do
+            node.children.each do |child|
+              write_json_cst_json(json, child, bytes)
+            end
+          end
+        end
+      end
+    end
+
+    private def self.write_ruby_cst_pretty(io : IO, node : Warp::Lang::Ruby::CST::RedNode, bytes : Bytes, depth : Int32)
+      indent = "  " * depth
+      token = node.token
+      if token
+        text = slice_text(bytes, token.start, token.length)
+        io.puts "#{indent}- #{node.kind} [#{token.start}, #{token.length}] #{text.inspect}"
+      else
+        io.puts "#{indent}- #{node.kind}"
+      end
+      node.children.each do |child|
+        write_ruby_cst_pretty(io, child, bytes, depth + 1)
+      end
+    end
+
+    private def self.write_ruby_cst_json(json : JSON::Builder, node : Warp::Lang::Ruby::CST::RedNode, bytes : Bytes)
+      json.object do
+        json.field "kind", node.kind.to_s
+        if tok = node.token
+          json.field "token" do
+            json.object do
+              json.field "kind", tok.kind.to_s
+              json.field "start", tok.start
+              json.field "length", tok.length
+              json.field "text", slice_text(bytes, tok.start, tok.length)
+            end
+          end
+        end
+        json.field "leading_trivia" do
+          json.array do
+            node.leading_trivia.each do |tr|
+              json.object do
+                json.field "kind", tr.kind.to_s
+                json.field "start", tr.start
+                json.field "length", tr.length
+                json.field "text", slice_text(bytes, tr.start, tr.length)
+              end
+            end
+          end
+        end
+        json.field "children" do
+          json.array do
+            node.children.each do |child|
+              write_ruby_cst_json(json, child, bytes)
+            end
+          end
+        end
+      end
+    end
+
+    private def self.write_crystal_cst_pretty(io : IO, node : Warp::Lang::Crystal::CST::RedNode, bytes : Bytes, depth : Int32)
+      indent = "  " * depth
+      if text = node.text
+        io.puts "#{indent}- #{node.kind} #{text.inspect}"
+      else
+        io.puts "#{indent}- #{node.kind}"
+      end
+      node.children.each do |child|
+        write_crystal_cst_pretty(io, child, bytes, depth + 1)
+      end
+    end
+
+    private def self.write_crystal_cst_json(json : JSON::Builder, node : Warp::Lang::Crystal::CST::RedNode, bytes : Bytes)
+      json.object do
+        json.field "kind", node.kind.to_s
+        json.field "text", node.text
+        if payload = node.method_payload
+          json.field "method_payload" do
+            json.object do
+              json.field "name", payload.name
+              json.field "return_type", payload.return_type
+              json.field "had_parens", payload.had_parens
+              json.field "body", payload.body
+              json.field "params" do
+                json.array do
+                  payload.params.each do |param|
+                    json.object do
+                      json.field "name", param.name
+                      json.field "type", param.type
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+        json.field "children" do
+          json.array do
+            node.children.each do |child|
+              write_crystal_cst_json(json, child, bytes)
+            end
+          end
+        end
+      end
+    end
+
+    private def self.write_json_ast_pretty(io : IO, node : Warp::AST::Node, depth : Int32)
+      indent = "  " * depth
+      if value = node.value
+        io.puts "#{indent}- #{node.kind} #{value.inspect}"
+      else
+        io.puts "#{indent}- #{node.kind}"
+      end
+      node.children.each do |child|
+        write_json_ast_pretty(io, child, depth + 1)
+      end
+    end
+
+    private def self.write_json_ast_json(json : JSON::Builder, node : Warp::AST::Node)
+      json.object do
+        json.field "kind", node.kind.to_s
+        json.field "value", node.value
+        json.field "children" do
+          json.array do
+            node.children.each do |child|
+              write_json_ast_json(json, child)
+            end
+          end
+        end
+      end
+    end
+
+    private def self.write_ruby_ast_pretty(io : IO, node : Warp::Lang::Ruby::AST::Node, depth : Int32)
+      indent = "  " * depth
+      io.puts "#{indent}- #{node.kind} [#{node.start}, #{node.length}] #{node.value.inspect}"
+      node.children.each do |child|
+        write_ruby_ast_pretty(io, child, depth + 1)
+      end
+    end
+
+    private def self.write_ruby_ast_json(json : JSON::Builder, node : Warp::Lang::Ruby::AST::Node)
+      json.object do
+        json.field "kind", node.kind.to_s
+        json.field "value", node.value
+        json.field "start", node.start
+        json.field "length", node.length
+        json.field "meta", node.meta
+        json.field "children" do
+          json.array do
+            node.children.each do |child|
+              write_ruby_ast_json(json, child)
+            end
+          end
+        end
+      end
+    end
+
+    private def self.write_json_simd(json : JSON::Builder, bytes : Bytes)
+      result = Warp::Lexer.index(bytes)
+      if result.error.success?
+        indices = result.buffer.backing || [] of UInt32
+        json.object do
+          json.field "count", indices.size
+          json.field "indices" do
+            json.array do
+              indices.each_with_index do |idx_u32, i|
+                idx = idx_u32.to_i
+                byte = idx < bytes.size ? bytes[idx] : 0_u8
+                char = idx < bytes.size ? bytes[idx].chr : '?'
+                json.object do
+                  json.field "index", i
+                  json.field "offset", idx
+                  json.field "byte", byte.to_i
+                  json.field "char", char.to_s
+                end
+              end
+            end
+          end
+        end
+      else
+        write_json_error(json, "SIMD scan failed (#{result.error}).")
+      end
+    end
+
+    private def self.write_json_tokens(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, jsonc : Bool, path : String)
+      case lang
+      when DumpLanguage::Json
+        if jsonc
+          tokens, error = Warp::Lexer::TokenScanner.scan(bytes, true)
+          unless error.success?
+            write_json_error(json, "Token scan failed (#{error}) for #{path}.")
+            return
+          end
+          json.object do
+            json.field "count", tokens.size
+            json.field "tokens" do
+              json.array do
+                tokens.each_with_index do |tok, idx|
+                  json.object do
+                    json.field "index", idx
+                    json.field "kind", tok.kind.to_s
+                    json.field "start", tok.start
+                    json.field "length", tok.length
+                    json.field "text", slice_text(bytes, tok.start, tok.length)
+                  end
+                end
+              end
+            end
+          end
+        else
+          parser = Warp::Parser.new
+          count = 0
+          err = nil
+          json.object do
+            json.field "tokens" do
+              json.array do
+                err = parser.each_token(bytes) do |tok|
+                  json.object do
+                    json.field "index", count
+                    json.field "kind", tok.type.to_s
+                    json.field "start", tok.start
+                    json.field "length", tok.length
+                    json.field "text", slice_text(bytes, tok.start, tok.length)
+                  end
+                  count += 1
+                end
+              end
+            end
+            json.field "count", count
+          end
+          if err && !err.not_nil!.success?
+            write_json_error(json, "Token scan failed (#{err.not_nil!}) for #{path}.")
+          end
+        end
+      when DumpLanguage::Ruby
+        tokens, error, pos = Warp::Lang::Ruby::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_json_error(json, diag.to_s)
+          return
+        end
+        json.object do
+          json.field "count", tokens.size
+          json.field "tokens" do
+            json.array do
+              tokens.each_with_index do |tok, idx|
+                json.object do
+                  json.field "index", idx
+                  json.field "kind", tok.kind.to_s
+                  json.field "start", tok.start
+                  json.field "length", tok.length
+                  json.field "text", slice_text(bytes, tok.start, tok.length)
+                end
+              end
+            end
+          end
+        end
+      when DumpLanguage::Crystal
+        tokens, error, pos = Warp::Lang::Crystal::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_json_error(json, diag.to_s)
+          return
+        end
+        json.object do
+          json.field "count", tokens.size
+          json.field "tokens" do
+            json.array do
+              tokens.each_with_index do |tok, idx|
+                json.object do
+                  json.field "index", idx
+                  json.field "kind", tok.kind.to_s
+                  json.field "start", tok.start
+                  json.field "length", tok.length
+                  json.field "text", slice_text(bytes, tok.start, tok.length)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+
+    private def self.write_json_tape(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, jsonc : Bool, path : String)
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: jsonc)
+        unless result.error.success?
+          write_json_error(json, "Tape parse failed (#{result.error}) for #{path}.")
+          return
+        end
+        doc = result.doc.not_nil!
+        json.object do
+          json.field "count", doc.tape.size
+          json.field "entries" do
+            json.array do
+              doc.tape.each_with_index do |entry, idx|
+                json.object do
+                  json.field "index", idx
+                  json.field "type", entry.type.to_s
+                  json.field "a", entry.a
+                  json.field "b", entry.b
+                  json.field "text", json_tape_text(bytes, entry)
+                end
+              end
+            end
+          end
+        end
+      when DumpLanguage::Ruby
+        tokens, error, pos = Warp::Lang::Ruby::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_json_error(json, diag.to_s)
+          return
+        end
+        root, parse_error = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
+        unless parse_error.success? && root
+          write_json_error(json, "Ruby CST parse failed (#{parse_error}) for #{path}.")
+          return
+        end
+        red = Warp::Lang::Ruby::CST::RedNode.new(root.not_nil!)
+        tape = Warp::Lang::Ruby::Tape::Builder.build(bytes, red)
+        json.object do
+          json.field "count", tape.size
+          json.field "entries" do
+            json.array do
+              tape.each_with_index do |entry, idx|
+                json.object do
+                  json.field "index", idx
+                  json.field "type", entry.type.to_s
+                  json.field "trivia_start", entry.trivia_start
+                  json.field "lexeme_start", entry.lexeme_start
+                  json.field "lexeme_end", entry.lexeme_end
+                  json.field "text", slice_text(bytes, entry.lexeme_start, entry.lexeme_end - entry.lexeme_start)
+                end
+              end
+            end
+          end
+        end
+      when DumpLanguage::Crystal
+        write_json_error(json, "Tape is not implemented for Crystal yet.")
+      end
+    end
+
+    private def self.write_json_cst(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, jsonc : Bool, path : String)
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_cst(bytes, jsonc: jsonc)
+        unless result.error.success?
+          write_json_error(json, "CST parse failed (#{result.error}) for #{path}.")
+          return
+        end
+        doc = result.doc.not_nil!
+        write_json_cst_json(json, doc.root, bytes)
+      when DumpLanguage::Ruby
+        tokens, error, pos = Warp::Lang::Ruby::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_json_error(json, diag.to_s)
+          return
+        end
+        root, parse_error = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
+        unless parse_error.success? && root
+          write_json_error(json, "Ruby CST parse failed (#{parse_error}) for #{path}.")
+          return
+        end
+        write_ruby_cst_json(json, Warp::Lang::Ruby::CST::RedNode.new(root.not_nil!), bytes)
+      when DumpLanguage::Crystal
+        tokens, error, pos = Warp::Lang::Crystal::Lexer.scan(bytes)
+        unless error.success?
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, pos, path)
+          write_json_error(json, diag.to_s)
+          return
+        end
+        root, parse_error = Warp::Lang::Crystal::CST::Parser.parse(bytes, tokens)
+        unless parse_error.success? && root
+          write_json_error(json, "Crystal CST parse failed (#{parse_error}) for #{path}.")
+          return
+        end
+        doc = Warp::Lang::Crystal::CST::Document.new(bytes, Warp::Lang::Crystal::CST::RedNode.new(root.not_nil!))
+        write_crystal_cst_json(json, doc.root, bytes)
+      end
+    end
+
+    private def self.write_json_ast(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, jsonc : Bool, path : String)
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_ast(bytes, jsonc: jsonc)
+        unless result.error.success?
+          write_json_error(json, "AST parse failed (#{result.error}) for #{path}.")
+          return
+        end
+        write_json_ast_json(json, result.node.not_nil!)
+      when DumpLanguage::Ruby
+        result = Warp::Lang::Ruby::Parser.parse(bytes)
+        unless result.error.success? && result.node
+          write_json_error(json, "Ruby AST parse failed (#{result.error}) for #{path}.")
+          return
+        end
+        write_ruby_ast_json(json, result.node.not_nil!)
+      when DumpLanguage::Crystal
+        write_json_error(json, "AST is not implemented for Crystal yet.")
+      end
+    end
+
+    private def self.write_json_error(json : JSON::Builder, message : String)
+      json.object do
+        json.field "error", message
+      end
     end
 
     private def self.collect_files(source_path : String, config : ProjectConfig, target : TranspileTarget) : Array(String)

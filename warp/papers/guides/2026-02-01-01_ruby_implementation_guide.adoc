@@ -45,20 +45,33 @@ This allows the engine to reconstruct the source exactly (lossless) or apply tra
 
 == Developer Introspection (CLI)
 
-To assist in debugging and further development, several CLI flags have been added to the `transpile` command.
+To assist in debugging and further development, Warp exposes a dedicated `dump` command for pipeline inspection.
 
 === Usage
 [source,bash]
 ----
-bin/warp transpile crystal --dump-cst -s source.rb
+bin/warp dump tokens --lang auto source.rb
+bin/warp dump cst --lang ruby source.rb
+bin/warp dump tape --lang ruby source.rb
+bin/warp dump ast --lang ruby source.rb
+bin/warp dump full source.rb
 ----
 
-=== Available Dump Flags
-* `--dump-tokens`: Prints the raw token stream with positions and lexemes.
-* `--dump-cst`: Displays the hierarchical Concrete Syntax Tree.
-* `--dump-ast`: Prints the high-level Abstract Syntax Tree (Object Model).
-* `--dump-tape`: Shows the linear Tape IR entries.
-* `--dump-simd`: Visualizes the structural character positions used for SIMD acceleration.
+=== Available Dump Targets
+* `simd`: Structural scan indices (JSON only).
+* `tokens`: Raw token stream with positions and lexemes.
+* `tape`: Linear Tape IR entries (JSON + Ruby).
+* `cst`: Concrete Syntax Tree (lossless).
+* `ast`: Abstract Syntax Tree (semantic).
+* `full`: All available stages for the selected language.
+
+=== Output Formats
+* `-f/--format pretty`: Human-readable output for debugging (default).
+* `-f/--format json`: Machine-readable output for automated analysis.
+
+=== Language Selection
+* `-l/--lang auto`: Auto-detect from file extension/content (default).
+* `-l/--lang ruby|crystal|json|jsonc`: Explicit language selection.
 
 == Implementation Roadmap
 

@@ -1,0 +1,59 @@
+= Pipeline Dump CLI Guide
+:toc:
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+
+This guide documents the `warp dump` command, which exposes the internal pipeline stages for debugging, teaching, and automated analysis.
+
+== Overview
+
+The `dump` command prints one stage of the pipeline at a time or a combined view with `full`.
+It supports human-readable output (default) and machine-readable JSON.
+
+== Usage
+
+[source,bash]
+----
+warp dump <simd|tokens|tape|cst|ast|full> [options] <file>
+----
+
+== Examples
+
+[source,bash]
+----
+# SIMD structural indices for JSON
+warp dump simd --lang json data.json
+
+# Tokens with auto-detected language
+warp dump tokens --lang auto source.rb
+
+# Ruby tape stream
+warp dump tape --lang ruby source.rb
+
+# CST in JSON format (for automation)
+warp dump cst -l json -f json data.json
+
+# AST for JSON (auto-detect)
+warp dump ast data.json
+
+# Full pipeline (all stages supported by the selected language)
+warp dump full source.rb
+----
+
+== Options
+
+* `-l, --lang=LANG` — Language selection (`auto|json|jsonc|ruby|crystal`).
+* `-f, --format=FORMAT` — Output format (`pretty|json`).
+* `--jsonc` — Enable JSONC parsing (JSON only).
+* `-h, --help` — Command help.
+
+== Output Notes
+
+* **pretty** format is optimized for human inspection and teaching.
+* **json** format is stable and intended for tooling and automated analysis.
+* The `full` target only emits stages implemented by the selected language provider.
+
+== Error Handling
+
+Errors include the stage name and a clear description. Lexer errors are annotated with line/column context when available.
