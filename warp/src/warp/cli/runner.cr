@@ -68,6 +68,7 @@ Options:
   --generate-rbs=BOOL     Generate .rbs signature files (default false)
   --generate-rbi=BOOL     Generate .rbi annotation files (default false)
   --parallel=N            Use N parallel workers (default: CPU cores)
+  --dry-run               Parse/validate without writing output files
   --stdout                Write output to stdout
   -v, --verbose           Print detailed system and worker information
 
@@ -178,6 +179,7 @@ YAML
       dump_ast = false
       dump_tape = false
       dump_simd = false
+      dry_run = false
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
@@ -193,6 +195,7 @@ YAML
         p.on("--parallel=N", "Use N parallel workers (default: CPU cores)") do |v|
           parallel_workers = v.to_i? || Warp::Parallel::CPUDetector.cpu_count
         end
+        p.on("--dry-run", "Parse/validate without writing output files") { dry_run = true }
         p.on("--stdout", "Write output to stdout") { stdout = true }
         p.on("-v", "--verbose", "Print detailed information about system and workers") { verbose = true }
         p.on("--dump-tokens", "Dump tokens to stdout") { dump_tokens = true }
@@ -202,7 +205,11 @@ YAML
         p.on("--dump-simd", "Dump SIMD structural indices") { dump_simd = true }
       end
 
-      parser.parse(args || [] of String)
+      parsed_args = args || [] of String
+      parser.parse(parsed_args)
+      if parsed_args.size > 0 && source_path == "."
+        source_path = parsed_args[0]
+      end
 
       config = ConfigLoader.load(config_path)
 
@@ -291,7 +298,7 @@ YAML
 
         stats_chan = Channel(Tuple(Bool, Int32)).new(files.size)
         processor.process_files(files) do |path|
-          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, dry_run, verbose)
           stats_chan.send({ok, out_count})
         end
 
@@ -307,7 +314,7 @@ YAML
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, dry_run, verbose)
           if ok
             success_count += 1
           else
@@ -319,7 +326,7 @@ YAML
 
       # Compute actual output files on disk (more accurate than internal counters)
       actual_output_files = 0
-      if !stdout && output_root && File.exists?(output_root)
+      if !dry_run && !stdout && output_root && File.exists?(output_root)
         actual_output_files = Dir.glob(File.join(output_root, "**", "*")).select { |p| File.file?(p) }.size
       end
 
@@ -430,6 +437,7 @@ YAML
       dump_ast : Bool = false,
       dump_tape : Bool = false,
       dump_simd : Bool = false,
+      dry_run : Bool = false,
       verbose : Bool = false,
     ) : Tuple(Bool, Int32)
       source = File.read(path)
@@ -441,7 +449,11 @@ YAML
       end
 
       if dump_cst
-        Warp::Lang::Ruby::Inspector.dump_cst(bytes)
+        if target == TranspileTarget::Ruby || path.ends_with?(".cr")
+          Warp::Lang::Crystal::Inspector.dump_cst(bytes)
+        else
+          Warp::Lang::Ruby::Inspector.dump_cst(bytes)
+        end
         return {true, 0}
       end
 
@@ -481,14 +493,16 @@ YAML
         end
 
         output_count = 0
-        if stdout
+        if dry_run
+          # No output in dry-run mode
+        elsif stdout
           puts result.output
         else
           write_or_print(path, output_root, result.output, ".rb", stdout, config.folder_mappings)
           output_count += 1
 
           # Generate accompanying RBS/RBI files if requested
-          if (generate_rbs || config.generate_rbs) && !stdout
+          if (generate_rbs || config.generate_rbs) && !stdout && !dry_run
             ruby_bytes = result.output.to_slice
             tokens, lex_error, _ = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
             if lex_error == Warp::Core::ErrorCode::Success
@@ -500,7 +514,7 @@ YAML
             end
           end
 
-          if (generate_rbi || config.generate_rbi) && !stdout
+          if (generate_rbi || config.generate_rbi) && !stdout && !dry_run
             ruby_bytes = result.output.to_slice
             tokens, lex_error, _ = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
             if lex_error == Warp::Core::ErrorCode::Success
@@ -558,8 +572,12 @@ YAML
                   end
 
         ext = target == TranspileTarget::Rbs ? ".rbs" : (target == TranspileTarget::Rbi ? ".rbi" : ".rb")
-        write_or_print(path, output_root, content, ext, stdout, config.folder_mappings)
-        return {true, stdout ? 0 : 1}
+        if dry_run
+          return {true, 0}
+        else
+          write_or_print(path, output_root, content, ext, stdout, config.folder_mappings)
+          return {true, stdout ? 0 : 1}
+        end
       else
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
         result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations, path)
@@ -577,7 +595,9 @@ YAML
           return {false, 0}
         end
         output_count = 0
-        if stdout
+        if dry_run
+          # No output in dry-run mode
+        elsif stdout
           puts result.output
         else
           out_path = output_path_for(path, output_root, ".cr", config.folder_mappings)

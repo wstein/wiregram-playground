@@ -99,6 +99,12 @@ crystal run bin/warp.cr -- --version
 # Generate RBS type signatures
 ./bin/warp transpile rbs -s myfile.rb -o types/
 
+# Dry-run parse/validate without writing output
+./bin/warp transpile ruby --dry-run -s myfile.cr
+
+# Dump CST for Crystal source
+./bin/warp transpile ruby --dump-cst myfile.cr
+
 # Show help
 ./bin/warp --help
 ```

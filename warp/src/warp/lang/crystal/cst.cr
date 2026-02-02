@@ -222,37 +222,98 @@ module Warp::Lang::Crystal
       end
 
       private def parse_simple_block(kind : NodeKind) : GreenNode
-        start_pos = @pos
-        start_byte = current.start
+        # Delegate method defs to the specialized parser
+        return parse_method_def if kind == NodeKind::MethodDef
 
-        # For MethodDef, extract metadata
-        if kind == NodeKind::MethodDef
-          return parse_method_def
-        end
-
-        # For other block types (Struct, Class, Module, etc), capture entire block as RawText
-        # Start from the keyword (struct, class, etc)
+        # Record the start of the block (keyword position)
         block_start = current.start
+        advance # consume the keyword
 
-        # Skip past the keyword
-        advance
-
-        # Skip to the matching End
-        while @pos < @tokens.size && current.kind != TokenKind::End
+        # Skip header until end-of-line (if present)
+        while @pos < @tokens.size && current.kind != TokenKind::Newline
           advance
         end
+        advance if current.kind == TokenKind::Newline
 
-        # Include the End keyword
-        if current.kind == TokenKind::End
-          block_end = current.start + current.length
-          advance
-        else
-          block_end = @bytes.size
+        # Parse inner contents into child nodes until the matching 'end'
+        children = [] of GreenNode
+        cursor = @pos < @tokens.size ? current.start : @bytes.size
+        i = @pos
+
+        while i < @tokens.size
+          tok = @tokens[i]
+
+          if tok.kind == TokenKind::Def
+            def_start = tok.start
+            if def_start > cursor
+              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, def_start - cursor]))
+            end
+
+            # Re-position parser and parse method def
+            saved_pos = @pos
+            @pos = i
+            method_node = parse_method_def
+            children << method_node
+            # Update index and cursor
+            i = @pos
+            cursor = @pos < @tokens.size ? current.start : @bytes.size
+            next
+          elsif tok.kind == TokenKind::Class
+            # Nested class: parse recursively
+            nested_start = tok.start
+            if nested_start > cursor
+              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, nested_start - cursor]))
+            end
+            saved_pos = @pos
+            @pos = i
+            nested = parse_simple_block(NodeKind::ClassDef)
+            children << nested
+            i = @pos
+            cursor = @pos < @tokens.size ? current.start : @bytes.size
+            next
+          elsif tok.kind == TokenKind::Module
+            nested_start = tok.start
+            if nested_start > cursor
+              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, nested_start - cursor]))
+            end
+            saved_pos = @pos
+            @pos = i
+            nested = parse_simple_block(NodeKind::ModuleDef)
+            children << nested
+            i = @pos
+            cursor = @pos < @tokens.size ? current.start : @bytes.size
+            next
+          elsif tok.kind == TokenKind::Struct
+            nested_start = tok.start
+            if nested_start > cursor
+              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, nested_start - cursor]))
+            end
+            saved_pos = @pos
+            @pos = i
+            nested = parse_simple_block(NodeKind::StructDef)
+            children << nested
+            i = @pos
+            cursor = @pos < @tokens.size ? current.start : @bytes.size
+            next
+          elsif tok.kind == TokenKind::End
+            end_start = tok.start
+            if end_start > cursor
+              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, end_start - cursor]))
+            end
+            # Advance parser after 'end' and return
+            @pos = i + 1
+            return GreenNode.new(kind, children)
+          else
+            i += 1
+          end
         end
 
-        # Capture entire block as text
-        block_text = String.new(@bytes[block_start, block_end - block_start])
-        GreenNode.new(kind, [] of GreenNode, block_text)
+        # If we fell out without finding an 'end', capture remaining text
+        if cursor < @bytes.size
+          children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, @bytes.size - cursor]))
+        end
+
+        GreenNode.new(kind, children)
       end
 
       private def parse_method_def : GreenNode

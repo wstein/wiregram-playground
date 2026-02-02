@@ -128,12 +128,15 @@ end
 ## Verification
 
 **Numeric Suffixes:**
+
 ```crystal
 x = 42_u64
 y = 100_i32
 z = 3.14_f64
 ```
+
 Transpiles to:
+
 ```ruby
 x = 42
 y = 100
@@ -141,32 +144,41 @@ z = 3.14
 ```
 
 **Array Type Annotations:**
+
 ```crystal
 arr = [] of Int32
 arr2 = [] of String
 ```
+
 Transpiles to:
+
 ```ruby
 arr = []
 arr2 = []
 ```
 
 **Hash Type Annotations:**
+
 ```crystal
 hash = {} of String => Int32
 ```
+
 Transpiles to:
+
 ```ruby
 hash = {}
 ```
 
 **Tuple Literals:**
+
 ```crystal
 tuple = {1, 2}
 pair = {"hello", 42}
 triple = {x, y, z}
 ```
+
 Transpiles to:
+
 ```ruby
 tuple = [1, 2]
 pair = ["hello", 42]
