@@ -71,13 +71,6 @@ Options:
   --dry-run               Parse/validate without writing output files
   --stdout                Write output to stdout
   -v, --verbose           Print detailed system and worker information
-
-Debugging Flags:
-  --dump-tokens           Dump tokens to stdout
-  --dump-cst              Dump Concrete Syntax Tree to stdout
-  --dump-ast              Dump Abstract Syntax Tree to stdout
-  --dump-tape             Dump Tape IR to stdout
-  --dump-simd             Dump SIMD structural indices to stdout
 TXT
     end
 
@@ -174,11 +167,6 @@ YAML
       stdout = false
       parallel_workers : Int32? = nil
       verbose = false
-      dump_tokens = false
-      dump_cst = false
-      dump_ast = false
-      dump_tape = false
-      dump_simd = false
       dry_run = false
 
       parser = OptionParser.new do |p|
@@ -198,11 +186,6 @@ YAML
         p.on("--dry-run", "Parse/validate without writing output files") { dry_run = true }
         p.on("--stdout", "Write output to stdout") { stdout = true }
         p.on("-v", "--verbose", "Print detailed information about system and workers") { verbose = true }
-        p.on("--dump-tokens", "Dump tokens to stdout") { dump_tokens = true }
-        p.on("--dump-cst", "Dump CST to stdout") { dump_cst = true }
-        p.on("--dump-ast", "Dump AST to stdout") { dump_ast = true }
-        p.on("--dump-tape", "Dump Tape IR to stdout") { dump_tape = true }
-        p.on("--dump-simd", "Dump SIMD structural indices") { dump_simd = true }
       end
 
       parsed_args = args || [] of String
@@ -298,7 +281,7 @@ YAML
 
         stats_chan = Channel(Tuple(Bool, Int32)).new(files.size)
         processor.process_files(files) do |path|
-          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, dry_run, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dry_run, verbose)
           stats_chan.send({ok, out_count})
         end
 
@@ -314,7 +297,7 @@ YAML
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, dry_run, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dry_run, verbose)
           if ok
             success_count += 1
           else
@@ -432,45 +415,11 @@ YAML
       stdout : Bool,
       rbs_output_root : String? = nil,
       rbi_output_root : String? = nil,
-      dump_tokens : Bool = false,
-      dump_cst : Bool = false,
-      dump_ast : Bool = false,
-      dump_tape : Bool = false,
-      dump_simd : Bool = false,
       dry_run : Bool = false,
       verbose : Bool = false,
     ) : Tuple(Bool, Int32)
       source = File.read(path)
       bytes = source.to_slice
-
-      if dump_tokens
-        Warp::Lang::Ruby::Inspector.dump_tokens(bytes)
-        return {true, 0}
-      end
-
-      if dump_cst
-        if target == TranspileTarget::Ruby || path.ends_with?(".cr")
-          Warp::Lang::Crystal::Inspector.dump_cst(bytes)
-        else
-          Warp::Lang::Ruby::Inspector.dump_cst(bytes)
-        end
-        return {true, 0}
-      end
-
-      if dump_ast
-        Warp::Lang::Ruby::Inspector.dump_ast(bytes)
-        return {true, 0}
-      end
-
-      if dump_tape
-        Warp::Lang::Ruby::Inspector.dump_tape(bytes)
-        return {true, 0}
-      end
-
-      if dump_simd
-        Warp::Lang::Ruby::Inspector.dump_simd(bytes)
-        return {true, 0}
-      end
 
       # Use provided RBS/RBI output roots, or fall back to config
       rbs_output_dir = rbs_output_root || config.rbs_output_dir

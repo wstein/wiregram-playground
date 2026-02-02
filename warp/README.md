@@ -102,9 +102,6 @@ crystal run bin/warp.cr -- --version
 # Dry-run parse/validate without writing output
 ./bin/warp transpile ruby --dry-run -s myfile.cr
 
-# Dump CST for Crystal source
-./bin/warp transpile ruby --dump-cst myfile.cr
-
 # Show help
 ./bin/warp --help
 ```
