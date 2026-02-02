@@ -88,6 +88,34 @@ module Warp
         true
       end
 
+      protected def compute_extra_masks(ptr : Pointer(UInt8), block_len : Int32) : Tuple(UInt64, UInt64, UInt64)
+        number = 0_u64
+        identifier = 0_u64
+        unicode_letter = 0_u64
+
+        i = 0
+        while i < block_len
+          b = ptr[i]
+          bit = 1_u64 << i
+
+          if (b >= '0'.ord.to_u8 && b <= '9'.ord.to_u8) || b == '.'.ord.to_u8 || b == 'e'.ord.to_u8 || b == 'E'.ord.to_u8
+            number |= bit
+          end
+
+          if (b >= 'a'.ord.to_u8 && b <= 'z'.ord.to_u8) || (b >= 'A'.ord.to_u8 && b <= 'Z'.ord.to_u8) || b == '_'.ord.to_u8
+            identifier |= bit
+          end
+
+          if b >= 0x80_u8 && (b & 0xC0_u8) != 0x80_u8
+            unicode_letter |= bit
+          end
+
+          i += 1
+        end
+
+        {number, identifier, unicode_letter}
+      end
+
       abstract def name : String
     end
   end

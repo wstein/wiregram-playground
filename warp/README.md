@@ -35,6 +35,7 @@ Plans, refactoring summaries, and completion reports.
 - [Completion Report](papers/implementation/2026-02-01-07_completion_report.adoc)
 - [CST-Driven Transpiler Architecture](papers/implementation/2026-02-02-05_cst_driven_transpiler.adoc) **NEW**
 - [Newline Preservation Fix](papers/implementation/2026-02-02-04_newline_preservation_fix.md)
+- [Enhanced SIMD Scan (JSON)](papers/implementation/2026-02-03-01_enhanced_simd_scan.adoc)
 
 ### [Performance](papers/performance/)
 

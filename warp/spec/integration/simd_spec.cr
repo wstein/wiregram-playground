@@ -18,6 +18,15 @@ describe "SIMD scanning via dump CLI" do
     stdout_text.includes?("json").should be_true
   end
 
+  it "outputs enhanced SIMD structural indices for JSON" do
+    stdout_text, stderr_text, status = run_warp_cli(["dump", "simd", "--lang", "json", "--enhanced", "spec/fixtures/cli/sample.json"])
+
+    status.success?.should be_true
+    stderr_text.empty?.should be_true
+    stdout_text.includes?("SIMD structural indices").should be_true
+    stdout_text.includes?("json").should be_true
+  end
+
   it "outputs SIMD structural indices for Ruby" do
     stdout_text, stderr_text, status = run_warp_cli(["dump", "simd", "--lang", "ruby", "spec/fixtures/cli/rb_simple.rb"])
 

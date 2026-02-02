@@ -43,6 +43,13 @@ module Warp
       }
 
       def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+        if ENV["WARP_SIMD_CRYSTAL"]? == "1"
+          simd_result = Warp::Lang::Crystal.simd_scan(bytes)
+          if simd_result.error == Warp::Core::ErrorCode::Utf8Error
+            return {Array(Token).new, Warp::Core::ErrorCode::Utf8Error, 0}
+          end
+        end
+
         tokens = [] of Token
         i = 0
         len = bytes.size

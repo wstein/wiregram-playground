@@ -40,6 +40,13 @@ module Warp
 
       def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         # Module-level compatibility: this method is used internally by tests and other code.
+        if ENV["WARP_SIMD_RUBY"]? == "1"
+          simd_result = Warp::Lang::Ruby.simd_scan(bytes)
+          if simd_result.error == Warp::Core::ErrorCode::Utf8Error
+            return {Array(Token).new, Warp::Core::ErrorCode::Utf8Error, 0}
+          end
+        end
+
         tokens = [] of Token
         i = 0
         len = bytes.size

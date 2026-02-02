@@ -103,8 +103,22 @@ module Warp
                byte == '['.ord.to_u8 || byte == ']'.ord.to_u8 ||
                byte == '('.ord.to_u8 || byte == ')'.ord.to_u8 ||
                byte == ':'.ord.to_u8 || byte == ','.ord.to_u8 ||
-               byte == ';'.ord.to_u8 || byte == '='.ord.to_u8
+               byte == ';'.ord.to_u8 || byte == '='.ord.to_u8 ||
+               byte == '.'.ord.to_u8 || byte == '#'.ord.to_u8 ||
+               byte == '/'.ord.to_u8
               structural |= (1_u64 << i)
+            end
+
+            # Heredoc start (<<, <<-, <<~)
+            if byte == '<'.ord.to_u8 && i + 1 < block_len && ptr[i + 1] == '<'.ord.to_u8
+              structural |= (1_u64 << i)
+              structural |= (1_u64 << (i + 1))
+            end
+
+            # String interpolation marker '#{'
+            if byte == '#'.ord.to_u8 && i + 1 < block_len && ptr[i + 1] == '{'.ord.to_u8
+              structural |= (1_u64 << i)
+              structural |= (1_u64 << (i + 1))
             end
           end
 

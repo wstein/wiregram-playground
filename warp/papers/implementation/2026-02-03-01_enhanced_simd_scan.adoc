@@ -1,0 +1,53 @@
+= Enhanced SIMD Scan (JSON)
+
+== Summary
+
+This document describes the enhanced SIMD scanning path for JSON that extends the base structural scan with:
+
+- Number boundary detection (digits + dot + exponent markers)
+- Identifier boundary detection (ASCII letters + underscore)
+- Unicode letter detection (UTF-8 leading bytes)
+
+The enhanced scan is designed to be backward compatible with the existing structural scan and can be enabled via the CLI.
+
+== Implementation
+
+=== New Masks
+
+The SIMD masks now include additional fields:
+
+- `number` — digits and number markers (`0-9`, `.`, `e`, `E`)
+- `identifier` — ASCII letters and underscore
+- `unicode_letter` — UTF-8 leading bytes (non-ASCII)
+
+These masks are computed in all backends, with scalar fallback where SIMD-specific logic is not yet implemented.
+
+=== Enhanced SIMD Scan
+
+A new scanner is available at `src/warp/lexer/enhanced_simd_scan.cr`:
+
+- Uses the existing string and UTF-8 validators
+- Preserves the existing JSON structural indices
+- Adds number and identifier boundary starts outside string regions
+- Adds Unicode letter detection inside string regions
+
+== CLI Usage
+
+Enable enhanced SIMD in `dump simd`:
+
+----
+warp dump simd --lang json --enhanced path/to/file.json
+----
+
+The enhanced scan is also respected in `dump full` when the same flag is used.
+
+== Notes
+
+- The added masks are currently computed using scalar logic inside each backend for portability.
+- SIMD-optimized versions can be added per backend without changing the public API.
+
+== Next Steps
+
+- SIMD-optimized number and identifier scanning per backend
+- Unicode property tables for more precise letter detection
+- Integration into Ruby/Crystal lexers once their SIMD tokenization is expanded

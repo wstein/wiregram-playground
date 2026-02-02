@@ -44,7 +44,8 @@ module Warp
           whitespace |= ~0_u64 << block_len
         end
 
-        Lexer::Masks.new(backslash, quote, whitespace, op, control)
+        number, identifier, unicode_letter = compute_extra_masks(ptr, block_len)
+        Lexer::Masks.new(backslash, quote, whitespace, op, control, number, identifier, unicode_letter)
       end
 
       def all_digits16?(ptr : Pointer(UInt8)) : Bool

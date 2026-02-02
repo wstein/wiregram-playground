@@ -76,6 +76,7 @@ Options:
   -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
+  --enhanced             Use enhanced SIMD detection (JSON only)
   -h, --help             Show this help message
 
 Examples:
@@ -99,6 +100,7 @@ Options:
   -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
+  --enhanced             Use enhanced SIMD detection (JSON only)
   -h, --help             Show this help message
 TXT
     end
@@ -409,12 +411,14 @@ YAML
       lang_name = "auto"
       format_name = "pretty"
       jsonc = false
+      enhanced = false
 
       parser = OptionParser.new do |p|
         p.banner = dump_stage_usage(stage)
         p.on("-l LANG", "--lang=LANG", "Language: auto|json|jsonc|ruby|crystal") { |v| lang_name = v }
         p.on("-f FORMAT", "--format=FORMAT", "Output format: pretty|json") { |v| format_name = v }
         p.on("--jsonc", "Enable JSONC parsing (JSON only)") { jsonc = true }
+        p.on("--enhanced", "Use enhanced SIMD detection (JSON only)") { enhanced = true }
         p.on("-h", "--help", "Show this help message") { puts dump_stage_usage(stage); exit 0 }
       end
 
@@ -452,7 +456,7 @@ YAML
 
       case stage
       when "simd"
-        return dump_simd_stage(lang, bytes, format, path)
+        return dump_simd_stage(lang, bytes, format, path, enhanced)
       when "tokens"
         return dump_tokens_stage(lang, bytes, format, path, jsonc_effective)
       when "tape"
@@ -466,7 +470,7 @@ YAML
       when "ast"
         return dump_ast_stage(lang, bytes, format, path, jsonc_effective)
       when "full"
-        return dump_full_stage(lang, bytes, format, path, jsonc_effective)
+        return dump_full_stage(lang, bytes, format, path, jsonc_effective, enhanced)
       else
         puts "Unknown dump target: #{stage}"
         return 1
@@ -553,10 +557,10 @@ YAML
       nil
     end
 
-    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String) : Int32
+    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, enhanced : Bool = false) : Int32
       scan_result : Warp::Lang::Common::ScanResult = case lang
       when DumpLanguage::Json
-        json_result = Warp::Lexer.index(bytes)
+        json_result = enhanced ? Warp::Lexer::EnhancedSimdScan.index(bytes) : Warp::Lexer.index(bytes)
         Warp::Lang::Common::ScanResult.new(json_result.buffer.backing || Array(UInt32).new, json_result.error, "json")
       when DumpLanguage::Ruby
         Warp::Lang::Ruby.simd_scan(bytes)
@@ -845,23 +849,23 @@ YAML
       0
     end
 
-    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool, enhanced : Bool) : Int32
       case format
       when DumpFormat::Pretty
         io = STDOUT
-        dump_full_stage_pretty(io, lang, bytes, path, jsonc)
+        dump_full_stage_pretty(io, lang, bytes, path, jsonc, enhanced)
       when DumpFormat::Json
-        dump_full_stage_json(lang, bytes, path, jsonc)
+        dump_full_stage_json(lang, bytes, path, jsonc, enhanced)
       end
 
       0
     end
 
-    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool)
+    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool)
       io.puts "Full dump (#{dump_language_label(lang)})"
 
       io.puts "\n== simd =="
-      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path)
+      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path, enhanced)
 
       io.puts "\n== tokens =="
       dump_tokens_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
@@ -882,14 +886,14 @@ YAML
       dump_ast_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
     end
 
-    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool)
+    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool)
       JSON.build(STDOUT) do |json|
         json.object do
           json.field "language", dump_language_label(lang)
           json.field "stages" do
             json.object do
               json.field "simd" do
-                write_json_simd_all_langs(json, lang, bytes, path)
+                write_json_simd_all_langs(json, lang, bytes, path, enhanced)
               end
               json.field "tokens" do
                 write_json_tokens(json, lang, bytes, jsonc, path)
@@ -1562,10 +1566,10 @@ YAML
       end
     end
 
-    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String)
+    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String, enhanced : Bool)
       scan_result : Warp::Lang::Common::ScanResult = case lang
       when DumpLanguage::Json
-        json_result = Warp::Lexer.index(bytes)
+        json_result = enhanced ? Warp::Lexer::EnhancedSimdScan.index(bytes) : Warp::Lexer.index(bytes)
         Warp::Lang::Common::ScanResult.new(json_result.buffer.backing || Array(UInt32).new, json_result.error, "json")
       when DumpLanguage::Ruby
         Warp::Lang::Ruby.simd_scan(bytes)

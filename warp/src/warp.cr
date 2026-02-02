@@ -45,6 +45,7 @@ require "./warp/input/padded_buffer"
 require "./warp/ir/soa_view"
 require "./warp/ir/tape_builder"
 require "./warp/lexer/structural_scan"
+require "./warp/lexer/enhanced_simd_scan"
 require "./warp/lexer/token_assembler"
 require "./warp/lexer/token_scanner"
 require "./warp/parallel/cpu_detector"
@@ -52,6 +53,9 @@ require "./warp/parser"
 
 # Common language infrastructure
 require "./warp/lang/common/simd_scanner"
+require "./warp/lang/common/unicode_simd"
+require "./warp/lang/common/number_simd"
+require "./warp/lang/common/comment_simd"
 
 # Language support modules (for future extensibility)
 require "./warp/lang/json/types"

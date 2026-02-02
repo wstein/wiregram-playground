@@ -58,7 +58,8 @@ module Warp
           whitespace |= ~0_u64 << block_len
         end
 
-        Lexer::Masks.new(backslash, quote, whitespace, op, control)
+        number, identifier, unicode_letter = compute_extra_masks(ptr, block_len)
+        Lexer::Masks.new(backslash, quote, whitespace, op, control, number, identifier, unicode_letter)
       end
 
       def all_digits16?(ptr : Pointer(UInt8)) : Bool
@@ -100,10 +101,10 @@ module Warp
             setle %%dl
             movzbl %%dl, $0
             )
-            : "=r"(is_ascii)
-            : "S"(ptr)
-            : "zmm0", "zmm1", "zmm2", "ymm3", "ymm4", "xmm5", "xmm6", "rax", "rdx"
-            : "volatile"
+                  : "=r"(is_ascii)
+                  : "S"(ptr)
+                  : "zmm0", "zmm1", "zmm2", "ymm3", "ymm4", "xmm5", "xmm6", "rax", "rdx"
+                  : "volatile"
           )
           is_ascii != 0
         {% elsif flag?(:x86_64) && flag?(:avx2) %}
