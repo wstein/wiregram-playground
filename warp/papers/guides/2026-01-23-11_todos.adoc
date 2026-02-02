@@ -270,7 +270,37 @@ Transpiling [===>    ] 5/12 files (42%)
 15. LSP server (research phase)
 16. Fuzzing tests
 
-== Technical Debt & Notes
+== Phase 3: Language Support [.yellow]#⧗#
+
+=== 3.1 Ruby Parser & CST [.green]#✓#
+
+==== [.green]#✓# Pratt Parser for expressions
+*Status:* Completed +
+*Files:* `src/warp/lang/ruby/cst.cr` +
+*Description:* Implement Pratt parsing for Ruby expressions to handle operator precedence and method chaining properly. +
+*Effort:* 5/10
+
+==== [.green]#✓# Ruby Tape IR Generation
+*Status:* Completed +
+*Files:* `src/warp/lang/ruby/tape.cr` +
+*Description:* Implement linear Tape IR builder for Ruby to support lossless formatting. +
+*Effort:* 4/10
+
+==== [.green]#✓# Developer Introspection (CLI)
+*Status:* Completed +
+*Files:* `src/warp/cli/runner.cr`, `src/warp/lang/ruby/inspector.cr` +
+*Description:* Add `--dump-cst`, `--dump-tape`, etc. flags for engine debugging. +
+*Effort:* 3/10
+
+=== 3.2 Ruby Semantic Analysis [.yellow]#⧗#
+
+==== [.yellow]#⧗# Semantic AST Bridge
+*Status:* In Progress +
+*Files:* `src/warp/lang/ruby/ast_builder.cr` +
+*Description:* Map CST nodes to semantic Model objects. +
+*Effort:* 7/10
+
+== Phase 4: Experimental Features [.gray]#○#
 
 === Known Issues
 - [ ] `t1_fixed.cr/` directory causing File.read errors in CLI

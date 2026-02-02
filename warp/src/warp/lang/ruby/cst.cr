@@ -94,6 +94,20 @@ module Warp::Lang::Ruby
       @tokens : Array(Token)
       @pos : Int32
 
+      enum Precedence
+        Lowest
+        Assignment     # =
+        Conditional    # ? :
+        LogicalOr      # ||
+        LogicalAnd     # &&
+        Equality       # ==, !=
+        Relational     # <, >, <=, >=
+        Additive       # +, -
+        Multiplicative # *, /, %
+        Unary          # !, ~, +, -
+        Call           # .
+      end
+
       def initialize(@bytes, @tokens)
         @pos = 0
       end
@@ -114,6 +128,15 @@ module Warp::Lang::Ruby
             children << parse_method_def
           elsif is_sig_start?
             children << parse_sorbet_sig
+          elsif current.kind == TokenKind::Identifier
+            # Handle top-level require/require_relative and simple calls
+            txt = String.new(@bytes[current.start, current.length])
+            if txt == "require_relative" || txt == "require"
+              children << parse_require_stmt
+            else
+              # Fallback: attempt to parse expression
+              children << parse_expression
+            end
           else
             # Skip other tokens for now
             advance
@@ -129,19 +152,209 @@ module Warp::Lang::Ruby
         def_token = current
         advance # skip 'def'
 
-        # Collect method name and params as children
         children = [] of GreenNode
 
-        # Skip to 'end' for now (simplified)
-        while @pos < @tokens.size && current.kind != TokenKind::End
+        # 1. Skip whitespace/newlines to find method name
+        while @pos < @tokens.size && (current.kind == TokenKind::Whitespace || current.kind == TokenKind::Newline)
           advance
         end
 
-        if current.kind == TokenKind::End
-          advance # skip 'end'
+        # 2. Method Name
+        if current.kind == TokenKind::Identifier || current.kind == TokenKind::Constant
+          name_tok = current
+          children << GreenNode.new(NodeKind::Identifier, [] of GreenNode, name_tok)
+          advance
         end
 
+        # 3. Optional Parameters
+        if current.kind == TokenKind::Whitespace
+          advance
+        end
+
+        if current.kind == TokenKind::LParen
+          advance # (
+          while @pos < @tokens.size && current.kind != TokenKind::RParen
+            if current.kind == TokenKind::Identifier
+              children << GreenNode.new(NodeKind::Parameter, [] of GreenNode, current)
+            end
+            advance
+          end
+          advance if current.kind == TokenKind::RParen
+        end
+
+        # 4. Skip until end of line / start of body
+        while @pos < @tokens.size && current.kind != TokenKind::Newline && current.kind != TokenKind::Semicolon
+          # Handle cases where there might be something else on the line, but for now just advance
+          if current.kind == TokenKind::End # Oops, empty method?
+            break
+          end
+          advance
+        end
+
+        # 5. Body
+        while @pos < @tokens.size && current.kind != TokenKind::End
+          if current.kind == TokenKind::Whitespace || current.kind == TokenKind::Newline || current.kind == TokenKind::CommentLine
+            advance
+            next
+          end
+
+          children << parse_expression
+        end
+
+        # consume 'end' if present
+        advance if current.kind == TokenKind::End
+
         GreenNode.new(NodeKind::MethodDef, children, def_token, trivia)
+      end
+
+      # Parse a basic expression supporting Pratt precedence
+      private def parse_expression(precedence : Precedence = Precedence::Lowest) : GreenNode
+        start_trivia = collect_trivia
+        left = parse_prefix
+
+        loop do
+          # Peek for next significant token to determine precedence
+          # We might have whitespace/newlines here
+          saved_pos = @pos
+          trivia = collect_trivia
+          prec = get_precedence(current)
+
+          if precedence >= prec
+            @pos = saved_pos # backtrack trivia
+            break
+          end
+
+          left = parse_infix(left)
+        end
+
+        left
+      end
+
+      private def parse_prefix : GreenNode
+        case current.kind
+        when TokenKind::Identifier
+          tok = current
+          advance
+          GreenNode.new(NodeKind::Identifier, [] of GreenNode, tok)
+        when TokenKind::String
+          tok = current
+          advance
+          GreenNode.new(NodeKind::StringLiteral, [] of GreenNode, tok)
+        when TokenKind::Number, TokenKind::Float
+          tok = current
+          advance
+          GreenNode.new(NodeKind::NumberLiteral, [] of GreenNode, tok)
+        when TokenKind::LParen
+          advance # (
+          node = parse_expression
+          advance if current.kind == TokenKind::RParen
+          node
+        else
+          # Fallback
+          tok = current
+          advance
+          GreenNode.new(NodeKind::Identifier, [] of GreenNode, tok)
+        end
+      end
+
+      private def parse_infix(left : GreenNode) : GreenNode
+        case current.kind
+        when TokenKind::Dot
+          op_tok = current
+          advance # .
+          if current.kind == TokenKind::Identifier
+            name_tok = current
+            advance
+            # Check for block
+            children = [left, GreenNode.new(NodeKind::Identifier, [] of GreenNode, name_tok)]
+            if current.kind == TokenKind::LBrace
+              children << parse_block
+            end
+            GreenNode.new(NodeKind::MethodCall, children, op_tok)
+          else
+            left
+          end
+        when TokenKind::Plus, TokenKind::Minus, TokenKind::Star, TokenKind::Slash
+          op_tok = current
+          prec = get_precedence(current)
+          advance
+          right = parse_expression(prec)
+          GreenNode.new(NodeKind::BinaryOp, [left, right], op_tok)
+        when TokenKind::LBrace
+          # block attached to previous node
+          block = parse_block
+          GreenNode.new(NodeKind::MethodCall, [left, block], left.token)
+        else
+          advance
+          left
+        end
+      end
+
+      private def get_precedence(token : Token) : Precedence
+        case token.kind
+        when TokenKind::Dot
+          Precedence::Call
+        when TokenKind::Star, TokenKind::Slash, TokenKind::Percent
+          Precedence::Multiplicative
+        when TokenKind::Plus, TokenKind::Minus
+          Precedence::Additive
+        when TokenKind::Equal
+          Precedence::Assignment
+        when TokenKind::LBrace
+          Precedence::Call
+        else
+          Precedence::Lowest
+        end
+      end
+
+      # Parse a small inline block: { |params| body }
+      private def parse_block : GreenNode
+        brace_tok = current
+        advance # consume '{'
+
+        params = [] of GreenNode
+        # optional whitespace
+        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+          advance
+        end
+
+        if current.kind == TokenKind::Pipe
+          advance
+          while @pos < @tokens.size && current.kind != TokenKind::Pipe
+            if current.kind == TokenKind::Identifier
+              params << GreenNode.new(NodeKind::Parameter, [] of GreenNode, current)
+            end
+            advance
+          end
+          advance if current.kind == TokenKind::Pipe
+        end
+
+        # parse a single expression as block body (simple heuristic)
+        body_node : GreenNode? = nil
+        while @pos < @tokens.size && current.kind != TokenKind::RBrace
+          if current.kind == TokenKind::Whitespace || current.kind == TokenKind::Newline
+            advance
+            next
+          end
+
+          if current.kind == TokenKind::Identifier
+            body_node = parse_expression
+          else
+            advance
+          end
+        end
+
+        advance if current.kind == TokenKind::RBrace
+
+        children = [] of GreenNode
+        if params.size > 0
+          children << GreenNode.new(NodeKind::BlockParams, params)
+        end
+        if body_node
+          children << (body_node.not_nil!)
+        end
+
+        GreenNode.new(NodeKind::Block, children, brace_tok)
       end
 
       # Parse Sorbet sig block: sig { ... } or sig do ... end
@@ -179,6 +392,29 @@ module Warp::Lang::Ruby
         # Check if the identifier text is "sig"
         token_text = String.new(@bytes[current.start, current.length])
         token_text == "sig"
+      end
+
+      # Parse a simple require/require_relative statement: require "path"
+      private def parse_require_stmt : GreenNode
+        trivia = collect_trivia
+        id_tok = current
+        advance # consume require(_relative)
+
+        # skip whitespace
+        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+          advance
+        end
+
+        str_tok = current if current.kind == TokenKind::String
+        advance if current.kind == TokenKind::String
+
+        child = if str_tok
+                  GreenNode.new(NodeKind::StringLiteral, [] of GreenNode, str_tok)
+                else
+                  GreenNode.new(NodeKind::Identifier, [] of GreenNode, id_tok)
+                end
+
+        GreenNode.new(NodeKind::MethodCall, [child], id_tok, trivia)
       end
 
       # Collect leading trivia (whitespace, comments, newlines)

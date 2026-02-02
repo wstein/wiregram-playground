@@ -86,16 +86,6 @@ targets:
     description: "Transpile Sorbet annotations to RBS format (Ruby → Ruby)"
     target_path: "ports/ruby/" # Output directory for transpiled Ruby files
 
-    # File to exclude from transpilation
-    exclude_files:
-      - "ports/ruby/lib/warp/backend/*.rb" # All backend files by default
-
-    # Files to include in transpilation
-    include_files:
-      - "ports/ruby/lib/warp/backend/backend.rb"
-      - "ports/ruby/lib/warp/backend/selector.rb"
-      - "ports/ruby/lib/warp/backend/scalar_backend.rb"
-
     libraries:
       sorbet-runtime:
         action: "keep"
@@ -119,10 +109,19 @@ settings:
 # Operational section (Legacy compatibility for current implementation)
 transpiler:
   include:
-    - "bin/*.cr"
-    - "src/**/*.cr"
-    - "spec/**/*.cr"
+    - "./bin/*.cr"
+    - "./src/**/*.cr"
+    - "./spec/**/*.cr"
   exclude:
+    - "./src/warp/backend/armv6_backend.cr"
+    - "./src/warp/backend/avx_backend.cr"
+    - "./src/warp/backend/avx2_backend.cr"
+    - "./src/warp/backend/avx512_backend.cr"
+    - "./src/warp/backend/neon_backend.cr"
+    - "./src/warp/backend/neon_masks.cr"
+    - "./src/warp/backend/sse2_backend.cr"
+    - "./src/warp/backend/x86_masks_scalar.cr"
+    - "./src/warp/backend/x86_masks.cr"
     - "vendor/**"
 
 output:
@@ -135,7 +134,6 @@ output:
   generate_rbi: false
   folder_mappings:
     "src/": "lib/"
-    "bin/": "exe/"
 
 annotations:
   rbs_paths: []

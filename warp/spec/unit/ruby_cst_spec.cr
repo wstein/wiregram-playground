@@ -13,6 +13,28 @@ describe "Ruby CST" do
       cst.should_not be_nil
       cst.kind.should eq(Warp::Lang::Ruby::CST::NodeKind::Root)
     end
+
+    it "correctly nests method calls (chined calls)" do
+      source = "root.not_nil!.children"
+      bytes = source.to_slice
+      tokens, _ = Warp::Lang::Ruby::Lexer.scan(bytes)
+      cst, _ = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
+
+      # Root -> MethodCall(children) -> MethodCall(not_nil!) -> Identifier(root)
+      cst.kind.should eq(Warp::Lang::Ruby::CST::NodeKind::Root)
+      cst.children.size.should eq(1)
+
+      call_children = cst.children[0]
+      call_children.kind.should eq(Warp::Lang::Ruby::CST::NodeKind::MethodCall)
+
+      # The receiver should be another method call (not_nil!)
+      receiver_not_nil = call_children.children[0]
+      receiver_not_nil.kind.should eq(Warp::Lang::Ruby::CST::NodeKind::MethodCall)
+
+      # The receiver of not_nil! should be root
+      receiver_root = receiver_not_nil.children[0]
+      receiver_root.kind.should eq(Warp::Lang::Ruby::CST::NodeKind::Identifier)
+    end
   end
 
   describe "Rewriter" do

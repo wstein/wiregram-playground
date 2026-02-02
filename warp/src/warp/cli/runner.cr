@@ -58,15 +58,25 @@ Usage:
   warp transpile [crystal|ruby|rbs|rbi|inject-rbs|round-trip] [options]
 
 Options:
+  -h, --help              Show this help message
   -s, --source=PATH       Source file or directory
   -c, --config=PATH       Config file (default .warp.yaml or warp.yaml)
   -o, --out=DIR           Output directory
   --rbs=PATH              RBS file to load (repeatable)
   --rbi=PATH              RBI file to load (repeatable)
   --inline-rbs=BOOL       Parse inline # @rbs comments (default true)
+  --generate-rbs=BOOL     Generate .rbs signature files (default false)
+  --generate-rbi=BOOL     Generate .rbi annotation files (default false)
   --parallel=N            Use N parallel workers (default: CPU cores)
   --stdout                Write output to stdout
-  --verbose               Print detailed system and worker information
+  -v, --verbose           Print detailed system and worker information
+
+Debugging Flags:
+  --dump-tokens           Dump tokens to stdout
+  --dump-cst              Dump Concrete Syntax Tree to stdout
+  --dump-ast              Dump Abstract Syntax Tree to stdout
+  --dump-tape             Dump Tape IR to stdout
+  --dump-simd             Dump SIMD structural indices to stdout
 TXT
     end
 
@@ -163,9 +173,15 @@ YAML
       stdout = false
       parallel_workers : Int32? = nil
       verbose = false
+      dump_tokens = false
+      dump_cst = false
+      dump_ast = false
+      dump_tape = false
+      dump_simd = false
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
+        p.on("-h", "--help", "Show this help message") { puts transpile_usage; exit 0 }
         p.on("-s PATH", "--source=PATH", "Source file or directory") { |v| source_path = v }
         p.on("-c PATH", "--config=PATH", "Config file (default .warp.yaml)") { |v| config_path = v }
         p.on("-o DIR", "--out=DIR", "Output directory") { |v| out_dir = v }
@@ -179,6 +195,11 @@ YAML
         end
         p.on("--stdout", "Write output to stdout") { stdout = true }
         p.on("-v", "--verbose", "Print detailed information about system and workers") { verbose = true }
+        p.on("--dump-tokens", "Dump tokens to stdout") { dump_tokens = true }
+        p.on("--dump-cst", "Dump CST to stdout") { dump_cst = true }
+        p.on("--dump-ast", "Dump AST to stdout") { dump_ast = true }
+        p.on("--dump-tape", "Dump Tape IR to stdout") { dump_tape = true }
+        p.on("--dump-simd", "Dump SIMD structural indices") { dump_simd = true }
       end
 
       parser.parse(args || [] of String)
@@ -265,12 +286,12 @@ YAML
         processor = Warp::Parallel::FileProcessor.new(workers)
 
         processor.process_files(files) do |path|
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root)
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd)
         end
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root)
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd)
         end
       end
 
@@ -357,9 +378,39 @@ YAML
       stdout : Bool,
       rbs_output_root : String? = nil,
       rbi_output_root : String? = nil,
+      dump_tokens : Bool = false,
+      dump_cst : Bool = false,
+      dump_ast : Bool = false,
+      dump_tape : Bool = false,
+      dump_simd : Bool = false,
     )
       source = File.read(path)
       bytes = source.to_slice
+
+      if dump_tokens
+        Warp::Lang::Ruby::Inspector.dump_tokens(bytes)
+        return
+      end
+
+      if dump_cst
+        Warp::Lang::Ruby::Inspector.dump_cst(bytes)
+        return
+      end
+
+      if dump_ast
+        Warp::Lang::Ruby::Inspector.dump_ast(bytes)
+        return
+      end
+
+      if dump_tape
+        Warp::Lang::Ruby::Inspector.dump_tape(bytes)
+        return
+      end
+
+      if dump_simd
+        Warp::Lang::Ruby::Inspector.dump_simd(bytes)
+        return
+      end
 
       # Use provided RBS/RBI output roots, or fall back to config
       rbs_output_dir = rbs_output_root || config.rbs_output_dir

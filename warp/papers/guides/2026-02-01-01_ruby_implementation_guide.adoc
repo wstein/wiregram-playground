@@ -1,0 +1,76 @@
+= Ruby Implementation Guide: From Prototype to Pratt
+:toc:
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+
+This guide documents the transition of Warp's Ruby support from a minimal prototype to a robust, industrial-strength parsing pipeline.
+
+== Overview
+
+Warp's Ruby support now mirrors the architecture used for Crystal, featuring a high-performance Pratt parser, a linear Tape IR for lossless formatting, and comprehensive introspection tools.
+
+== The Pratt Parser
+
+The original Ruby parser was a simple recursive descent implementation that struggled with operator precedence and method call chaining. We replaced it with a **Pratt Parser** (Top-Down Operator Precedence).
+
+=== Key Features
+* **Operator Precedence**: Correctly handles arithmetic, logical, and member access (`.`) operators.
+* **Method Chaining**: Expressions like `root.not_nil!.children.map` are now correctly parsed into a nested `MethodCall` hierarchy rather than a flat list.
+* **Block Support**: Handles both `{ ... }` and `do ... end` blocks as part of method calls.
+* **Red/Green CST**: Maintains the lossless Lossless Syntax Tree (LST) invariant.
+
+=== Example: Method Chaining
+[source,ruby]
+----
+root.not_nil!.children.map { |n| n.kind }
+----
+The Pratt parser processes this as:
+1. `root` (Identifier)
+2. `.not_nil!` (MethodCall on `root`)
+3. `.children` (MethodCall on result of 2)
+4. `.map` with block (MethodCall on result of 3)
+
+== Tape IR (Internal Representation)
+
+Warp uses a **Tape** structure to represent the source code as a linear stream of entries. This is the primary input for the structural scanner and the formatter.
+
+=== Ruby Tape Builder
+The `Warp::Lang::Ruby::Tape::Builder` converts the CST into a linear tape of `Entry` records:
+* `trivia_start`: Offset to leading whitespace/comments.
+* `lexeme_start`: Offset to the token itself.
+* `lexeme_end`: End of the token.
+
+This allows the engine to reconstruct the source exactly (lossless) or apply transformations while preserving surrounding trivia.
+
+== Developer Introspection (CLI)
+
+To assist in debugging and further development, several CLI flags have been added to the `transpile` command.
+
+=== Usage
+[source,bash]
+----
+bin/warp transpile crystal --dump-cst -s source.rb
+----
+
+=== Available Dump Flags
+* `--dump-tokens`: Prints the raw token stream with positions and lexemes.
+* `--dump-cst`: Displays the hierarchical Concrete Syntax Tree.
+* `--dump-ast`: Prints the high-level Abstract Syntax Tree (Object Model).
+* `--dump-tape`: Shows the linear Tape IR entries.
+* `--dump-simd`: Visualizes the structural character positions used for SIMD acceleration.
+
+== Implementation Roadmap
+
+1. [x] **Pratt Parser Implementation**: Completed for core Ruby expressions.
+2. [x] **Tape Generation**: Implemented Ruby-specific tape builder.
+3. [x] **CLI Tooling**: Integrated debugging flags.
+4. [ ] **Semantic AST Bridge**: Mapping CST nodes to semantic `Warp::Model` objects (In progress).
+5. [ ] **Corpus Validation**: Running the existing `corpus/ruby/` through the new pipeline.
+
+== Technical Reference
+
+* Parser: `src/warp/lang/ruby/cst.cr`
+* Tape Builder: `src/warp/lang/ruby/tape.cr`
+* Inspector: `src/warp/lang/ruby/inspector.cr`
+* CLI Integration: `src/warp/cli/runner.cr`

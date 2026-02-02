@@ -37,12 +37,13 @@ Implement Crystal → Ruby transpilation using a **parallel but symmetric pipeli
 |===
 |Component |Status |Notes
 |Ruby Lexer |✓ Complete |71 token types, full trivia support
-|Ruby CST Parser |✓ Complete |Green/Red pattern, lossless preservation
+|Ruby CST Parser |✓ Complete |Pratt-based operator precedence, Green/Red pattern, lossless preservation
+|Ruby Tape IR |✓ Complete |Linear IR for lossless formatting and SIMD scanning
 |Semantic Analyzer |⚠ Minimal |Basic annotation extraction only
 |Crystal CST Builder |⚠ Minimal |Method defs only, no full syntax support
 |Crystal Serializer |⚠ Minimal |Basic emission, limited formatting
 |Type Mapping |⚠ Partial |RBS → Crystal types via annotations
-|CLI Tooling |✗ Missing |No `warp` CLI yet (planned)
+|CLI Tooling |✓ Complete |`warp` CLI with --dump-{cst,ast,tokens,tape,simd} flags
 |Configuration |⚠ Partial |TranspilerConfig exists but unused
 |Testing |⚠ Partial |25 Sorbet integration tests passing
 |===
@@ -81,7 +82,7 @@ flowchart TB
         R8 --> R9[Crystal Serializer]
         R9 --> R10[Crystal Source]
     end
-    
+
     subgraph "Crystal → Ruby Pipeline (New)"
         C1[Crystal Source] --> C2[Crystal Lexer]
         C2 --> C3[Crystal CST Parser]
@@ -94,7 +95,7 @@ flowchart TB
         C9 --> C10[Ruby Serializer]
         C10 --> C11[Ruby Source + RBS]
     end
-    
+
     R10 -.->|Round-trip test| C1
     C11 -.->|Round-trip test| R1
 ----
@@ -312,7 +313,7 @@ module Warp::Lang::Crystal
     Nil, Of, Out, Pointerof, Private, Protected, Require, Rescue, Return,
     Select, Self, Sizeof, Struct, Super, Then, True, Type, Typeof, Union,
     Unless, Until, Verbatim, When, While, With, Yield
-    
+
     # Identifiers
     Identifier       # foo, bar_baz
     Constant        # Foo, MY_CONST
@@ -320,7 +321,7 @@ module Warp::Lang::Crystal
     ClassVar        # @@count
     GlobalVar       # $global
     MacroVar        # %macro_var
-    
+
     # Literals
     String          # "hello", 'world'
     StringInterp    # "hello #{name}"
@@ -330,31 +331,31 @@ module Warp::Lang::Crystal
     Regex           # /pattern/
     Command         # `ls -la`
     Heredoc         # <<-EOF
-    
+
     # Operators (matching Ruby + Crystal-specific)
     Plus, Minus, Star, Slash, Percent, StarStar
     Eq, EqEq, EqEqEq, Neq, Lt, Gt, Le, Ge, Cmp, Match, NotMatch
     And, Or, Not, AndAnd, OrOr, Ampersand, Pipe, Caret, Tilde
     LShift, RShift, Question
-    
+
     # Delimiters
     LParen, RParen, LBracket, RBracket, LBrace, RBrace
     Comma, Dot, DotDot, DotDotDot, Colon, ColonColon, Semicolon
     Arrow, FatArrow, AtSign
-    
+
     # Type-specific
     TypeDecl        # : Type
     TypeUnion       # |
     TypeGeneric     # (T)
-    
+
     # Macro-specific
     MacroStart      # {{
     MacroEnd        # }}
     MacroExpr       # {{ expr }}
-    
+
     # Trivia
     Whitespace, Newline, Comment
-    
+
     # Special
     Eof, Error
   end
@@ -368,7 +369,7 @@ end
 module Warp::Lang::Crystal::CST
   enum NodeKind
     Root
-    
+
     # Declarations
     ClassDef        # class Foo ... end
     ModuleDef       # module Bar ... end
@@ -380,7 +381,7 @@ module Warp::Lang::Crystal::CST
     MacroDef        # macro define_property(name)
     AliasDef        # alias Name = Type
     AnnotationDef   # annotation MyAnnotation
-    
+
     # Type Expressions
     TypeDecl        # : Type
     TypeUnion       # Type1 | Type2
@@ -391,7 +392,7 @@ module Warp::Lang::Crystal::CST
     TypeTuple       # Tuple(Int32, String)
     TypeNamedTuple  # NamedTuple(x: Int32)
     TypeMetaclass   # Foo.class
-    
+
     # Statements
     Assignment      # x = 5
     TypedAssignment # x : Int32 = 5
@@ -405,7 +406,7 @@ module Warp::Lang::Crystal::CST
     BreakStatement  # break
     NextStatement   # next
     YieldStatement  # yield value
-    
+
     # Expressions
     MethodCall      # obj.method(args)
     MacroCall       # macro_name arg1, arg2
@@ -424,11 +425,11 @@ module Warp::Lang::Crystal::CST
     RangeLiteral    # 1..10, 1...10
     RegexLiteral    # /pattern/
     ProcLiteral     # ->(x : Int32) { x + 1 }
-    
+
     # Blocks
     Block           # { |x| x + 1 } or do |x| ... end
     BlockParams     # |x, y|
-    
+
     # Operators
     BinaryOp        # +, -, *, /, etc.
     UnaryOp         # -, +, !, ~
@@ -437,13 +438,13 @@ module Warp::Lang::Crystal::CST
     Typeof          # typeof(expr)
     Sizeof          # sizeof(Type)
     Pointerof       # pointerof(@var)
-    
+
     # Macros
     MacroIf         # {% if flag %}
     MacroFor        # {% for x in collection %}
     MacroExpression # {{ expression }}
     MacroVerbatim   # {% verbatim %} ... {% endverbatim %}
-    
+
     # Misc
     Annotation      # @[Attribute]
     Argument        # method argument
@@ -470,7 +471,7 @@ module Warp::Lang::Crystal
       getter includes : Array(String)
       getter extends : Array(String)
       getter annotations : Array(AnnotationInfo)
-      
+
       enum TypeKind
         Class
         Module
@@ -480,7 +481,7 @@ module Warp::Lang::Crystal
         Alias
       end
     end
-    
+
     struct MethodInfo
       getter name : String
       getter params : Array(ParamInfo)
@@ -490,14 +491,14 @@ module Warp::Lang::Crystal
       getter is_class_method : Bool
       getter generic_params : Array(String)
       getter annotations : Array(AnnotationInfo)
-      
+
       enum Visibility
         Public
         Protected
         Private
       end
     end
-    
+
     struct ParamInfo
       getter name : String
       getter type : String?
@@ -506,7 +507,7 @@ module Warp::Lang::Crystal
       getter is_double_splat : Bool
       getter is_block : Bool
     end
-    
+
     struct MacroInfo
       getter name : String
       getter params : Array(String)
@@ -514,21 +515,21 @@ module Warp::Lang::Crystal
       getter source_location : SourceLocation
       getter expansion_sites : Array(MacroExpansionSite)
     end
-    
+
     struct MacroExpansionSite
       getter location : SourceLocation
       getter arguments : Array(String)
       getter expanded_code : String?  # If available
     end
-    
+
     struct AnnotationInfo
       getter name : String
       getter args : Hash(String, String)
     end
-    
+
     def analyze(green_root : CST::GreenNode) : TranspileContext
       red_root = CST::RedNode.new(green_root)
-      
+
       # Extract semantic information
       types = extract_types(red_root)
       methods = extract_methods(red_root)
@@ -536,13 +537,13 @@ module Warp::Lang::Crystal
       constants = extract_constants(red_root)
       ivars = extract_instance_vars(red_root)
       cvars = extract_class_vars(red_root)
-      
+
       # Build type graph for dependencies
       type_graph = build_type_graph(types, methods)
-      
+
       # Analyze macro usage
       macro_analysis = analyze_macro_usage(macros)
-      
+
       TranspileContext.new(
         source_lang: :crystal,
         target_lang: :ruby,
@@ -557,12 +558,12 @@ module Warp::Lang::Crystal
         diagnostics: @diagnostics,
       )
     end
-    
+
     private def extract_types(root : CST::RedNode) : Hash(String, TypeInfo)
       # Traverse CST and extract class/module/struct/enum definitions
       # ...
     end
-    
+
     private def analyze_macro_usage(macros : Array(MacroInfo)) : MacroAnalysis
       # Determine which macros can be converted vs. preserved
       # Track expansion sites and dependencies
@@ -586,13 +587,13 @@ module Warp::Lang::Ruby
       Inline      # Generate inline comments
       All         # All of the above
     end
-    
+
     def initialize(@style : AnnotationStyle = AnnotationStyle::All)
       @sorbet_sigs = [] of String
       @rbs_definitions = [] of String
       @inline_comments = Hash(String, String).new
     end
-    
+
     def generate_for_method(method_info : Crystal::SemanticAnalyzer::MethodInfo) : String
       case @style
       when .sorbet?, .all?
@@ -605,10 +606,10 @@ module Warp::Lang::Ruby
         ""
       end
     end
-    
+
     private def generate_sorbet_sig(method : Crystal::SemanticAnalyzer::MethodInfo) : String
       parts = [] of String
-      
+
       # Build params section
       if method.params.any?
         param_parts = method.params.map do |param|
@@ -617,49 +618,49 @@ module Warp::Lang::Ruby
         end
         parts << "params(#{param_parts.join(", ")})"
       end
-      
+
       # Build returns section
       if return_type = method.return_type
         parts << "returns(#{crystal_type_to_sorbet(return_type)})"
       else
         parts << "void"
       end
-      
+
       "sig { #{parts.join(".")} }"
     end
-    
+
     private def generate_rbs_method(method : Crystal::SemanticAnalyzer::MethodInfo) : String
       params = method.params.map do |param|
         type = crystal_type_to_rbs(param.type)
         default = param.default_value ? " = #{param.default_value}" : ""
         "#{type} #{param.name}#{default}"
       end.join(", ")
-      
+
       return_type = method.return_type ? crystal_type_to_rbs(method.return_type.not_nil!) : "void"
-      
+
       "def #{method.name}: (#{params}) -> #{return_type}"
     end
-    
+
     private def crystal_type_to_sorbet(crystal_type : String?) : String
       return "T.untyped" unless crystal_type
-      
+
       # Handle nilable types
       if crystal_type.ends_with?("?")
         inner = crystal_type[0...-1]
         return "T.nilable(#{crystal_type_to_sorbet(inner)})"
       end
-      
+
       # Handle union types
       if crystal_type.includes?(" | ")
         types = crystal_type.split(" | ").map { |t| crystal_type_to_sorbet(t.strip) }
         return "T.any(#{types.join(", ")})"
       end
-      
+
       # Handle generic types
       if match = crystal_type.match(/^(\w+)\((.+)\)$/)
         container = match[1]
         inner_type = match[2]
-        
+
         case container
         when "Array"
           return "T::Array[#{crystal_type_to_sorbet(inner_type)}]"
@@ -672,7 +673,7 @@ module Warp::Lang::Ruby
           return "T::Set[#{crystal_type_to_sorbet(inner_type)}]"
         end
       end
-      
+
       # Basic type mappings
       case crystal_type
       when "Int32", "Int64", "UInt32", "UInt64"
@@ -691,27 +692,27 @@ module Warp::Lang::Ruby
         crystal_type  # Pass through custom types
       end
     end
-    
+
     private def crystal_type_to_rbs(crystal_type : String?) : String
       return "untyped" unless crystal_type
-      
+
       # Handle nilable types
       if crystal_type.ends_with?("?")
         inner = crystal_type[0...-1]
         return "#{crystal_type_to_rbs(inner)}?"
       end
-      
+
       # Handle union types
       if crystal_type.includes?(" | ")
         types = crystal_type.split(" | ").map { |t| crystal_type_to_rbs(t.strip) }
         return "(#{types.join(" | ")})"
       end
-      
+
       # Handle generic types
       if match = crystal_type.match(/^(\w+)\((.+)\)$/)
         container = match[1]
         inner_type = match[2]
-        
+
         case container
         when "Array"
           return "Array[#{crystal_type_to_rbs(inner_type)}]"
@@ -724,7 +725,7 @@ module Warp::Lang::Ruby
           return "Set[#{crystal_type_to_rbs(inner_type)}]"
         end
       end
-      
+
       # Basic type mappings
       case crystal_type
       when "Int32", "Int64", "UInt32", "UInt64"
@@ -753,36 +754,36 @@ module Warp::Lang::Ruby
   class CSTBuilder
     def build_from_crystal_context(context : Crystal::TranspileContext) : CST::Document
       root_children = [] of CST::GreenNode
-      
+
       # Generate requires if needed
       if context.needs_sorbet?
         root_children << build_require_node("sorbet-runtime")
       end
-      
+
       # Generate type definitions (classes, modules, structs)
       context.types.each do |name, type_info|
         root_children << build_type_definition(type_info, context)
       end
-      
+
       # Generate standalone methods
       context.methods.select(&.is_top_level?).each do |method|
         root_children << build_method_with_sig(method, context)
       end
-      
+
       # Generate macro preservation comments
       context.macros.each do |macro_info|
         root_children << build_macro_preservation(macro_info)
       end
-      
+
       root = CST::GreenNode.new(CST::NodeKind::Root, root_children)
       CST::Document.new(context.source.to_slice, CST::RedNode.new(root))
     end
-    
+
     private def build_type_definition(
       type_info : Crystal::SemanticAnalyzer::TypeInfo,
       context : Crystal::TranspileContext
     ) : CST::GreenNode
-      
+
       case type_info.kind
       when .class?
         build_class_def(type_info, context)
@@ -800,59 +801,59 @@ module Warp::Lang::Ruby
         build_comment_node("# [CRYSTAL] Unknown type: #{type_info.name}")
       end
     end
-    
+
     private def build_method_with_sig(
       method : Crystal::SemanticAnalyzer::MethodInfo,
       context : Crystal::TranspileContext
     ) : CST::GreenNode
-      
+
       children = [] of CST::GreenNode
-      
+
       # Generate Sorbet sig if configured
       if context.config.generate_sorbet_sigs?
         sig_gen = TypeAnnotationGenerator.new(AnnotationStyle::Sorbet)
         sig_text = sig_gen.generate_for_method(method)
         children << build_comment_or_code_node(sig_text)
       end
-      
+
       # Build method definition
       children << build_method_def_node(method)
-      
+
       CST::GreenNode.new(CST::NodeKind::MethodDef, children)
     end
-    
+
     private def build_struct_as_class(
       struct_info : Crystal::SemanticAnalyzer::TypeInfo,
       context : Crystal::TranspileContext
     ) : CST::GreenNode
-      
+
       # Add comment about struct -> class conversion
       comment = build_comment_node(
         "# [CRYSTAL] Struct converted to class (value semantics not preserved)"
       )
-      
+
       # Build class with note
       class_node = build_class_def(struct_info, context)
-      
+
       CST::GreenNode.new(
         CST::NodeKind::ClassDef,
         [comment, class_node]
       )
     end
-    
+
     private def build_macro_preservation(macro_info : Crystal::SemanticAnalyzer::MacroInfo) : CST::GreenNode
       comment_lines = [
         "# [CRYSTAL MACRO - NOT EXECUTABLE]",
         "# macro #{macro_info.name}(#{macro_info.params.join(", ")})",
       ]
-      
+
       # Add macro body as comments
       macro_info.body.each_line do |line|
         comment_lines << "#   #{line}"
       end
-      
+
       comment_lines << "# [END CRYSTAL MACRO]"
-      
+
       build_multiline_comment_node(comment_lines)
     end
   end
@@ -877,26 +878,26 @@ module Warp::Testing
       getter formatting_delta : Int32
       getter diagnostics : Array(String)
     end
-    
+
     def validate_round_trip_ruby_to_crystal_to_ruby(ruby_source : String) : RoundTripResult
       # Step 1: Ruby → Crystal
       r2c = Ruby::CSTToCSTTranspiler.transpile(ruby_source.to_slice)
       return failed_result(ruby_source, "", r2c, nil) unless r2c.error.success?
-      
+
       crystal_output = r2c.output
-      
+
       # Step 2: Crystal → Ruby
       c2r = Crystal::CSTToCSTTranspiler.transpile(crystal_output.to_slice)
       return failed_result(ruby_source, crystal_output, r2c, c2r) unless c2r.error.success?
-      
+
       ruby_output = c2r.output
-      
+
       # Step 3: Compare semantic equivalence
       semantic_eq = compare_semantics(ruby_source, ruby_output)
-      
+
       # Step 4: Measure formatting delta
       delta = measure_formatting_delta(ruby_source, ruby_output)
-      
+
       RoundTripResult.new(
         success: true,
         ruby_source: ruby_source,
@@ -908,26 +909,26 @@ module Warp::Testing
         diagnostics: collect_diagnostics(r2c, c2r),
       )
     end
-    
+
     def validate_round_trip_crystal_to_ruby_to_crystal(crystal_source : String) : RoundTripResult
       # Step 1: Crystal → Ruby
       c2r = Crystal::CSTToCSTTranspiler.transpile(crystal_source.to_slice)
       return failed_result("", crystal_source, nil, c2r) unless c2r.error.success?
-      
+
       ruby_output = c2r.output
-      
+
       # Step 2: Ruby → Crystal
       r2c = Ruby::CSTToCSTTranspiler.transpile(ruby_output.to_slice)
       return failed_result("", crystal_source, r2c, c2r) unless r2c.error.success?
-      
+
       crystal_output = r2c.output
-      
+
       # Step 3: Compare semantic equivalence
       semantic_eq = compare_semantics(crystal_source, crystal_output)
-      
+
       # Step 4: Measure formatting delta
       delta = measure_formatting_delta(crystal_source, crystal_output)
-      
+
       RoundTripResult.new(
         success: true,
         ruby_source: ruby_output,
@@ -939,13 +940,13 @@ module Warp::Testing
         diagnostics: collect_diagnostics(r2c, c2r),
       )
     end
-    
+
     private def compare_semantics(source1 : String, source2 : String) : Bool
       # Parse both and compare AST structures (ignoring formatting)
       # This is a complex operation requiring AST normalization
       # ...
     end
-    
+
     private def measure_formatting_delta(source1 : String, source2 : String) : Int32
       # Count character differences (excluding whitespace normalization)
       # ...
@@ -1064,7 +1065,7 @@ project:
   name: "my-project"
   source_language: "ruby"  # or "crystal"
   target_language: "crystal"  # or "ruby"
-  
+
 # Language-specific versions
 languages:
   ruby:
@@ -1077,7 +1078,7 @@ languages:
 # Transpilation settings
 transpiler:
   direction: "bidirectional"  # "ruby_to_crystal", "crystal_to_ruby", or "bidirectional"
-  
+
   # Source patterns
   include:
     - "src/**/*.cr"
@@ -1088,45 +1089,45 @@ transpiler:
     - "spec/**"
     - "test/**"
     - "vendor/**"
-  
+
   # Type annotation generation
   annotations:
     generate_sorbet: true
     generate_rbs: true
     inline_comments: false
     sidecar_files: true  # Generate .rbs files alongside .rb
-  
+
   # Type mapping overrides
   type_mapping:
     # Crystal → Ruby
     "Int32": "Integer"
     "Float64": "Float"
     "Bool": "T::Boolean"
-    
+
     # Ruby → Crystal
     "Integer": "Int32"  # Default int type
     "Float": "Float64"
     "T::Boolean": "Bool"
-  
+
   # Macro handling
   macros:
     strategy: "preserve"  # "preserve", "convert", or "expand"
     preserve_as_comments: true
     try_metaprogramming_conversion: false
     track_expansions: true
-  
+
   # Transformation rules
   transformations:
     # Ruby → Crystal
     remove_sorbet_sigs: true
     convert_attr_accessors: true
     remove_program_guards: true
-    
+
     # Crystal → Ruby
     generate_attr_accessors: true
     convert_structs_to_classes: true
     preserve_generic_params: "rbs"  # "rbs", "comment", or "ignore"
-  
+
   # Lossiness handling
   lossiness:
     on_lossy_conversion: "warn"  # "error", "warn", or "silent"
@@ -1140,13 +1141,13 @@ output:
   preserve_directory_structure: true
   generate_metadata: true
   metadata_format: "yaml"  # or "json"
-  
+
   # Ruby output
   ruby:
     file_extension: ".rb"
     sorbet_sig_style: "block"  # "block" or "inline"
     generate_rbs_directory: "./sig"
-  
+
   # Crystal output
   crystal:
     file_extension: ".cr"
@@ -1164,13 +1165,13 @@ logging:
   level: "info"  # "debug", "info", "warn", "error"
   file: ".warp.log"
   format: "text"  # "text" or "json"
-  
+
 # Testing and validation
 validation:
   enable_round_trip_tests: true
   semantic_equivalence_check: true
   max_formatting_delta: 1000  # Characters
-  
+
 # Performance
 performance:
   parallel: true
@@ -1226,7 +1227,7 @@ Expected round-trip: ✓ Perfect (except whitespace)
 # Crystal input
 class Box(T)
   getter value : T
-  
+
   def initialize(@value : T)
   end
 end
@@ -1240,7 +1241,7 @@ Expected Ruby output:
 class Box
   sig { returns(T.untyped) }  # Generic param lost
   attr_reader :value
-  
+
   sig { params(value: T.untyped).void }
   def initialize(value)
     @value = value
