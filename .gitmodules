@@ -4,3 +4,6 @@
 [submodule "docs"]
 	path = docs
 	url = https://github.com/wstein/wiregram-docs.git
+[submodule "warp/ports/ruby"]
+	path = warp/ports/ruby
+	url = https://github.com/wstein/wiregram-playground-warp-ports-ruby.git
