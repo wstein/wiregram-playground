@@ -33,7 +33,16 @@ module Warp::Lang::Ruby
       # Step 5: Emit Crystal source
       output = Warp::Lang::Crystal::Serializer.emit(crystal_doc)
 
+      # Step 6: Apply language-specific transformations (Ruby -> Crystal mappings)
+      output = apply_ruby_to_crystal_mappings(output)
+
       Result.new(output, Warp::Core::ErrorCode::Success, context.diagnostics, crystal_doc)
+    end
+
+    private def self.apply_ruby_to_crystal_mappings(source : String) : String
+      # Convert require_relative to require (Ruby -> Crystal)
+      output = source.gsub(/require_relative\s+/, "require ")
+      output
     end
   end
 end

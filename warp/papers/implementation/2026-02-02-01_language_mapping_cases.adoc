@@ -1,0 +1,243 @@
+= Language Mapping Cases: Ruby ↔ Crystal
+:toc:
+:toclevels: 3
+:sectanchors:
+:sectlinks:
+
+This document describes the CST-based transformation mappings between Ruby and Crystal in the Warp transpiler.
+
+== Overview
+
+The bidirectional transpiler maps language-specific syntax between Ruby and Crystal while preserving semantics. Each mapping is handled at the CST level, ensuring accuracy and maintainability.
+
+== Require Statements
+
+=== Case 1: Crystal `require` → Ruby `require_relative`
+
+Crystal does not have a standard library loader with relative paths. All Crystal requires are absolute.
+Ruby uses `require` for absolute paths and `require_relative` for relative paths within a project.
+
+**Crystal Source:**
+[source,crystal]
+----
+require "../spec_helper"
+require "json"
+----
+
+**Ruby Target:**
+[source,ruby]
+----
+require_relative "../spec_helper"
+require "json"
+----
+
+**CST Mapping:**
+1. Identify `MethodCall` nodes with token `require`
+2. Check the first string argument for relative path indicators (`../`, `./`)
+3. If relative: Transform token from `require` to `require_relative`
+4. If absolute: Keep as `require`
+
+**Implementation Location:** `src/warp/lang/crystal/crystal_to_ruby_transpiler.cr`
+
+=== Case 2: Ruby `require_relative` → Crystal `require`
+
+Ruby's `require_relative` indicates project-relative imports. Crystal normalizes these to absolute paths.
+
+**Ruby Source:**
+[source,ruby]
+----
+require_relative "../spec_helper"
+require_relative "./helpers"
+----
+
+**Crystal Target:**
+[source,crystal]
+----
+require "../spec_helper"
+require "./helpers"
+----
+
+**CST Mapping:**
+1. Identify `MethodCall` nodes with token `require_relative`
+2. Transform token from `require_relative` to `require`
+3. Keep the string argument unchanged
+
+**Implementation Location:** `src/warp/lang/ruby/cst_to_cst_transpiler.cr`
+
+== Block Syntax
+
+=== Case 3: Crystal `&.method` → Ruby Explicit Block
+
+Crystal's symbol-to-proc syntax (`&.method`) is shorthand for the receiver method call.
+Ruby also supports this but can be verbose. The transpiler converts to explicit blocks for clarity.
+
+**Crystal Source:**
+[source,crystal]
+----
+items.map(&.kind)
+words.select(&.empty?)
+----
+
+**Ruby Target:**
+[source,ruby]
+----
+items.map { |item| item.kind }
+words.select { |word| word.empty? }
+----
+
+**CST Mapping:**
+1. Identify `MethodCall` nodes with an `Ampersand` token followed by a method identifier
+2. Extract the method name from the `&.` syntax
+3. Create a `Block` node with:
+   - `BlockParams`: Generated parameter name (inferred from context or `item`)
+   - `MethodCall`: Receiver (parameter) with the extracted method
+4. Replace the `&.method` argument with the new `Block` node
+
+**Implementation Location:** `src/warp/lang/crystal/crystal_to_ruby_transpiler.cr`
+
+**Challenge:** Inferring parameter name from context (e.g., pluralize `items` → `item`)
+
+=== Case 4: Ruby Explicit Block → Crystal `&.method` (Conditional)
+
+Ruby's explicit blocks can sometimes be converted to Crystal's symbol-to-proc shorthand when:
+1. Block has single parameter
+2. Block body is single method call on parameter
+3. No complex logic or multiple statements
+
+**Ruby Source:**
+[source,ruby]
+----
+items.map { |n| n.kind }
+----
+
+**Crystal Target (Direct Conversion):**
+[source,crystal]
+----
+items.map(&.kind)
+----
+
+**Crystal Target (Safe Conversion if complex):**
+[source,crystal]
+----
+items.map { |n| n.kind }
+----
+
+**CST Mapping:**
+1. Identify `Block` nodes in `MethodCall` arguments
+2. Analyze block:
+   - Single parameter?
+   - Body is single `MethodCall`?
+   - Receiver is the parameter?
+3. If yes: Convert to `&.method` shorthand
+4. If no: Keep as explicit block
+
+**Implementation Location:** `src/warp/lang/ruby/cst_to_cst_transpiler.cr`
+
+**Safety:** Conservative approach—prefer explicit blocks when semantics are unclear
+
+== Method Chaining
+
+=== Case 5: Preserving Method Chain Structure
+
+Both Ruby and Crystal support method chaining. The CST representation uses nested `MethodCall` nodes.
+
+**Ruby and Crystal (Identical):**
+[source,ruby]
+----
+root.not_nil!.children.map { |n| n.kind }
+----
+
+[source,crystal]
+----
+root.not_nil!.children.map(&.kind)
+----
+
+**CST Structure:**
+```
+MethodCall(map)
+  └─ MethodCall(children)
+       └─ MethodCall(not_nil!)
+            └─ Identifier(root)
+```
+
+The structure is preserved; only the block syntax (Case 3/4) differs.
+
+== Type Annotations
+
+=== Case 6: Crystal Type Syntax → Sorbet
+
+Crystal:
+[source,crystal]
+----
+def greet(name : String, age : Int32) : String
+  "Hello, #{name}!"
+end
+----
+
+Ruby with Sorbet:
+[source,ruby]
+----
+sig { params(name: String, age: Integer).returns(String) }
+def greet(name, age)
+  "Hello, #{name}!"
+end
+----
+
+**CST Mapping:**
+1. Extract type annotations from Crystal `MethodDef` parameters
+2. Build Sorbet `sig` structure
+3. Remove type annotations from Ruby parameters
+
+**Implementation Location:** `src/warp/lang/crystal/crystal_to_ruby_transpiler.cr`
+
+== Round-Trip Fidelity
+
+=== Semantic Equivalence
+
+A round-trip is semantically equivalent if:
+- `Ruby → Crystal → Ruby` produces equivalent Ruby
+- `Crystal → Ruby → Crystal` produces equivalent Crystal
+
+For example:
+- `require_relative` becomes `require` then back to `require_relative` (with original path)
+- Block syntax conversions are idempotent within language boundaries
+
+=== Formatting Preservation
+
+The CST-based approach preserves formatting for unchanged nodes. Transformed nodes use canonical formatting.
+
+**Example:**
+
+Ruby (original):
+```ruby
+require_relative   "../spec_helper"   # Extra spaces preserved
+```
+
+After Crystal roundtrip (canonical):
+```ruby
+require_relative "../spec_helper"
+```
+
+== Testing Strategy
+
+1. **Unit Tests**: Individual mapping cases (require, blocks)
+2. **Integration Tests**: Full file transpilation
+3. **Roundtrip Tests**: `Ruby → Crystal → Ruby` and `Crystal → Ruby → Crystal`
+4. **CST Validation**: Ensure CST structure is correct after transformation
+
+See: `spec/unit/bidirectional_mapping_spec.cr`
+
+== Edge Cases & Limitations
+
+1. **Symbol-to-proc inference**: Parameter names must be inferred intelligently
+2. **Block complexity**: Nested blocks or multiple statements degrade to explicit syntax
+3. **Macro expansion**: Crystal macros have no direct Ruby equivalent (preserved as comments)
+4. **Access modifiers**: Private/protected visibility uses different syntax
+5. **Tuple unpacking**: Requires different handling in each language
+
+== Future Enhancements
+
+- Smart parameter naming for generated blocks (e.g., `items` → `item`)
+- Preservation of inline comments within transformed nodes
+- Support for more complex block patterns
+- Macro preservation and documentation
