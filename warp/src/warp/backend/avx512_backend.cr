@@ -82,6 +82,46 @@ module Warp
         end
         mask
       end
+
+      def ascii_block?(ptr : Pointer(UInt8)) : Bool
+        {% if flag?(:x86_64) && flag?(:avx512bw) %}
+          is_ascii = 0_u32
+          asm(
+            %(
+            vmovdqu64 (%%rsi), %%zmm0
+            vpxor %%zmm1, %%zmm1, %%zmm1
+            vpmaxub %%zmm0, %%zmm1, %%zmm2
+            vextracti64x4 $0x1, %%zmm2, %%ymm3
+            vpmaxub %%ymm3, %%ymm2, %%ymm4
+            vextracti128 $0x1, %%ymm4, %%xmm5
+            vpmaxub %%xmm5, %%xmm4, %%xmm6
+            vmovd %%xmm6, %%eax
+            cmp $0x7F, %%al
+            setle %%dl
+            movzbl %%dl, $0
+            )
+            : "=r"(is_ascii)
+            : "S"(ptr)
+            : "zmm0", "zmm1", "zmm2", "ymm3", "ymm4", "xmm5", "xmm6", "rax", "rdx"
+            : "volatile"
+          )
+          is_ascii != 0
+        {% elsif flag?(:x86_64) && flag?(:avx2) %}
+          i = 0
+          while i < 16
+            return false if ptr[i] > 0x7F_u8
+            i += 1
+          end
+          true
+        {% else %}
+          i = 0
+          while i < 16
+            return false if ptr[i] > 0x7F_u8
+            i += 1
+          end
+          true
+        {% end %}
+      end
     end
   end
 end

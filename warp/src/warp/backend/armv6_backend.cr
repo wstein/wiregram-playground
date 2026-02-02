@@ -90,6 +90,16 @@ module Warp
         end
         mask
       end
-    end
+
+      # ARMv6 scalar implementation for ASCII block detection
+      # ARMv6 lacks NEON support, so pure scalar byte-by-byte comparison
+      def ascii_block?(ptr : Pointer(UInt8)) : Bool
+        i = 0
+        while i < 16
+          return false if ptr[i] > 0x7F_u8
+          i += 1
+        end
+        true
+      end    end
   end
 end

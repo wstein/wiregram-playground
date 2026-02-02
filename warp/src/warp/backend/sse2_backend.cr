@@ -86,6 +86,35 @@ module Warp
         mask
       end
 
+      def ascii_block?(ptr : Pointer(UInt8)) : Bool
+        {% if flag?(:x86_64) && flag?(:sse2) %}
+          is_ascii = 0_u32
+          asm(
+            %(
+            movdqu (%%rsi), %%xmm0
+            pxor %%xmm1, %%xmm1
+            pmaxub %%xmm0, %%xmm1
+            movd %%xmm1, %%eax
+            cmp $0x7F, %%al
+            setle %%dl
+            movzbl %%dl, $0
+            )
+            : "=r"(is_ascii)
+            : "S"(ptr)
+            : "xmm0", "xmm1", "rax", "rdx"
+            : "volatile"
+          )
+          is_ascii != 0
+        {% else %}
+          i = 0
+          while i < 16
+            return false if ptr[i] > 0x7F_u8
+            i += 1
+          end
+          true
+        {% end %}
+      end
+
       private def scalar_masks(ptr : Pointer(UInt8), len : Int32) : X86Masks::Masks16
         backslash = 0_u16
         quote = 0_u16

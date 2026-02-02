@@ -68,6 +68,35 @@ module Warp
         X86Masks.all_digits16?(ptr)
       end
 
+      def ascii_block?(ptr : Pointer(UInt8)) : Bool
+        {% if flag?(:x86_64) && flag?(:avx2) %}
+          is_ascii = 0_u32
+          asm(
+            %(
+            vmovdqu (%%rsi), %%xmm0
+            vpxor %%xmm1, %%xmm1, %%xmm1
+            vpmaxub %%xmm0, %%xmm1, %%xmm2
+            vmovd %%xmm2, %%eax
+            cmp $0x7F, %%al
+            setle %%dl
+            movzbl %%dl, $0
+            )
+            : "=r"(is_ascii)
+            : "S"(ptr)
+            : "xmm0", "xmm1", "xmm2", "rax", "rdx"
+            : "volatile"
+          )
+          is_ascii != 0
+        {% else %}
+          i = 0
+          while i < 16
+            return false if ptr[i] > 0x7F_u8
+            i += 1
+          end
+          true
+        {% end %}
+      end
+
       def newline_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
         mask = 0_u64
         i = 0

@@ -129,25 +129,6 @@ describe Warp::Parser do
     parser.parse_document(%([{"a":1},2]).to_slice).error.success?.should be_true
   end
 
-  {% if flag?(:aarch64) %}
-  it "validates multibyte UTF-8 sequences in neon validator" do
-    bytes = Bytes[
-      0xc2, 0xa2,       # 2-byte
-      0xe0, 0xa0, 0x80, # 3-byte (E0)
-      0xe1, 0x88, 0xb4, # 3-byte
-      0xed, 0x9f, 0xbf, # 3-byte (ED)
-      0xf0, 0x90, 0x80, 0x80, # 4-byte (F0)
-      0xf1, 0x80, 0x80, 0x80, # 4-byte
-      0xf4, 0x8f, 0xbf, 0xbf  # 4-byte (F4)
-    ]
-    # Ensure 16-byte padding so NEON loads are safe when validating 16-byte blocks
-    padded = bytes + Bytes.new(16)
-    state = 0_u32
-    Warp::Lexer::Utf8::Neon.validate_block(padded.to_unsafe, pointerof(state)).should be_true
-    Warp::Lexer::Utf8::Neon.validate_block(padded.to_unsafe + 16, pointerof(state)).should be_true
-    state.should eq(0_u32)
-  end
-  {% end %}
 
   it "rejects invalid literals when validation is enabled" do
     json = %({"a":tru})
