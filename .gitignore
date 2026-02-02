@@ -115,3 +115,4 @@ Thumbs.db
 /docs/
 /lib/
 warp/bin/warp
+warp/bin/warp_test

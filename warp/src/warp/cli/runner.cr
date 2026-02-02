@@ -47,7 +47,7 @@ module Warp::CLI
 Usage:
   warp init
   warp transpile [target] [options]
-  warp dump <simd|tokens|tape|cst|ast|full> [options] <file>
+  warp dump <simd|tokens|tape|soa|cst|dom|ast|full> [options] <file>
   warp version
 
 Targets:
@@ -70,7 +70,7 @@ TXT
     private def self.dump_usage : String
       <<-TXT
 Usage:
-  warp dump <simd|tokens|tape|cst|ast|full> [options] <file>
+  warp dump <simd|tokens|tape|soa|cst|dom|ast|full> [options] <file>
 
 Options:
   -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
@@ -82,7 +82,9 @@ Examples:
   warp dump simd --lang json data.json
   warp dump tokens --lang auto spec/fixtures/cli/rb_simple.rb
   warp dump tape --lang ruby spec/fixtures/cli/rb_simple.rb
+  warp dump soa --lang json data.json
   warp dump cst -l json -f json spec/fixtures/rcl_test.json
+  warp dump dom -l json spec/fixtures/rcl_test.json
   warp dump ast spec/fixtures/rcl_test.json
   warp dump full spec/fixtures/cli/rb_simple.rb
 TXT
@@ -394,7 +396,7 @@ YAML
       stage = args[0]
       stage = "full" if stage == "all"
 
-      unless ["simd", "tokens", "tape", "cst", "ast", "full"].includes?(stage)
+      unless ["simd", "tokens", "tape", "soa", "cst", "dom", "ast", "full"].includes?(stage)
         puts "Unknown dump target: #{stage}"
         puts dump_usage
         return 1
@@ -455,8 +457,12 @@ YAML
         return dump_tokens_stage(lang, bytes, format, path, jsonc_effective)
       when "tape"
         return dump_tape_stage(lang, bytes, format, path, jsonc_effective)
+      when "soa"
+        return dump_soa_stage(lang, bytes, format, path, jsonc_effective)
       when "cst"
         return dump_cst_stage(lang, bytes, format, path, jsonc_effective)
+      when "dom"
+        return dump_dom_stage(lang, bytes, format, path, jsonc_effective)
       when "ast"
         return dump_ast_stage(lang, bytes, format, path, jsonc_effective)
       when "full"
@@ -715,6 +721,54 @@ YAML
       0
     end
 
+    private def self.dump_soa_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: jsonc)
+        unless result.error.success?
+          write_dump_error("soa", lang, format, "SoA parse failed (#{result.error}) for #{path}.")
+          return 1
+        end
+        doc = result.doc.not_nil!
+        return dump_json_soa(doc, format)
+      when DumpLanguage::Ruby
+        write_dump_error("soa", lang, format, "SoA is not implemented for Ruby yet.")
+        return 0
+      when DumpLanguage::Crystal
+        write_dump_error("soa", lang, format, "SoA is not implemented for Crystal yet.")
+        return 0
+      end
+
+      0
+    end
+
+    private def self.dump_dom_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_dom(bytes, jsonc: jsonc)
+        unless result.error.success?
+          write_dump_error("dom", lang, format, "DOM parse failed (#{result.error}) for #{path}.")
+          return 1
+        end
+        value = result.value
+        unless value
+          write_dump_error("dom", lang, format, "DOM parse returned nil for #{path}.")
+          return 1
+        end
+        return dump_json_dom(value, format)
+      when DumpLanguage::Ruby
+        write_dump_error("dom", lang, format, "DOM is not implemented for Ruby yet.")
+        return 0
+      when DumpLanguage::Crystal
+        write_dump_error("dom", lang, format, "DOM is not implemented for Crystal yet.")
+        return 0
+      end
+
+      0
+    end
+
     private def self.dump_cst_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool) : Int32
       case lang
       when DumpLanguage::Json
@@ -813,8 +867,14 @@ YAML
       io.puts "\n== tape =="
       dump_tape_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
 
+      io.puts "\n== soa =="
+      dump_soa_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
+
       io.puts "\n== cst =="
       dump_cst_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
+
+      io.puts "\n== dom =="
+      dump_dom_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
 
       io.puts "\n== ast =="
       dump_ast_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
@@ -839,8 +899,14 @@ YAML
               json.field "tape" do
                 write_json_tape(json, lang, bytes, jsonc, path)
               end
+              json.field "soa" do
+                write_json_soa(json, lang, bytes, jsonc, path)
+              end
               json.field "cst" do
                 write_json_cst(json, lang, bytes, jsonc, path)
+              end
+              json.field "dom" do
+                write_json_dom(json, lang, bytes, jsonc, path)
               end
               json.field "ast" do
                 write_json_ast(json, lang, bytes, jsonc, path)
@@ -872,7 +938,13 @@ YAML
         end
         STDOUT.puts
       else
-        STDERR.puts message
+        # Write "not implemented" messages to stdout so they appear in full dumps
+        # Write actual errors to stderr for standalone stage dumps
+        if message.includes?("is not implemented")
+          STDOUT.puts message
+        else
+          STDERR.puts message
+        end
       end
     end
 
@@ -1038,6 +1110,119 @@ YAML
         slice_text(bytes, entry.a, entry.b)
       else
         ""
+      end
+    end
+
+    private def self.dump_json_soa(doc : Warp::IR::Document, format : DumpFormat) : Int32
+      soa = doc.soa_view
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "SoA (json)"
+        io.puts "index   type         a       b"
+        soa.types.each_with_index do |type, idx|
+          io.puts "#{idx.to_s.rjust(5)}  #{type.to_s.ljust(10)}  #{soa.a[idx].to_s.rjust(5)}  #{soa.b[idx].to_s.rjust(5)}"
+        end
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "soa"
+            json.field "language", "json"
+            json.field "entries" do
+              json.array do
+                soa.types.each_with_index do |type, idx|
+                  json.object do
+                    json.field "index", idx
+                    json.field "type", type.to_s
+                    json.field "a", soa.a[idx]
+                    json.field "b", soa.b[idx]
+                  end
+                end
+              end
+            end
+            json.field "count", soa.types.size
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.dump_json_dom(value : Warp::DOM::Value, format : DumpFormat) : Int32
+      case format
+      when DumpFormat::Pretty
+        io = STDOUT
+        io.puts "DOM (json)"
+        io.puts format_json_dom_pretty(value, 0)
+      when DumpFormat::Json
+        JSON.build(STDOUT) do |json|
+          json.object do
+            json.field "stage", "dom"
+            json.field "language", "json"
+            json.field "value" do
+              write_dom_value_json(json, value)
+            end
+          end
+        end
+        STDOUT.puts
+      end
+      0
+    end
+
+    private def self.format_json_dom_pretty(value : Warp::DOM::Value, indent : Int32) : String
+      indent_str = "  " * indent
+      case value
+      when Nil
+        "nil"
+      when Bool
+        value ? "true" : "false"
+      when Int64
+        value.to_s
+      when Float64
+        value.to_s
+      when String
+        value.inspect
+      when Array
+        if value.empty?
+          "[]"
+        else
+          items = value.map { |v| format_json_dom_pretty(v, indent + 1) }
+          "[\n#{items.map { |item| "#{indent_str}  #{item}" }.join(",\n")}\n#{indent_str}]"
+        end
+      when Hash
+        if value.empty?
+          "{}"
+        else
+          items = value.map { |k, v| "#{k.inspect}: #{format_json_dom_pretty(v, indent + 1)}" }
+          "{\n#{items.map { |item| "#{indent_str}  #{item}" }.join(",\n")}\n#{indent_str}}"
+        end
+      else
+        value.to_s
+      end
+    end
+
+    private def self.write_dom_value_json(json : JSON::Builder, value : Warp::DOM::Value) : Nil
+      case value
+      when Nil
+        json.null
+      when Bool
+        json.bool(value)
+      when Int64
+        json.number(value)
+      when Float64
+        json.number(value)
+      when String
+        json.string(value)
+      when Array
+        json.array do
+          value.each { |v| write_dom_value_json(json, v) }
+        end
+      when Hash
+        json.object do
+          value.each do |k, v|
+            json.field(k) { write_dom_value_json(json, v) }
+          end
+        end
       end
     end
 
@@ -1564,6 +1749,56 @@ YAML
         end
       when DumpLanguage::Crystal
         write_json_error(json, "Tape is not implemented for Crystal yet.")
+      end
+    end
+
+    private def self.write_json_soa(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, jsonc : Bool, path : String)
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_document(bytes, validate_literals: true, validate_numbers: true, jsonc: jsonc)
+        unless result.error.success?
+          write_json_error(json, "SoA parse failed (#{result.error}) for #{path}.")
+          return
+        end
+        doc = result.doc.not_nil!
+        soa = doc.soa_view
+        json.array do
+          soa.types.each_with_index do |type, idx|
+            json.object do
+              json.field "index", idx
+              json.field "type", type.to_s
+              json.field "a", soa.a[idx]
+              json.field "b", soa.b[idx]
+            end
+          end
+        end
+      when DumpLanguage::Ruby
+        write_json_error(json, "SoA is not implemented for Ruby yet.")
+      when DumpLanguage::Crystal
+        write_json_error(json, "SoA is not implemented for Crystal yet.")
+      end
+    end
+
+    private def self.write_json_dom(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, jsonc : Bool, path : String)
+      case lang
+      when DumpLanguage::Json
+        parser = Warp::Parser.new
+        result = parser.parse_dom(bytes, jsonc: jsonc)
+        unless result.error.success?
+          write_json_error(json, "DOM parse failed (#{result.error}) for #{path}.")
+          return
+        end
+        value = result.value
+        unless value
+          write_json_error(json, "DOM parse returned nil for #{path}.")
+          return
+        end
+        write_dom_value_json(json, value)
+      when DumpLanguage::Ruby
+        write_json_error(json, "DOM is not implemented for Ruby yet.")
+      when DumpLanguage::Crystal
+        write_json_error(json, "DOM is not implemented for Crystal yet.")
       end
     end
 
