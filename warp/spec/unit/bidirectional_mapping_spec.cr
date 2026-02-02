@@ -13,7 +13,7 @@ CR
 
       result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(crystal_source.to_slice)
       result.error.should eq(Warp::Core::ErrorCode::Success)
-      
+
       # Should contain require_relative for relative paths
       output = result.output
       output.should contain("require_relative") if output.includes?("../")
@@ -30,7 +30,7 @@ RB
 
       result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(ruby_source.to_slice)
       result.error.should eq(Warp::Core::ErrorCode::Success)
-      
+
       # Should contain require for Crystal
       output = result.output
       output.should contain("require")
@@ -47,7 +47,7 @@ CR
 
       result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(crystal_source.to_slice)
       result.error.should eq(Warp::Core::ErrorCode::Success)
-      
+
       # Should convert &.kind to { |item| item.kind } or similar
       output = result.output
       # After transpilation, Ruby should have explicit block syntax
@@ -63,7 +63,7 @@ RB
 
       result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(ruby_source.to_slice)
       result.error.should eq(Warp::Core::ErrorCode::Success)
-      
+
       # Should convert { |n| n.kind } to &.kind
       output = result.output
       # After transpilation, Crystal may use &.kind shorthand or explicit block
@@ -75,7 +75,7 @@ RB
     it "parses Ruby method chain with block" do
       ruby_source = "root.not_nil!.children.map { |n| n.kind }"
       bytes = ruby_source.to_slice
-      tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(bytes)
+      tokens, lex_error, _ = Warp::Lang::Ruby::Lexer.scan(bytes)
       lex_error.should eq(Warp::Core::ErrorCode::Success)
 
       cst, parse_error = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
@@ -89,7 +89,7 @@ RB
     it "parses Crystal method chain with block shorthand" do
       crystal_source = "root.not_nil!.children.map(&.kind)"
       bytes = crystal_source.to_slice
-      tokens, lex_error = Warp::Lang::Crystal::Lexer.scan(bytes)
+      tokens, lex_error, _ = Warp::Lang::Crystal::Lexer.scan(bytes)
       lex_error.should eq(Warp::Core::ErrorCode::Success)
 
       cst, parse_error = Warp::Lang::Crystal::CST::Parser.parse(bytes, tokens)
@@ -104,7 +104,7 @@ RB
     it "Ruby CST has explicit Block node for { |n| ... }" do
       ruby_source = "items.map { |n| n.kind }"
       bytes = ruby_source.to_slice
-      tokens, _ = Warp::Lang::Ruby::Lexer.scan(bytes)
+      tokens, _, _ = Warp::Lang::Ruby::Lexer.scan(bytes)
       cst, _ = Warp::Lang::Ruby::CST::Parser.parse(bytes, tokens)
 
       # Find the map MethodCall with block

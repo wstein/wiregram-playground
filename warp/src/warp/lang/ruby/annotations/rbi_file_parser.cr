@@ -3,7 +3,7 @@ module Warp::Lang::Ruby::Annotations
   class RbiFileParser
     def parse(source : String) : Hash(String, RbsMethodSignature)
       bytes = source.to_slice
-      tokens, err = Warp::Lang::Ruby::Lexer.scan(bytes)
+      tokens, err, _ = Warp::Lang::Ruby::Lexer.scan(bytes)
       return {} of String => RbsMethodSignature unless err == Warp::Core::ErrorCode::Success
 
       extractor = AnnotationExtractor.new(bytes, tokens)

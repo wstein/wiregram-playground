@@ -38,7 +38,7 @@ module Warp
         "when"   => TokenKind::When,
       }
 
-      def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode)
+      def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         # Module-level compatibility: this method is used internally by tests and other code.
         tokens = [] of Token
         i = 0
@@ -184,7 +184,7 @@ module Warp
               end
             end
             unless found
-              return {tokens, ErrorCode::StringError}
+              return {tokens, ErrorCode::StringError, start_i}
             end
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -208,7 +208,7 @@ module Warp
               end
             end
             unless found
-              return {tokens, ErrorCode::StringError}
+              return {tokens, ErrorCode::StringError, start_i}
             end
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -235,7 +235,7 @@ module Warp
               end
             end
             if j >= len
-              return {tokens, ErrorCode::StringError}
+              return {tokens, ErrorCode::StringError, start_i}
             end
             tokens << Token.new(TokenKind::Regex, i, j - i)
             i = j
@@ -462,7 +462,7 @@ module Warp
         end
 
         tokens << Token.new(TokenKind::Eof, len, 0)
-        {tokens, ErrorCode::Success}
+        {tokens, ErrorCode::Success, 0}
       end
 
       private def self.match_literal(bytes : Bytes, start : Int32, literal : String) : Bool
@@ -495,7 +495,7 @@ module Warp
 
       # Expose a `Lexer` class for compatibility with existing callers/tests.
       class Lexer
-        def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode)
+        def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
           Warp::Lang::Ruby.scan(bytes)
         end
       end

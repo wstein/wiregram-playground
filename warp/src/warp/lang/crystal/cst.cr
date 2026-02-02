@@ -10,6 +10,10 @@ module Warp::Lang::Crystal
       StructDef
       EnumDef
       MacroDef
+      MethodCall
+      Identifier
+      StringLiteral
+      Block
     end
 
     struct ParamInfo
@@ -127,12 +131,52 @@ module Warp::Lang::Crystal
             children << parse_simple_block(NodeKind::EnumDef)
           when TokenKind::Macro
             children << parse_simple_block(NodeKind::MacroDef)
+          when TokenKind::Identifier, TokenKind::Constant
+            children << parse_expression
           else
             advance
           end
         end
 
         GreenNode.new(NodeKind::Root, children)
+      end
+
+      private def parse_expression : GreenNode
+        tok = current
+        tok_text = String.new(@bytes[tok.start, tok.length])
+        node = GreenNode.new(NodeKind::Identifier, [] of GreenNode, tok_text)
+        advance
+
+        while @pos < @tokens.size
+          case current.kind
+          when TokenKind::Dot
+            advance
+            if current.kind == TokenKind::Identifier || current.kind == TokenKind::Constant
+              method_tok = current
+              method_text = String.new(@bytes[method_tok.start, method_tok.length])
+              advance
+              node = GreenNode.new(NodeKind::MethodCall, [node], method_text)
+            else
+              break
+            end
+          when TokenKind::LParen
+            advance
+            # Collect everything inside parens as raw text for now or just skip to RParen
+            while @pos < @tokens.size && current.kind != TokenKind::RParen
+              if current.kind == TokenKind::Ampersand
+                # Could handle block shorthand here
+                advance
+              else
+                advance
+              end
+            end
+            advance if current.kind == TokenKind::RParen
+            # Wrap as method call if we just had one, or keep same node
+          else
+            break
+          end
+        end
+        node
       end
 
       private def parse_simple_block(kind : NodeKind) : GreenNode
@@ -146,6 +190,31 @@ module Warp::Lang::Crystal
         advance if current.kind == TokenKind::End
 
         GreenNode.new(kind, [] of GreenNode)
+      end
+
+      private def collect_trivia : Array(Warp::Lang::Crystal::Token)
+        trivia = [] of Warp::Lang::Crystal::Token
+
+        while @pos < @tokens.size
+          kind = current.kind
+          if kind == TokenKind::Whitespace || kind == TokenKind::Newline || kind == TokenKind::CommentLine
+            trivia << current
+            advance
+          else
+            break
+          end
+        end
+
+        trivia
+      end
+
+      private def current : Warp::Lang::Crystal::Token
+        return @tokens[-1] if @pos >= @tokens.size
+        @tokens[@pos]
+      end
+
+      private def advance
+        @pos += 1 if @pos < @tokens.size
       end
 
       private def collect_trivia : Array(Warp::Lang::Crystal::Token)

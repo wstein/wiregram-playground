@@ -1,0 +1,251 @@
+= Enhanced Lexer Error Reporting
+:toc:
+:toclevels: 2
+:sectanchors:
+:sectlinks:
+
+== Overview
+
+The Warp lexer now includes enhanced error reporting with source code context, line/column information, and snippets showing the error location.
+
+== Features
+
+=== 1. Detailed Error Information
+
+Each lexer error includes:
+- **Error code**: Specific `ErrorCode` value (e.g., `StringError`, `RegexError`)
+- **Message**: Human-readable description of the error
+- **Line/Column**: Exact position in source code
+- **Source snippet**: Context showing error location with surrounding lines
+
+=== 2. Source Code Context
+
+Errors display surrounding context:
+
+```
+ → 2 | def greet(name)
+   3 |   "Hello, name
+       ^^^^^^^^^^
+   4 | end
+```
+
+=== 3. Position Tracking
+
+LexerError tracks:
+- **Byte position** in source
+- **Line number** (1-indexed)
+- **Column number** (1-indexed)
+- **Full line content**
+
+== Usage
+
+=== Creating a LexerError
+
+[source,crystal]
+----
+error = Warp::Lang::Ruby::LexerError.new(
+  Warp::Core::ErrorCode::StringError,
+  "Unterminated string literal",
+  source_bytes,
+  position
+)
+
+puts error.to_s
+----
+
+=== Output Example
+
+```
+LexError at 3:10: Unterminated string literal
+
+   1 | def greet(name)
+   2 |   message = "Hello, name
+       ^^^^^^^^^^^^^^^^^
+   3 | end
+```
+
+== Integration Points
+
+=== Lexer
+
+The `Lexer` can be enhanced to return `LexerError` instead of just `ErrorCode`:
+
+[source,crystal]
+----
+def self.scan_with_errors(bytes : Bytes) : {Array(Token), LexerError?}
+  # Current implementation returns {tokens, error_code}
+  # Enhanced version would return {tokens, lexer_error_object}
+end
+----
+
+=== CLI
+
+The CLI error reporting shows:
+
+```bash
+$ warp transpile crystal -s broken.rb
+Using config: .warp.yaml
+Error: Lexical error in broken.rb:3:10
+
+LexError at 3:10: Unterminated string literal
+
+   1 | def greet(name)
+   2 |   message = "Hello, name
+       ^^^^^^^^^^^^^^^^^
+   3 | end
+```
+
+=== Parser Integration
+
+When lexing succeeds but parsing fails, similar context is provided:
+
+[source,crystal]
+----
+parse_error = Warp::Lang::Ruby::ParseError.new(
+  Warp::Core::ErrorCode::UnexpectedToken,
+  "Expected expression",
+  source_bytes,
+  error_position
+)
+----
+
+== Error Types
+
+=== String Literals
+
+[cols="2,3,2"]
+|===
+|Error|Cause|Code
+|Unterminated double quote|Missing closing `"`|`StringError`
+|Unterminated single quote|Missing closing `'`|`StringError`
+|Invalid escape sequence|Bad `\` usage|`StringError`
+|===
+
+Example:
+```ruby
+# Line 2: Unterminated string
+message = "Hello World
+```
+
+### Regex Literals
+
+[cols="2,3,2"]
+|===
+|Error|Cause|Code
+|Unterminated regex|Missing closing `/`|`RegexError`
+|Invalid regex pattern|Bad regex syntax|`RegexError`
+|===
+
+### Heredoc
+
+[cols="2,3,2"]
+|===
+|Error|Cause|Code
+|Missing terminator|Delimiter not found|`HeredocError`
+|Invalid delimiter|Non-word chars|`HeredocError`
+|===
+
+## Examples
+
+### Example 1: Unterminated String
+
+Input:
+```ruby
+def format_message
+  greeting = "Hello
+  puts greeting
+end
+```
+
+Output:
+```
+LexError at 2:15: Unterminated string literal
+
+   1 | def format_message
+   2 |   greeting = "Hello
+       ^^^^^^^^^^^^
+   3 |   puts greeting
+   4 | end
+```
+
+### Example 2: Invalid Escape
+
+Input:
+```ruby
+path = "C:\users\name"
+```
+
+Output:
+```
+LexError at 1:6: Invalid escape sequence '\u'
+
+   1 | path = "C:\users\name"
+       ^^^^^^^^
+```
+
+### Example 3: Nested Error Context
+
+Input:
+```ruby
+lines 1-5: [valid code]
+line 6:   tag = %{unclosed
+line 7: }
+lines 8+: [valid code]
+```
+
+Output:
+```
+LexError at 6:9: Unterminated percent literal
+
+   4 |
+   5 | tag = %{unclosed
+       ^^^^^^
+   6 | }
+   7 |
+```
+
+## Architecture
+
+=== LexerError Class
+
+[source,crystal]
+----
+class LexerError
+  getter error_code : Warp::Core::ErrorCode
+  getter message : String
+  getter source : Bytes
+  getter position : Int32
+  getter line : Int32
+  getter column : Int32
+  getter line_content : String
+  getter context : String
+
+  def to_s : String
+    # Formatted error message with context
+  end
+end
+----
+
+=== Context Extraction
+
+The `extract_context` method:
+1. Calculates line/column from byte position
+2. Extracts the line content
+3. Builds a multi-line snippet with pointers
+
+=== Snippet Building
+
+The `build_context_snippet` method:
+1. Shows 2 lines before error
+2. Shows 2 lines after error
+3. Points to exact column with `^`
+4. Uses `→` prefix for error line
+
+## Future Enhancements
+
+- [ ] Suggestion messages ("did you mean...?")
+- [ ] Error recovery and continuation
+- [ ] Multiple error reporting (collect all, then report)
+- [ ] Color-coded output in terminal
+- [ ] Machine-readable error format (JSON)
+- [ ] Integration with IDE plugins

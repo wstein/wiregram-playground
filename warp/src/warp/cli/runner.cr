@@ -286,12 +286,12 @@ YAML
         processor = Warp::Parallel::FileProcessor.new(workers)
 
         processor.process_files(files) do |path|
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd)
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
         end
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd)
+          process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dump_tokens, dump_cst, dump_ast, dump_tape, dump_simd, verbose)
         end
       end
 
@@ -383,6 +383,7 @@ YAML
       dump_ast : Bool = false,
       dump_tape : Bool = false,
       dump_simd : Bool = false,
+      verbose : Bool = false,
     )
       source = File.read(path)
       bytes = source.to_slice
@@ -417,10 +418,18 @@ YAML
       rbi_output_dir = rbi_output_root || config.rbi_output_dir
       case target
       when TranspileTarget::Ruby
-        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes)
+        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes, path)
         if result.error != Warp::Core::ErrorCode::Success
           puts "Transpile error (Crystal->Ruby): #{path}"
           result.diagnostics.each { |d| puts "  - #{d}" }
+
+          if verbose && (tokens = result.tokens)
+            puts "\nToken stream up to error:"
+            tokens.each_with_index do |t, idx|
+              txt = String.new(bytes[t.start, Math.min(t.length, bytes.size - t.start)])
+              puts "  #{idx.to_s.rjust(3)}: #{t.kind} #{txt.inspect}"
+            end
+          end
           return
         end
 
@@ -432,7 +441,7 @@ YAML
           # Generate accompanying RBS/RBI files if requested
           if (generate_rbs || config.generate_rbs) && !stdout
             ruby_bytes = result.output.to_slice
-            tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
+            tokens, lex_error, _ = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
             if lex_error == Warp::Core::ErrorCode::Success
               extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(ruby_bytes, tokens)
               sigs = extractor.extract
@@ -443,7 +452,7 @@ YAML
 
           if (generate_rbi || config.generate_rbi) && !stdout
             ruby_bytes = result.output.to_slice
-            tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
+            tokens, lex_error, _ = Warp::Lang::Ruby::Lexer.scan(ruby_bytes)
             if lex_error == Warp::Core::ErrorCode::Success
               extractor = Warp::Lang::Ruby::Annotations::AnnotationExtractor.new(ruby_bytes, tokens)
               sigs = extractor.extract
@@ -467,9 +476,18 @@ YAML
         end
         return
       else
-        tokens, lex_error = Warp::Lang::Ruby::Lexer.scan(bytes)
+        tokens, lex_error, lex_pos = Warp::Lang::Ruby::Lexer.scan(bytes)
         if lex_error != Warp::Core::ErrorCode::Success
-          print_with_progress_clear("Lex error (Ruby): #{path}")
+          diag = Warp::Diagnostics.lex_error("lex error", bytes, lex_pos, path)
+          print_with_progress_clear(diag.to_s)
+
+          if verbose
+            puts "\nToken stream up to error:"
+            tokens.each_with_index do |t, idx|
+              txt = String.new(bytes[t.start, Math.min(t.length, bytes.size - t.start)])
+              puts "  #{idx.to_s.rjust(3)}: #{t.kind} #{txt.inspect}"
+            end
+          end
           return
         end
       end
@@ -492,10 +510,18 @@ YAML
         write_or_print(path, output_root, content, ext, stdout, config.folder_mappings)
       else
         annotations = build_annotation_store(path, source, config, extra_rbs, extra_rbi, inline_rbs)
-        result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations)
+        result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes, annotations, path)
         if result.error != Warp::Core::ErrorCode::Success
           print_with_progress_clear("Transpile error (Ruby->Crystal): #{path}")
           result.diagnostics.each { |d| print_with_progress_clear("  - #{d}") }
+
+          if verbose && (toks = result.tokens)
+            puts "\nToken stream up to error:"
+            toks.each_with_index do |t, idx|
+              txt = String.new(bytes[t.start, Math.min(t.length, bytes.size - t.start)])
+              puts "  #{idx.to_s.rjust(3)}: #{t.kind} #{txt.inspect}"
+            end
+          end
           return
         end
         if stdout

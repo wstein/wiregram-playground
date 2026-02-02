@@ -1,9 +1,10 @@
 module Warp::Lang::Ruby
   class Inspector
     def self.dump_tokens(bytes : Bytes)
-      tokens, err = Lexer.scan(bytes)
+      tokens, err, pos = Lexer.scan(bytes)
       if err != Warp::Core::ErrorCode::Success
-        puts "Lexer error: #{err}"
+        diag = Warp::Diagnostics.lex_error("lexer fail", bytes, pos)
+        puts diag.to_s
         return
       end
 
@@ -15,7 +16,7 @@ module Warp::Lang::Ruby
     end
 
     def self.dump_cst(bytes : Bytes)
-      tokens, _ = Lexer.scan(bytes)
+      tokens, _, _ = Lexer.scan(bytes)
       root_green, err = CST::Parser.parse(bytes, tokens)
       if err != Warp::Core::ErrorCode::Success
         puts "Parser error: #{err}"
@@ -44,7 +45,7 @@ module Warp::Lang::Ruby
     end
 
     def self.dump_ast(bytes : Bytes)
-      tokens, _ = Lexer.scan(bytes)
+      tokens, _, _ = Lexer.scan(bytes)
       root_green, _ = CST::Parser.parse(bytes, tokens)
       root_red = CST::RedNode.new(root_green)
 
@@ -62,7 +63,7 @@ module Warp::Lang::Ruby
     end
 
     def self.dump_tape(bytes : Bytes)
-      tokens, _ = Lexer.scan(bytes)
+      tokens, _, _ = Lexer.scan(bytes)
       root_green, _ = CST::Parser.parse(bytes, tokens)
       root_red = CST::RedNode.new(root_green)
 

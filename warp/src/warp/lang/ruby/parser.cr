@@ -19,7 +19,7 @@ module Warp
         end
 
         def self.parse(bytes : Bytes) : AstResult
-          tokens, err = Lexer.scan(bytes)
+          tokens, err, _ = Lexer.scan(bytes)
           return AstResult.new(nil, err) unless err.success?
 
           parser = new(bytes, tokens)

@@ -42,7 +42,7 @@ module Warp
         "super"      => TokenKind::Super,
       }
 
-      def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode)
+      def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         tokens = [] of Token
         i = 0
         len = bytes.size
@@ -107,7 +107,7 @@ module Warp
                 j += 1
               end
             end
-            return {tokens, Warp::Core::ErrorCode::StringError} unless found
+            return {tokens, Warp::Core::ErrorCode::StringError, i} unless found
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
             next
@@ -129,10 +129,60 @@ module Warp
                 j += 1
               end
             end
-            return {tokens, Warp::Core::ErrorCode::StringError} unless found
+            return {tokens, Warp::Core::ErrorCode::StringError, i} unless found
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
             next
+          end
+
+          # Percent strings: %(...), %[...], %{...}, etc.
+          if c == '%'.ord && i + 1 < len
+            next_char = bytes[i + 1]
+            # Check for string delimiters
+            delimiter_open = nil
+            delimiter_close = nil
+            case next_char
+            when '('.ord
+              delimiter_open = '('.ord
+              delimiter_close = ')'.ord
+            when '['.ord
+              delimiter_open = '['.ord
+              delimiter_close = ']'.ord
+            when '{'.ord
+              delimiter_open = '{'.ord
+              delimiter_close = '}'.ord
+            when '<'.ord
+              delimiter_open = '<'.ord
+              delimiter_close = '>'.ord
+            when '|'.ord
+              delimiter_open = '|'.ord
+              delimiter_close = '|'.ord
+            when ' '.ord, '\t'.ord
+              delimiter_open = next_char
+              delimiter_close = next_char
+            else
+              # If next char is not a delimiter, skip this as a % operator
+              # This will be handled as Percent token later
+              delimiter_open = nil
+            end
+
+            if delimiter_open
+              j = i + 2
+              found = false
+              while j < len
+                if bytes[j] == delimiter_close
+                  j += 1
+                  found = true
+                  break
+                else
+                  j += 1
+                end
+              end
+              return {tokens, Warp::Core::ErrorCode::StringError, i} unless found
+              tokens << Token.new(TokenKind::String, i, j - i)
+              i = j
+              next
+            end
           end
 
           # Numbers (int/float)
@@ -317,7 +367,7 @@ module Warp
         end
 
         tokens << Token.new(TokenKind::Eof, len, 0)
-        {tokens, Warp::Core::ErrorCode::Success}
+        {tokens, Warp::Core::ErrorCode::Success, 0}
       end
 
       private def self.is_identifier_start(c : UInt8) : Bool
@@ -329,7 +379,7 @@ module Warp
       end
 
       class Lexer
-        def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode)
+        def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
           Warp::Lang::Crystal.scan(bytes)
         end
       end

@@ -7,15 +7,19 @@ module Warp::Lang::Ruby
       property error : Warp::Core::ErrorCode
       property diagnostics : Array(String)
       property crystal_doc : Warp::Lang::Crystal::CST::Document?
+      property tokens : Array(Token)?
 
-      def initialize(@output, @error, @diagnostics = [] of String, @crystal_doc = nil)
+      def initialize(@output, @error, @diagnostics = [] of String, @crystal_doc = nil, @tokens = nil)
       end
     end
 
-    def self.transpile(bytes : Bytes, annotations : Annotations::AnnotationStore? = nil) : Result
+    def self.transpile(bytes : Bytes, annotations : Annotations::AnnotationStore? = nil, path : String? = nil) : Result
       # Step 1: Lex Ruby
-      tokens, lex_error = Lexer.scan(bytes)
-      return Result.new("", lex_error, ["lex error"], nil) unless lex_error == Warp::Core::ErrorCode::Success
+      tokens, lex_error, lex_pos = Lexer.scan(bytes)
+      if lex_error != Warp::Core::ErrorCode::Success
+        diag = Warp::Diagnostics.lex_error("lex error", bytes, lex_pos, path)
+        return Result.new("", lex_error, [diag.to_s], nil, tokens)
+      end
 
       # Step 2: Parse Ruby CST
       ruby_root, parse_error = CST::Parser.parse(bytes, tokens)
