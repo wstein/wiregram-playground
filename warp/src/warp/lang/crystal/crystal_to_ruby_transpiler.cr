@@ -161,8 +161,40 @@ module Warp
         end
 
         private def transform_body(body : String) : String
-          # Transform &.method to &:method
+          # 1. Remove Crystal numeric suffixes (_u64, _i32, _f64, etc.)
+          # Match patterns like 42_u64, 100_i32, 3.14_f64, 1_000_000_u64
+          body = body.gsub(/_[uif](?:8|16|32|64)\b/, "")
+          body = body.gsub(/_[uif]size\b/, "")
+
+          # 2. Transform {} of Key => Value to {} (remove Crystal-style hash type annotations)
+          # MUST come before tuple transformation to avoid double-matching
+          # Matches: {} of String => Int32, etc.
+          body = body.gsub(/\{\}\s+of\s+[A-Za-z_][A-Za-z0-9_:]*\s*=>\s*[A-Za-z_][A-Za-z0-9_:]*/, "{}")
+
+          # 3. Transform [] of Type to [] (remove Crystal-style array type annotations)
+          # Matches: [] of SomeType, [] of String, etc.
+          body = body.gsub(/\[\]\s+of\s+[A-Za-z_][A-Za-z0-9_:]*(?:\([^)]*\))?\b/, "[]")
+
+          # 4. Transform tuple literals {a, b} to array literals [a, b]
+          # This is more complex because we need to preserve content but not catch hash literals
+          # Tuple pattern: {expr, expr} but NOT {key: value} or {key => value}
+          # We use a simple heuristic to avoid matching hash literals with =>
+          body = body.gsub(/\{([^}]*?)\}/) do |match|
+            inner = match[1...-1] # Remove outer braces
+            # Check if this looks like a hash (contains =>) or named args (contains :)
+            # Also check if it's empty {} (likely a hash, not a tuple)
+            # Simple heuristic: if it contains => or key: value pattern, or is empty, keep as-is
+            if inner.empty? || inner.includes?("=>") || inner.match(/\w+\s*:/)
+              match # Keep hash/named args/empty braces as-is
+            else
+              # This is likely a tuple or regular braces - convert to array brackets
+              "[#{inner}]"
+            end
+          end
+
+          # 5. Transform &.method to &:method
           body = body.gsub(/&\.([a-zA-Z_][a-zA-Z0-9_]*[!?]?)/, "&:\\1")
+
           body
         end
 
