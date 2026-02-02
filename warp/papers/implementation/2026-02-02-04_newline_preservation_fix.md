@@ -1,9 +1,11 @@
 # Newline Preservation Fix
 
 ## Issue
+
 Transpiled code was being output without newlines in some cases, causing all output to appear as a single concatenated line.
 
 ## Root Cause Analysis
+
 The issue manifested in two places:
 
 1. **Crystal → Ruby transpilation (primary concern)**: The current implementation uses **text-based regex transforms**, not a CST-based rewrite. Newlines are preserved because we iterate with `each_line(chomp: false)` and avoid joining lines without delimiters, but the transformation itself is still string substitution.
@@ -13,12 +15,14 @@ The issue manifested in two places:
 ## Solution Implemented
 
 ### 1. Verified Transpiler Correctness
+
 - Confirmed the Ruby lexer creates `Newline` tokens correctly
 - Verified CSTBuilder preserves bytes including newlines in `RawText` nodes
 - Validated Serializer emits trivia from GreenNode.text without modification
 - Confirmed Crystal serializer preserves MethodDef body text (which includes newlines)
 
 ### 2. Added Integration Tests
+
 Added comprehensive test cases in `spec/integration/cli_spec.cr`:
 
 ```crystal
