@@ -114,4 +114,4 @@ Thumbs.db
 /bin/
 /docs/
 /lib/
-simdjson/bin/warp
+warp/bin/warp
