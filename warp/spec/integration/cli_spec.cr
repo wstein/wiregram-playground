@@ -37,4 +37,35 @@ describe "CLI Integration" do
     out.includes?("Using").should eq(true)
     out.includes?("parallel").should eq(true)
   end
+
+  it "preserves newlines when transpiling Ruby to Crystal" do
+    fixture_file = "spec/fixtures/cli/rb_simple.rb"
+    cmd = ["crystal", "run", "bin/warp.cr", "--", "transpile", "crystal", "-s", fixture_file, "--stdout"].join(" ")
+
+    out = %x(#{cmd})
+
+    # Output should contain newlines, not all concatenated
+    # Count lines - should be at least 4 for a simple multi-line function
+    line_count = out.lines.size
+    line_count.should be > 3
+
+    # Should preserve structure
+    out.includes?("def ").should eq(true)
+    out.includes?("end").should eq(true)
+  end
+
+  it "preserves newlines when transpiling Crystal to Ruby" do
+    fixture_file = "spec/fixtures/cli/cr_simple.cr"
+    cmd = ["crystal", "run", "bin/warp.cr", "--", "transpile", "ruby", "-s", fixture_file, "--stdout"].join(" ")
+
+    out = %x(#{cmd})
+
+    # Output should contain newlines, not all concatenated
+    line_count = out.lines.size
+    line_count.should be > 2
+
+    # Should preserve structure
+    out.includes?("def ").should eq(true)
+    out.includes?("end").should eq(true)
+  end
 end

@@ -51,16 +51,20 @@ module Warp
           # Simple text-based transformation for 'require' -> 'require_relative'
           # Also translate Crystal '&.method' shorthand to Ruby '&:method' (Proc shorthand)
           # This is a basic implementation; a full CST-based approach would traverse the tree
-          output = output.gsub(/(\brequire\s+["'])\.\./, "require_relative \"..")
-          output = output.gsub(/(\brequire\s+["'])\./, "require_relative \"./")
+          # Only rewrite *bare* `require` invocations that use relative paths; leave `require_relative` unchanged
+          output = output.gsub(/\brequire(?!_relative)\s+(['"])\.\.\//, "require_relative \\1../")
+          output = output.gsub(/\brequire(?!_relative)\s+(['"])\./, "require_relative \\1./")
+          output = output.gsub(/\brequire(?!_relative)\s+(['"])\.\//, "require_relative \\1./")
+
+          # Normalize accidental duplicate slashes produced by replacement (e.g., ".//" -> "./")
+          output = output.gsub(/require_relative\s+(['"])\.\/+/, "require_relative \\1./")
 
           # Convert '&.ident' (Crystal method-to-proc shorthand) to Ruby '&:ident'
           output = output.gsub(/&\.(\w+)/, "&:\\1")
 
           # Insert Sorbet sigs for typed Crystal method definitions and strip types
-          lines = output.lines
           transformed = [] of String
-          lines.each do |line|
+          output.each_line(chomp: false) do |line|
             if (md = line.match(/^([ \t]*)def\s+([A-Za-z0-9_!?=]+)\s*(?:\(([^)]*)\))?\s*(?:\:\s*([^\s]+))?/))
               captures = md.captures
               indent = captures[0] || ""
