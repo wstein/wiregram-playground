@@ -50,10 +50,14 @@ require "./warp/lexer/token_scanner"
 require "./warp/parallel/cpu_detector"
 require "./warp/parser"
 
+# Common language infrastructure
+require "./warp/lang/common/simd_scanner"
+
 # Language support modules (for future extensibility)
 require "./warp/lang/json/types"
 require "./warp/lang/ruby/types"
 require "./warp/lang/ruby/lexer"
+require "./warp/lang/ruby/simd_scanner"
 require "./warp/lang/ruby/lexer_error"
 require "./warp/lang/ruby/ast"
 require "./warp/lang/ruby/ast_builder"
@@ -75,6 +79,7 @@ require "./warp/lang/ruby/transpiler_config"
 require "./warp/lang/ruby/analyzer"
 require "./warp/lang/crystal/types"
 require "./warp/lang/crystal/lexer"
+require "./warp/lang/crystal/simd_scanner"
 require "./warp/lang/crystal/type_mapping"
 require "./warp/lang/crystal/cst"
 require "./warp/lang/crystal/cst_builder"

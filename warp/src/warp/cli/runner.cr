@@ -554,23 +554,29 @@ YAML
     end
 
     private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String) : Int32
-      if lang != DumpLanguage::Json
-        write_dump_error("simd", lang, format, "SIMD scan is only available for JSON inputs.")
+      scan_result : Warp::Lang::Common::ScanResult = case lang
+      when DumpLanguage::Json
+        json_result = Warp::Lexer.index(bytes)
+        Warp::Lang::Common::ScanResult.new(json_result.buffer.backing || Array(UInt32).new, json_result.error, "json")
+      when DumpLanguage::Ruby
+        Warp::Lang::Ruby.simd_scan(bytes)
+      when DumpLanguage::Crystal
+        Warp::Lang::Crystal.simd_scan(bytes)
+      else
+        Warp::Lang::Common::ScanResult.new(Array(UInt32).new, Warp::Core::ErrorCode::Empty, "unknown")
+      end
+
+      unless scan_result.error.success?
+        write_dump_error("simd", lang, format, "SIMD scan failed (#{scan_result.error}) for #{path}.")
         return 1
       end
 
-      result = Warp::Lexer.index(bytes)
-      unless result.error.success?
-        write_dump_error("simd", lang, format, "SIMD scan failed (#{result.error}) for #{path}.")
-        return 1
-      end
-
-      indices = result.buffer.backing || [] of UInt32
+      indices = scan_result.indices
 
       case format
       when DumpFormat::Pretty
         io = STDOUT
-        io.puts "SIMD structural indices (#{indices.size})"
+        io.puts "SIMD structural indices (#{scan_result.language}, #{indices.size} found)"
         io.puts "index   offset   byte  char"
         indices.each_with_index do |idx_u32, i|
           idx = idx_u32.to_i
@@ -855,11 +861,7 @@ YAML
       io.puts "Full dump (#{dump_language_label(lang)})"
 
       io.puts "\n== simd =="
-      if lang == DumpLanguage::Json
-        dump_simd_stage(lang, bytes, DumpFormat::Pretty, path)
-      else
-        io.puts "SIMD scan is not supported for #{dump_language_label(lang)}."
-      end
+      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path)
 
       io.puts "\n== tokens =="
       dump_tokens_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
@@ -887,11 +889,7 @@ YAML
           json.field "stages" do
             json.object do
               json.field "simd" do
-                if lang == DumpLanguage::Json
-                  write_json_simd(json, bytes)
-                else
-                  write_json_error(json, "SIMD scan is not supported for #{dump_language_label(lang)}.")
-                end
+                write_json_simd_all_langs(json, lang, bytes, path)
               end
               json.field "tokens" do
                 write_json_tokens(json, lang, bytes, jsonc, path)
@@ -1561,6 +1559,44 @@ YAML
             end
           end
         end
+      end
+    end
+
+    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String)
+      scan_result : Warp::Lang::Common::ScanResult = case lang
+      when DumpLanguage::Json
+        json_result = Warp::Lexer.index(bytes)
+        Warp::Lang::Common::ScanResult.new(json_result.buffer.backing || Array(UInt32).new, json_result.error, "json")
+      when DumpLanguage::Ruby
+        Warp::Lang::Ruby.simd_scan(bytes)
+      when DumpLanguage::Crystal
+        Warp::Lang::Crystal.simd_scan(bytes)
+      else
+        Warp::Lang::Common::ScanResult.new(Array(UInt32).new, Warp::Core::ErrorCode::Empty, "unknown")
+      end
+
+      if scan_result.error.success?
+        indices = scan_result.indices
+        json.object do
+          json.field "count", indices.size
+          json.field "indices" do
+            json.array do
+              indices.each_with_index do |idx_u32, i|
+                idx = idx_u32.to_i
+                byte = idx < bytes.size ? bytes[idx] : 0_u8
+                char = idx < bytes.size ? bytes[idx].chr : '?'
+                json.object do
+                  json.field "index", i
+                  json.field "offset", idx
+                  json.field "byte", byte.to_i
+                  json.field "char", char.to_s
+                end
+              end
+            end
+          end
+        end
+      else
+        write_json_error(json, "SIMD scan failed (#{scan_result.error}) for #{path}.")
       end
     end
 
