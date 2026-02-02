@@ -235,8 +235,15 @@ module Warp::Lang::Crystal
         end
         advance if current.kind == TokenKind::Newline
 
-        # Parse inner contents into child nodes until the matching 'end'
-        children = [] of GreenNode
+        # Capture header text as a RawText child so it's preserved
+        header_end = @pos < @tokens.size ? current.start : @bytes.size
+        if header_end > block_start
+          header_text = String.new(@bytes[block_start, header_end - block_start])
+          children = [GreenNode.new(NodeKind::RawText, [] of GreenNode, header_text)]
+        else
+          children = [] of GreenNode
+        end
+
         cursor = @pos < @tokens.size ? current.start : @bytes.size
         i = @pos
 
@@ -250,7 +257,6 @@ module Warp::Lang::Crystal
             end
 
             # Re-position parser and parse method def
-            saved_pos = @pos
             @pos = i
             method_node = parse_method_def
             children << method_node
@@ -259,12 +265,10 @@ module Warp::Lang::Crystal
             cursor = @pos < @tokens.size ? current.start : @bytes.size
             next
           elsif tok.kind == TokenKind::Class
-            # Nested class: parse recursively
             nested_start = tok.start
             if nested_start > cursor
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, nested_start - cursor]))
             end
-            saved_pos = @pos
             @pos = i
             nested = parse_simple_block(NodeKind::ClassDef)
             children << nested
@@ -276,7 +280,6 @@ module Warp::Lang::Crystal
             if nested_start > cursor
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, nested_start - cursor]))
             end
-            saved_pos = @pos
             @pos = i
             nested = parse_simple_block(NodeKind::ModuleDef)
             children << nested
@@ -288,7 +291,6 @@ module Warp::Lang::Crystal
             if nested_start > cursor
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, nested_start - cursor]))
             end
-            saved_pos = @pos
             @pos = i
             nested = parse_simple_block(NodeKind::StructDef)
             children << nested
@@ -297,9 +299,12 @@ module Warp::Lang::Crystal
             next
           elsif tok.kind == TokenKind::End
             end_start = tok.start
+            end_end = end_start + tok.length
             if end_start > cursor
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[cursor, end_start - cursor]))
             end
+            # Include the 'end' token text as well
+            children << GreenNode.new(NodeKind::RawText, [] of GreenNode, String.new(@bytes[end_start, end_end - end_start]))
             # Advance parser after 'end' and return
             @pos = i + 1
             return GreenNode.new(kind, children)
@@ -331,10 +336,22 @@ module Warp::Lang::Crystal
           advance
         end
 
-        # Get method name
+        # Get method name (support `self.method` and simple identifiers)
         if current.kind == TokenKind::Identifier
           method_name = String.new(@bytes[current.start, current.length])
           advance
+        elsif current.kind == TokenKind::Self
+          # Handle `self.foo` style
+          name = String.new(@bytes[current.start, current.length])
+          advance
+          if current.kind == TokenKind::Dot
+            advance
+            if current.kind == TokenKind::Identifier || current.kind == TokenKind::Constant
+              name = "#{name}.#{String.new(@bytes[current.start, current.length])}"
+              advance
+            end
+          end
+          method_name = name
         end
 
         # Skip whitespace

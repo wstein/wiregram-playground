@@ -50,14 +50,18 @@ module Warp::Lang::Crystal
       if payload = node.method_payload
         parts << "name=#{payload.name.inspect}"
         unless payload.params.empty?
-          parts << "params=[#{payload.params.map { |p| "#{p.name}:#{p.type ? p.type : \"untyped\"}" }.join(", ")}]"
+          param_list = payload.params.map do |p|
+            t = p.type ? p.type : "untyped"
+            "#{p.name}:#{t}"
+          end.join(", ")
+          parts << "params=[#{param_list}]"
         end
         if payload.return_type
           parts << "return=#{payload.return_type}"
         end
         if payload.original_source
           # Show a short snippet of original source for context
-          parts << "orig=#{format_text(payload.original_source, 120)}"
+          parts << "orig=#{format_text(payload.original_source.not_nil!, 120)}"
         end
       end
 

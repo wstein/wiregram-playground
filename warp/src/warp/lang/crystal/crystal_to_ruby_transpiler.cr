@@ -328,18 +328,28 @@ module Warp
         end
 
         private def visit_class_def(node : CST::GreenNode) : String
-          text = node.text || ""
-          transform_body(text)
+          # Visit children to ensure inner defs and nested blocks are transformed
+          parts = [] of String
+          node.children.each do |child|
+            parts << visit(child)
+          end
+          parts.join
         end
 
         private def visit_module_def(node : CST::GreenNode) : String
-          text = node.text || ""
-          transform_body(text)
+          parts = [] of String
+          node.children.each do |child|
+            parts << visit(child)
+          end
+          parts.join
         end
 
         private def visit_struct_def(node : CST::GreenNode) : String
-          text = node.text || ""
-          transform_body(text)
+          parts = [] of String
+          node.children.each do |child|
+            parts << visit(child)
+          end
+          parts.join
         end
 
         private def visit_enum_def(node : CST::GreenNode) : String
