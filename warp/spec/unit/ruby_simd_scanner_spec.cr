@@ -76,5 +76,23 @@ describe "Ruby SIMD Scanner" do
       # Should handle multi-line code
       (scanner.error == Warp::Core::ErrorCode::Success || indices.size > 0).should be_true
     end
+
+    it "detects heredoc start markers" do
+      code = "<<~EOF\nhello\nEOF\n"
+      scanner = Warp::Lang::Ruby::SimdScanner.new(code.to_slice)
+      indices = scanner.scan
+
+      bytes = code.to_slice
+      indices.any? { |idx| idx < bytes.size && bytes[idx]? == '<'.ord.to_u8 }.should be_true
+    end
+
+    it "detects string interpolation markers" do
+      code = %Q{puts "\#{name}"}
+      scanner = Warp::Lang::Ruby::SimdScanner.new(code.to_slice)
+      indices = scanner.scan
+
+      bytes = code.to_slice
+      indices.any? { |idx| idx < bytes.size && bytes[idx]? == '#'.ord.to_u8 }.should be_true
+    end
   end
 end

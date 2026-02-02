@@ -5,8 +5,8 @@
 This document describes the enhanced SIMD scanning path for JSON that extends the base structural scan with:
 
 - Number boundary detection (digits + dot + exponent markers)
-- Identifier boundary detection (ASCII letters + underscore)
-- Unicode letter detection (UTF-8 leading bytes)
+- Word boundary detection (ASCII letters + underscore)
+- UTF-8 leading byte detection (non-ASCII)
 
 The enhanced scan is designed to be backward compatible with the existing structural scan and can be enabled via the CLI.
 
@@ -17,8 +17,8 @@ The enhanced scan is designed to be backward compatible with the existing struct
 The SIMD masks now include additional fields:
 
 - `number` — digits and number markers (`0-9`, `.`, `e`, `E`)
-- `identifier` — ASCII letters and underscore
-- `unicode_letter` — UTF-8 leading bytes (non-ASCII)
+- `word` — ASCII letters and underscore
+- `utf8_lead` — UTF-8 leading bytes (non-ASCII)
 
 These masks are computed in all backends, with scalar fallback where SIMD-specific logic is not yet implemented.
 
@@ -28,8 +28,8 @@ A new scanner is available at `src/warp/lexer/enhanced_simd_scan.cr`:
 
 - Uses the existing string and UTF-8 validators
 - Preserves the existing JSON structural indices
-- Adds number and identifier boundary starts outside string regions
-- Adds Unicode letter detection inside string regions
+- Adds number and word boundary starts outside string regions
+- Detects UTF-8 leading bytes for later-stage semantic processing
 
 == CLI Usage
 

@@ -81,5 +81,14 @@ describe "Crystal SIMD Scanner" do
       # Should detect the @ character for annotations
       indices.should_not be_empty
     end
+
+    it "detects Crystal macro delimiters" do
+      code = "{{name}}"
+      scanner = Warp::Lang::Crystal::SimdScanner.new(code.to_slice)
+      indices = scanner.scan
+
+      bytes = code.to_slice
+      indices.any? { |idx| idx < bytes.size && bytes[idx]? == '{'.ord.to_u8 }.should be_true
+    end
   end
 end

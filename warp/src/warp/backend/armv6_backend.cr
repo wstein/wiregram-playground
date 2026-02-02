@@ -65,8 +65,8 @@ module Warp
           whitespace |= ~0_u64 << block_len
         end
 
-        number, identifier, unicode_letter = compute_extra_masks(ptr, block_len)
-        Lexer::Masks.new(backslash, quote, whitespace, op, control, number, identifier, unicode_letter)
+        number, word, utf8_lead = compute_extra_masks(ptr, block_len)
+        Lexer::Masks.new(backslash, quote, whitespace, op, control, number, word, utf8_lead)
       end
 
       # Check if 16 bytes are all ASCII digits

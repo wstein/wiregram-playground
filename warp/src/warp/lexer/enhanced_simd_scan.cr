@@ -17,7 +17,7 @@ module Warp
         error = ErrorCode::Success
 
         prev_number = 0_u64
-        prev_identifier = 0_u64
+        prev_word = 0_u64
 
         offset = 0
         while offset < len
@@ -33,21 +33,19 @@ module Warp
           block = scanner.next(masks.backslash, masks.quote, masks.whitespace, masks.op)
 
           number_mask = masks.number
-          identifier_mask = masks.identifier | masks.unicode_letter
+          word_mask = masks.word
 
           number_start = number_mask & ~((number_mask << 1) | prev_number)
-          identifier_start = identifier_mask & ~((identifier_mask << 1) | prev_identifier)
+          word_start = word_mask & ~((word_mask << 1) | prev_word)
 
           prev_number = number_mask >> 63
-          prev_identifier = identifier_mask >> 63
+          prev_word = word_mask >> 63
 
           outside_string = ~block.strings.in_string
-          unicode_in_string = masks.unicode_letter & block.strings.in_string
 
           structural = block.structural_start
           structural |= number_start & outside_string
-          structural |= identifier_start & outside_string
-          structural |= unicode_in_string
+          structural |= word_start & outside_string
 
           if block_len < 64
             structural &= (1_u64 << block_len) - 1_u64

@@ -245,8 +245,8 @@ module Warp
       getter op : UInt64
       getter control : UInt64
       getter number : UInt64
-      getter identifier : UInt64
-      getter unicode_letter : UInt64
+      getter word : UInt64
+      getter utf8_lead : UInt64
 
       def initialize(
         @backslash : UInt64,
@@ -255,8 +255,8 @@ module Warp
         @op : UInt64,
         @control : UInt64,
         @number : UInt64,
-        @identifier : UInt64,
-        @unicode_letter : UInt64,
+        @word : UInt64,
+        @utf8_lead : UInt64,
       )
       end
     end

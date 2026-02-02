@@ -2,7 +2,7 @@ module Warp
   module Lang
     module Common
       module UnicodeSimd
-        def self.letter_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
+        def self.utf8_lead_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
           mask = 0_u64
           i = 0
           while i < block_len
