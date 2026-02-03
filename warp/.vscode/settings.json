@@ -3,6 +3,7 @@
         "/^\\./bin/warp\\.cr --help$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "./bin/warp": true
     }
 }

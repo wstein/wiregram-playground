@@ -13,11 +13,13 @@
 #### Language-Specific Pattern Detection (Phase 1 ✅ Complete)
 
 **Ruby Patterns:**
+
 - ✅ Heredoc boundaries (`<<`, `<<-`, `<<~`)
 - ✅ Regex delimiters (`/pattern/` with modifiers)
 - ✅ String interpolation (`#{...}` in double-quoted strings)
 
 **Crystal Patterns:**
+
 - ✅ Macro boundaries (`{{...}}`, `{%...%}`)
 - ✅ Annotations (`@[...]`)
 - ✅ Type boundaries (`:` in type signatures)
@@ -25,18 +27,21 @@
 #### Clean Separation (Phase 2 ✅ Complete)
 
 **SIMD Layer (Fast):**
+
 - ✅ Whitespace detection (space, tab, newline)
 - ✅ Structural characters (braces, brackets, operators)
 - ✅ UTF-8 boundary detection
 - ✅ String delimiters
 
 **Tokenization Layer (Accurate):**
+
 - ✅ Keywords and identifiers
 - ✅ Number parsing
 - ✅ Comment recognition
 - ✅ Complex escape sequences
 
 **Pattern Analysis Layer (Optional):**
+
 - ✅ Ruby-specific patterns via `detect_*` methods
 - ✅ Crystal-specific patterns via `detect_*` methods
 - ✅ CLI integration: `warp detect patterns --lang ruby/crystal`
@@ -48,6 +53,7 @@
 ### Phase 5.1: Benchmark Suite (Weeks 1-2)
 
 #### Objective
+
 Establish baseline performance metrics against real-world codebases and identify optimization opportunities.
 
 #### Deliverables
@@ -58,6 +64,7 @@ Establish baseline performance metrics against real-world codebases and identify
    - JSON benchmarks: Real API responses, config files (1-20 MB)
 
 2. **Benchmark Tool** (`spec/benchmarks/comprehensive_bench.cr`)
+
    ```crystal
    # Measures:
    # - Throughput (MB/s) per language
@@ -87,6 +94,7 @@ Establish baseline performance metrics against real-world codebases and identify
    - Historical trend tracking
 
 #### Success Metrics
+
 - All benchmarks run successfully
 - Baseline established for all languages
 - No performance regressions from Phase 4
@@ -97,11 +105,13 @@ Establish baseline performance metrics against real-world codebases and identify
 ### Phase 5.2: Critical Path Optimization (Weeks 3-4)
 
 #### Objective
+
 Optimize the most frequently executed code paths based on profiling data.
 
 #### Priority 1: Whitespace Mask Computation (Est. 15-20% of runtime)
 
 **Current Implementation** (scalar):
+
 ```crystal
 # In backend.build_masks()
 i = 0
@@ -116,6 +126,7 @@ end
 ```
 
 **Optimizations:**
+
 - ✅ Already using SIMD in SSE2/NEON/AVX2 backends
 - [ ] Verify SIMD is actually being used (not falling back to scalar)
 - [ ] Profile actual vs. theoretical performance
@@ -124,6 +135,7 @@ end
 #### Priority 2: UTF-8 Validation (Est. 10-15% of runtime)
 
 **Current Implementation** (scalar state machine):
+
 ```crystal
 # Validates multi-byte sequences
 if remaining == 0
@@ -136,6 +148,7 @@ end
 ```
 
 **Optimizations:**
+
 - [ ] SIMD-accelerated UTF-8 validation (similar to simdjson)
 - [ ] Vectorized 16-byte chunk validation
 - [ ] Fallback to scalar for partial blocks
@@ -143,6 +156,7 @@ end
 #### Priority 3: Structural Character Detection (Est. 20-25% of runtime)
 
 **Current Implementation** (backend-specific):
+
 ```crystal
 # Braces, brackets, operators
 case c
@@ -152,6 +166,7 @@ end
 ```
 
 **Optimizations:**
+
 - [ ] Compare and merge backend-specific optimizations
 - [ ] SIMD shuffle tables for character classification
 - [ ] Vectorized bracket/brace tracking
@@ -159,6 +174,7 @@ end
 #### Priority 4: String Scanning (Est. 15-20% of runtime)
 
 **Current Implementation** (escape scanner + bitmasks):
+
 ```crystal
 # Uses escape_scanner + string state machine
 escaped = escape_scanner.next(backslash).escaped
@@ -166,6 +182,7 @@ unescaped = quote & ~escaped
 ```
 
 **Optimizations:**
+
 - [ ] Vectorized escape detection
 - [ ] SIMD string boundary finding
 - [ ] Branch prediction friendly loop structure
@@ -175,6 +192,7 @@ unescaped = quote & ~escaped
 ### Phase 5.3: Memory & Cache Optimization (Week 5)
 
 #### Objective
+
 Reduce memory footprint and improve cache efficiency.
 
 #### Deliverables
@@ -199,6 +217,7 @@ Reduce memory footprint and improve cache efficiency.
 ### Phase 5.4: Vectorization Enhancements (Week 6)
 
 #### Objective
+
 Extend SIMD acceleration to more code paths.
 
 #### Deliverables
@@ -223,6 +242,7 @@ Extend SIMD acceleration to more code paths.
 ### Phase 5.5: Production Readiness (Week 7)
 
 #### Objective
+
 Prepare for production deployment with stability and monitoring.
 
 #### Deliverables
@@ -253,47 +273,55 @@ Prepare for production deployment with stability and monitoring.
 ## Recommended Implementation Order
 
 ### Week 1: Foundation
+
 1. Set up benchmark infrastructure
 2. Collect real-world test corpus
 3. Establish baseline metrics
 
 ### Week 2: Analysis
+
 4. Profile existing performance
-5. Identify bottlenecks
-6. Rank optimization opportunities
+2. Identify bottlenecks
+3. Rank optimization opportunities
 
 ### Week 3: Optimization
+
 7. Implement Priority 1-2 optimizations
-8. Measure improvement
-9. Profile again for remaining bottlenecks
+2. Measure improvement
+3. Profile again for remaining bottlenecks
 
 ### Week 4: Refinement
+
 10. Implement Priority 3-4 optimizations
-11. Memory/cache optimization
-12. Cross-backend optimization
+2. Memory/cache optimization
+3. Cross-backend optimization
 
 ### Week 5: Polish
+
 13. Edge case testing
-14. Production readiness checks
-15. Documentation
+2. Production readiness checks
+3. Documentation
 
 ---
 
 ## Success Criteria for Phase 5
 
 ### Performance
+
 - [ ] Baseline benchmarks established for all languages
 - [ ] No regressions from Phase 4
 - [ ] ≥5% improvement in identified hot paths
 - [ ] Consistent performance across file sizes
 
 ### Quality
+
 - [ ] All existing tests pass
 - [ ] New edge case tests added
 - [ ] Security audit completed
 - [ ] Code reviewed for production readiness
 
 ### Documentation
+
 - [ ] Architecture documented
 - [ ] Performance tuning guide published
 - [ ] Benchmark results public
@@ -328,12 +356,14 @@ Prepare for production deployment with stability and monitoring.
 ## Files to Create/Modify in Phase 5
 
 ### New Files
+
 - `spec/benchmarks/comprehensive_bench.cr` - Full benchmark suite
 - `papers/performance/2026-02-10-01_phase5_benchmark_results.adoc` - Results
 - `PERFORMANCE_TUNING_GUIDE.md` - User-facing optimization guide
 - `ARCHITECTURE_DEEP_DIVE.md` - Technical deep dive
 
 ### Modified Files
+
 - `src/warp/backend/backend.cr` - Optimization placeholders
 - `src/warp/lexer/structural_scan.cr` - Performance improvements
 - `spec/benchmarks/simd_bench.cr` - Expanded benchmarks
@@ -363,4 +393,3 @@ Prepare for production deployment with stability and monitoring.
 ---
 
 **Status**: Ready for Planning & Prioritization ✅
-

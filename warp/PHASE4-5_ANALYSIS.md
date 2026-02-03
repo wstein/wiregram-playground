@@ -31,6 +31,7 @@ Your recommendations suggested:
 ### Phase 2: Clean Separation
 
 Your recommendations suggested:
+
 ```
 1. Keep complex patterns in tokenization - Numbers, identifiers, keywords, comments
 2. Use SIMD for boundary detection - Quickly identify regions for detailed tokenization
@@ -89,6 +90,7 @@ end
 ```
 
 **Assessment:**
+
 - ✅ Already covers most needs (whitespace, quote, structural via `op`)
 - ⏳ Language-specific masks could improve performance further
 - ⚠️ Would require architectural changes to all backends
@@ -124,33 +126,42 @@ This is exactly what Phase 4 implemented! ✅
 Based on the current architecture being solid, Phase 5 should focus on:
 
 ### Phase 5.1: Benchmark Suite (Weeks 1-2) 🎯
+
 Establish baseline performance metrics against real-world codebases:
+
 - Ruby: Rails, Sinatra, Bundler (10-100 MB test corpus)
 - Crystal: Crystal stdlib, compiler (5-50 MB)
 - JSON: Real API responses (1-20 MB)
 - **Target**: Identify current performance ceiling and optimization opportunities
 
 ### Phase 5.2: Critical Path Optimization (Weeks 3-4) ⚡
+
 Optimize the ~80% of runtime in:
+
 1. Whitespace mask computation (15-20%)
 2. UTF-8 validation (10-15%)
 3. Structural character detection (20-25%)
 4. String scanning (15-20%)
+
 - **Target**: 5-10% improvement through code path optimization
 
 ### Phase 5.3: Memory & Cache (Week 5) 💾
+
 - Profile allocation patterns
 - Optimize cache locality
 - Reduce memory footprint
 - **Target**: No memory regressions despite more features
 
 ### Phase 5.4: Vectorization Enhancements (Week 6) 📊
+
 Implement language-specific mask optimization (your recommendations!):
+
 - Enhanced Ruby masks (heredoc_start, symbol_markers)
 - Enhanced Crystal masks (macro_start/end, annotation markers)
 - **Target**: 5-15% improvement through specialized SIMD
 
 ### Phase 5.5: Production Readiness (Week 7) 🚀
+
 - Error handling & edge cases
 - Observability & monitoring
 - Security audit
@@ -161,17 +172,20 @@ Implement language-specific mask optimization (your recommendations!):
 
 ## Implementation Priority for Phase 5
 
-### If Focusing on Performance (Weeks 1-4):
+### If Focusing on Performance (Weeks 1-4)
+
 1. Benchmark suite (understand current state)
 2. Critical path optimization (quick wins)
 3. Move language-specific masks to Phase 5.4
 
-### If Focusing on Features (Weeks 3-5):
+### If Focusing on Features (Weeks 3-5)
+
 1. Skip early benchmarking
 2. Implement language-specific masks immediately
 3. Then benchmark improvements
 
-### If Focusing on Stability (Weeks 1-7):
+### If Focusing on Stability (Weeks 1-7)
+
 1. Comprehensive benchmarks
 2. Edge case testing
 3. Security audit
@@ -182,9 +196,11 @@ Implement language-specific mask optimization (your recommendations!):
 ## Files Created/Modified This Session
 
 ### New Files
+
 - ✅ `PHASE5_ROADMAP.md` - Complete Phase 5 planning document
 
 ### Phase 4 Completion
+
 - ✅ `src/warp/cli/runner.cr` - CLI detect patterns command
 - ✅ `PHASE4_COMPLETION.md` - Phase 4 summary
 - ✅ All tests passing (50/50)
@@ -195,18 +211,21 @@ Implement language-specific mask optimization (your recommendations!):
 
 **Option A: Performance First** (Recommended if you want production-grade system)
 → Start Phase 5.1 (Benchmark Suite) this week
+
 - Gives objective data for all future decisions
 - Identifies real vs. theoretical bottlenecks
 - Prevents optimizing wrong code paths
 
 **Option B: Features First** (Recommended if you want more language support)
 → Implement language-specific masks in Phase 5.4
+
 - Implement your RubyMasks and CrystalMasks suggestions
 - Extend to Python, JavaScript, Go in later phases
 - Build extensible foundation
 
 **Option C: Stability First** (Recommended if deploying to production soon)
 → Focus on Phase 5.5 (Production Readiness)
+
 - Comprehensive edge case testing
 - Security audit
 - Error handling for pathological inputs
@@ -223,6 +242,7 @@ Your architectural recommendations are **spot-on** and largely already implement
 ✅ Achieves 5-20x performance improvements  
 
 Phase 5 should focus on either:
+
 1. **Performance optimization** (benchmark → profile → optimize)
 2. **Feature expansion** (language-specific masks → more languages)
 3. **Production hardening** (edge cases → security → observability)
@@ -238,4 +258,3 @@ All three are valuable; choice depends on your deployment timeline and prioritie
 3. **Then**: Decide optimization priorities based on data
 
 Would you like me to start implementing Phase 5.1 (Benchmark Suite)?
-
