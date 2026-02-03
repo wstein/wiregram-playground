@@ -265,6 +265,7 @@ YAML
       end
 
       config = ConfigLoader.load(config_path)
+      transpiler_config = ConfigLoader.load_transpiler_config(config_path)
 
       # Announce which config file is being used (or if none found)
       used_config : String? = nil
@@ -323,7 +324,7 @@ YAML
 
       # Handle --inspect flag for single file debugging
       if inspect && files.size == 1
-        inspect_transpilation_pipeline(files[0], target, config)
+        inspect_transpilation_pipeline(files[0], target, config, transpiler_config)
         return 0
       end
 
@@ -357,7 +358,7 @@ YAML
 
         stats_chan = Channel(Tuple(Bool, Int32)).new(files.size)
         processor.process_files(files) do |path|
-          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dry_run, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dry_run, verbose, transpiler_config)
           stats_chan.send({ok, out_count})
         end
 
@@ -373,7 +374,7 @@ YAML
       else
         # Sequential processing
         files.each_with_index do |path, i|
-          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dry_run, verbose)
+          ok, out_count = process_file(path, output_root, target, config, extra_rbs, extra_rbi, inline_rbs, generate_rbs, generate_rbi, stdout, rbs_output_root, rbi_output_root, dry_run, verbose, transpiler_config)
           if ok
             success_count += 1
           else
@@ -2115,6 +2116,7 @@ YAML
       rbi_output_root : String? = nil,
       dry_run : Bool = false,
       verbose : Bool = false,
+      transpiler_config : Warp::Lang::Ruby::TranspilerConfig? = nil,
     ) : Tuple(Bool, Int32)
       source = File.read(path)
       bytes = source.to_slice
@@ -2124,7 +2126,7 @@ YAML
       rbi_output_dir = rbi_output_root || config.rbi_output_dir
       case target
       when TranspileTarget::Ruby
-        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes, path)
+        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes, path, transpiler_config)
         if result.error != Warp::Core::ErrorCode::Success
           puts "Transpile error (Crystal->Ruby): #{path}"
           result.diagnostics.each { |d| puts "  - #{d}" }
@@ -2488,7 +2490,7 @@ YAML
       end
     end
 
-    private def self.inspect_transpilation_pipeline(file_path : String, target : TranspileTarget, config : ProjectConfig) : Nil
+    private def self.inspect_transpilation_pipeline(file_path : String, target : TranspileTarget, config : ProjectConfig, transpiler_config : Warp::Lang::Ruby::TranspilerConfig? = nil) : Nil
       unless File.exists?(file_path) && File.file?(file_path)
         puts "Error: File not found: #{file_path}"
         return
@@ -2538,7 +2540,7 @@ YAML
         puts
 
         puts "[TRANSPILING Crystal -> Ruby]"
-        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes)
+        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes, file_path, transpiler_config)
         if result.error != Warp::Core::ErrorCode::Success
           puts "ERROR: Transpilation failed (#{result.error})"
           return

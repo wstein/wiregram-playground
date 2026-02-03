@@ -3,6 +3,14 @@
 
 version: 1.0
 
+# Debug configuration
+debug:
+  parser_errors: true # Report parser errors instead of silently falling back
+  lexer_errors: true # Report lexer errors with details
+  cst_fallback: false # Disable silent RawText fallback on parse failures
+  verbose_tokens: false # Log all tokenization steps (very verbose)
+  show_cst_tree: false # Display CST tree structure for debugging
+
 # Target languages and their configurations
 targets:
   crystal:

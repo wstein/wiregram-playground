@@ -15,19 +15,24 @@ module Warp
         end
 
         def self.transpile(bytes : Bytes, path : String? = nil, config : Warp::Lang::Ruby::TranspilerConfig? = nil) : Result
+          # Create debug context from config
+          debug = DebugContext.from_config(config)
+
           # Step 1: Lex Crystal source
           tokens, lex_error, lex_pos = Lexer.scan(bytes)
           if lex_error != Warp::Core::ErrorCode::Success
+            debug.report_lexer_error("scanning failed at position #{lex_pos}", lex_pos)
             diag = Warp::Diagnostics.lex_error("lex error", bytes, lex_pos, path)
-            return Result.new("", lex_error, [diag.to_s], tokens)
+            return Result.new("", lex_error, [diag.to_s] + debug.diagnostics, tokens)
           end
 
           # Step 2: Parse Crystal to CST
-          crystal_root, parse_error = CST::Parser.parse(bytes, tokens)
+          crystal_root, parse_error = CST::Parser.parse(bytes, tokens, debug)
           if parse_error != Warp::Core::ErrorCode::Success
-            return Result.new("", parse_error, ["parse error"])
+            debug.report_parser_error("failed to parse Crystal source")
+            return Result.new("", parse_error, ["parse error"] + debug.diagnostics)
           end
-          return Result.new("", Warp::Core::ErrorCode::UnexpectedError, ["nil CST root"]) if crystal_root.nil?
+          return Result.new("", Warp::Core::ErrorCode::UnexpectedError, ["nil CST root"] + debug.diagnostics) if crystal_root.nil?
 
           # Step 3: Transform Crystal CST to Ruby output via visitor
           cfg = config || Warp::Lang::Ruby::TranspilerConfig.new
@@ -37,7 +42,7 @@ module Warp
           # Step 4: Remove Crystal numeric type suffixes from the final output
           ruby_output = remove_numeric_suffixes(ruby_output)
 
-          Result.new(ruby_output, Warp::Core::ErrorCode::Success, [] of String)
+          Result.new(ruby_output, Warp::Core::ErrorCode::Success, debug.diagnostics)
         end
 
         private def self.remove_numeric_suffixes(text : String) : String

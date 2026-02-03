@@ -110,15 +110,36 @@ module Warp::Lang::Crystal
       @bytes : Bytes
       @tokens : Array(Warp::Lang::Crystal::Token)
       @pos : Int32
+      @debug : DebugContext?
 
-      def initialize(@bytes, @tokens)
+      def initialize(@bytes, @tokens, @debug = nil)
         @pos = 0
       end
 
-      def self.parse(bytes : Bytes, tokens : Array(Warp::Lang::Crystal::Token)) : Tuple(GreenNode?, Warp::Core::ErrorCode)
-        parser = new(bytes, tokens)
+      def self.parse(bytes : Bytes, tokens : Array(Warp::Lang::Crystal::Token), debug : DebugContext? = nil) : Tuple(GreenNode?, Warp::Core::ErrorCode)
+        parser = new(bytes, tokens, debug)
         root = parser.parse_program
         {root, Warp::Core::ErrorCode::Success}
+      end
+
+      private def report_raw_text(reason : String) : GreenNode?
+        # Report debug info about the fallback
+        if debug = @debug
+          preview = if @pos < @tokens.size
+                      tok = current
+                      String.new(@bytes[tok.start, Math.min(tok.length, 50)])
+                    else
+                      "<end of file>"
+                    end
+          debug.report_raw_text_fallback(reason, (@pos < @tokens.size ? current.start : -1), preview)
+
+          # In strict mode, don't allow RawText fallback
+          if debug.strict_mode?
+            # Instead of creating RawText, return nil to signal parse failure
+            return nil
+          end
+        end
+        nil # Continue with normal fallback behavior
       end
 
       def parse_program : GreenNode
@@ -131,6 +152,7 @@ module Warp::Lang::Crystal
           when TokenKind::Def
             # Capture any preceding text as RawText
             if last_pos < current.start
+              report_raw_text("unparsed content before def")
               raw_text = String.new(@bytes[last_pos, current.start - last_pos])
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
             end
@@ -140,6 +162,7 @@ module Warp::Lang::Crystal
           when TokenKind::Class
             # Capture any preceding text as RawText
             if last_pos < current.start
+              report_raw_text("unparsed content before class")
               raw_text = String.new(@bytes[last_pos, current.start - last_pos])
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
             end
@@ -148,6 +171,7 @@ module Warp::Lang::Crystal
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Module
             if last_pos < current.start
+              report_raw_text("unparsed content before module")
               raw_text = String.new(@bytes[last_pos, current.start - last_pos])
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
             end
@@ -155,6 +179,7 @@ module Warp::Lang::Crystal
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Struct
             if last_pos < current.start
+              report_raw_text("unparsed content before struct")
               raw_text = String.new(@bytes[last_pos, current.start - last_pos])
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
             end
@@ -162,6 +187,7 @@ module Warp::Lang::Crystal
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Enum
             if last_pos < current.start
+              report_raw_text("unparsed content before enum")
               raw_text = String.new(@bytes[last_pos, current.start - last_pos])
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
             end
@@ -169,6 +195,7 @@ module Warp::Lang::Crystal
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Macro
             if last_pos < current.start
+              report_raw_text("unparsed content before macro")
               raw_text = String.new(@bytes[last_pos, current.start - last_pos])
               children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
             end
@@ -182,6 +209,7 @@ module Warp::Lang::Crystal
 
         # Capture any remaining text as RawText
         if last_pos < @bytes.size
+          report_raw_text("trailing unparsed content at end of file")
           raw_text = String.new(@bytes[last_pos, @bytes.size - last_pos])
           children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
         end

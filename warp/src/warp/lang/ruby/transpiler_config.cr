@@ -183,5 +183,51 @@ module Warp::Lang::Ruby
       end
       result
     end
+
+    # Debug configuration getters
+    def debug_parser_errors? : Bool
+      debug_config = @config["debug"]?
+      return false unless debug_config
+      debug_config_h = debug_config.as_h?
+      return false unless debug_config_h
+      val = debug_config_h["parser_errors"]?
+      val ? val.as_bool? || false : false
+    end
+
+    def debug_lexer_errors? : Bool
+      debug_config = @config["debug"]?
+      return false unless debug_config
+      debug_config_h = debug_config.as_h?
+      return false unless debug_config_h
+      val = debug_config_h["lexer_errors"]?
+      val ? val.as_bool? || false : false
+    end
+
+    def debug_cst_fallback? : Bool
+      debug_config = @config["debug"]?
+      return true unless debug_config # Default to allowing fallback
+      debug_config_h = debug_config.as_h?
+      return true unless debug_config_h
+      val = debug_config_h["cst_fallback"]?
+      val ? val.as_bool? || true : true
+    end
+
+    def debug_verbose_tokens? : Bool
+      debug_config = @config["debug"]?
+      return false unless debug_config
+      debug_config_h = debug_config.as_h?
+      return false unless debug_config_h
+      val = debug_config_h["verbose_tokens"]?
+      val ? val.as_bool? || false : false
+    end
+
+    def debug_show_cst_tree? : Bool
+      debug_config = @config["debug"]?
+      return false unless debug_config
+      debug_config_h = debug_config.as_h?
+      return false unless debug_config_h
+      val = debug_config_h["show_cst_tree"]?
+      val ? val.as_bool? || false : false
+    end
   end
 end

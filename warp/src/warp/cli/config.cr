@@ -88,5 +88,10 @@ module Warp::CLI
 
       ProjectConfig.new(["**/*.rb", "**/*.cr"], [] of String, "out", "out", "out", "out", "out", false, false, {} of String => String, [] of String, [] of String, true)
     end
+
+    def self.load_transpiler_config(path : String?) : Warp::Lang::Ruby::TranspilerConfig
+      config_path = path || ".warp.yaml"
+      Warp::Lang::Ruby::TranspilerConfig.new(config_path)
+    end
   end
 end
