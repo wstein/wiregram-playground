@@ -331,12 +331,8 @@ module Warp::Lang::Crystal
         params = [] of ParamInfo
         had_parens = false
 
-        # Skip whitespace
-        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
-          advance
-        end
-
         # Get method name (support `self.method` and simple identifiers)
+        # Don't skip newlines yet - might have params/return type on same line
         if current.kind == TokenKind::Identifier
           method_name = String.new(@bytes[current.start, current.length])
           advance
@@ -354,12 +350,13 @@ module Warp::Lang::Crystal
           method_name = name
         end
 
-        # Skip whitespace
-        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
-          advance
-        end
+        # After method name, current might be:
+        # - LParen (parameters)
+        # - Colon (return type)
+        # - Newline (end of header)
+        # - Something else (implicit end of header)
 
-        # Parse parameters
+        # Parse parameters if present
         if current.kind == TokenKind::LParen
           had_parens = true
           advance # consume '('
@@ -370,16 +367,16 @@ module Warp::Lang::Crystal
               param_type : String? = nil
               advance
 
-              # Skip whitespace
-              while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+              # Skip newlines
+              while @pos < @tokens.size && current.kind == TokenKind::Newline
                 advance
               end
 
               # Check for type annotation (: Type)
               if current.kind == TokenKind::Colon
                 advance
-                # Skip whitespace
-                while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+                # Skip newlines
+                while @pos < @tokens.size && current.kind == TokenKind::Newline
                   advance
                 end
 
@@ -406,9 +403,7 @@ module Warp::Lang::Crystal
                   type_tokens = @tokens[type_start...@pos]
                   type_text = String.build do |io|
                     type_tokens.each do |t|
-                      if t.kind != TokenKind::Whitespace
-                        io << String.new(@bytes[t.start, t.length])
-                      end
+                      io << String.new(@bytes[t.start, t.length])
                     end
                   end
                   param_type = type_text
@@ -418,14 +413,14 @@ module Warp::Lang::Crystal
               params << ParamInfo.new(param_name, param_type)
 
               # Skip whitespace
-              while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+              while @pos < @tokens.size && current.kind == TokenKind::Newline
                 advance
               end
 
               # Skip comma
               if current.kind == TokenKind::Comma
                 advance
-                while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+                while @pos < @tokens.size && current.kind == TokenKind::Newline
                   advance
                 end
               end
@@ -437,21 +432,16 @@ module Warp::Lang::Crystal
           advance if current.kind == TokenKind::RParen
         end
 
-        # Skip whitespace and check for return type
-        return_type : String? = nil
-        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
-          advance
-        end
-
         # Check for return type annotation (: Type)
+        return_type : String? = nil
         if current.kind == TokenKind::Colon
           advance
-          # Skip whitespace
-          while @pos < @tokens.size && current.kind == TokenKind::Whitespace
+          # Skip newlines
+          while @pos < @tokens.size && current.kind == TokenKind::Newline
             advance
           end
 
-          # Collect return type tokens until newline
+          # Collect return type tokens until newline or semicolon
           type_start = @pos
           while @pos < @tokens.size && current.kind != TokenKind::Newline
             advance
@@ -462,16 +452,15 @@ module Warp::Lang::Crystal
             type_tokens = @tokens[type_start...@pos]
             type_text = String.build do |io|
               type_tokens.each do |t|
-                if t.kind != TokenKind::Whitespace
-                  io << String.new(@bytes[t.start, t.length])
-                end
+                io << String.new(@bytes[t.start, t.length])
               end
             end
             return_type = type_text
           end
         end
 
-        # Skip to end of header (usually newline)
+        # Now we should be at Newline (end of header) or EOF
+        # Skip to end of header line (handle single-line methods like `def foo; end`)
         while @pos < @tokens.size && current.kind != TokenKind::Newline
           advance
         end
@@ -482,8 +471,13 @@ module Warp::Lang::Crystal
         end
 
         # Collect body until 'end'
+        # Include trivia (whitespace) from first token of body
         body_start = @pos
-        body_byte_start = current.start
+        body_byte_start = if !current.trivia.empty?
+                            current.trivia.first.start
+                          else
+                            current.start
+                          end
 
         while @pos < @tokens.size && current.kind != TokenKind::End
           advance
@@ -505,7 +499,7 @@ module Warp::Lang::Crystal
 
       private def collect_trivia : Array(Warp::Lang::Crystal::Trivia)
         return [] of Warp::Lang::Crystal::Trivia if @pos >= @tokens.size
-        current.leading_trivia
+        current.trivia
       end
 
       private def current : Warp::Lang::Crystal::Token
@@ -519,7 +513,7 @@ module Warp::Lang::Crystal
 
       private def collect_trivia : Array(Warp::Lang::Crystal::Trivia)
         return [] of Warp::Lang::Crystal::Trivia if @pos >= @tokens.size
-        current.leading_trivia
+        current.trivia
       end
 
       private def current : Warp::Lang::Crystal::Token

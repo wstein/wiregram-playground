@@ -133,15 +133,13 @@ module Warp
         property kind : TokenKind
         property start : Int32
         property length : Int32
-        property leading_trivia : Array(Trivia)
-        property trailing_trivia : Array(Trivia)
+        property trivia : Array(Trivia)
 
         def initialize(
           @kind : TokenKind,
           @start : Int32,
           @length : Int32,
-          @leading_trivia : Array(Trivia) = [] of Trivia,
-          @trailing_trivia : Array(Trivia) = [] of Trivia,
+          @trivia : Array(Trivia) = [] of Trivia,
         )
         end
       end

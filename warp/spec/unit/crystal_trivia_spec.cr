@@ -10,17 +10,17 @@ describe "Crystal lexer trivia" do
 
     id_tok = tokens.find { |t| t.kind == Warp::Lang::Crystal::TokenKind::Identifier }
     id_tok.should_not be_nil
-    id_tok.not_nil!.leading_trivia.any? { |tr| tr.kind == Warp::Lang::Crystal::TriviaKind::Whitespace }.should be_true
+    id_tok.not_nil!.trivia.any? { |tr| tr.kind == Warp::Lang::Crystal::TriviaKind::Whitespace }.should be_true
   end
 
-  it "attaches comments as trailing trivia" do
+  it "attaches comments as leading trivia on newline" do
     bytes = %(def foo #comment
 end).to_slice
     tokens, err, _pos = Warp::Lang::Crystal::Lexer.scan(bytes)
     err.success?.should be_true
 
-    id_tok = tokens.find { |t| t.kind == Warp::Lang::Crystal::TokenKind::Identifier }
-    id_tok.should_not be_nil
-    id_tok.not_nil!.trailing_trivia.any? { |tr| tr.kind == Warp::Lang::Crystal::TriviaKind::CommentLine }.should be_true
+    newline_tok = tokens.find { |t| t.kind == Warp::Lang::Crystal::TokenKind::Newline }
+    newline_tok.should_not be_nil
+    newline_tok.not_nil!.trivia.any? { |tr| tr.kind == Warp::Lang::Crystal::TriviaKind::CommentLine }.should be_true
   end
 end

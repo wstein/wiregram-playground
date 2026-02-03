@@ -10,26 +10,26 @@ describe "Ruby lexer trivia" do
 
     string_tok = tokens.find { |t| t.kind == Warp::Lang::Ruby::TokenKind::String }
     string_tok.should_not be_nil
-    string_tok.not_nil!.leading_trivia.size.should be > 0
+    string_tok.not_nil!.trivia.size.should be > 0
   end
 
-  it "attaches comments as trailing trivia" do
+  it "attaches comments as leading trivia on EOF" do
     bytes = %(require "x" #comment).to_slice
     tokens, err, _pos = Warp::Lang::Ruby::Lexer.scan(bytes)
     err.success?.should be_true
 
-    string_tok = tokens.find { |t| t.kind == Warp::Lang::Ruby::TokenKind::String }
-    string_tok.should_not be_nil
-    string_tok.not_nil!.trailing_trivia.any? { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }.should be_true
+    eof_tok = tokens.last
+    eof_tok.kind.should eq(Warp::Lang::Ruby::TokenKind::Eof)
+    eof_tok.trivia.any? { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }.should be_true
   end
 
-  it "attaches whitespace before newline as trailing trivia" do
+  it "attaches whitespace before newline to the newline token" do
     bytes = %(a  \n b).to_slice
     tokens, err, _pos = Warp::Lang::Ruby::Lexer.scan(bytes)
     err.success?.should be_true
 
-    first_id = tokens.find { |t| t.kind == Warp::Lang::Ruby::TokenKind::Identifier }
-    first_id.should_not be_nil
-    first_id.not_nil!.trailing_trivia.any? { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::Whitespace }.should be_true
+    newline_tok = tokens.find { |t| t.kind == Warp::Lang::Ruby::TokenKind::Newline }
+    newline_tok.should_not be_nil
+    newline_tok.not_nil!.trivia.any? { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::Whitespace }.should be_true
   end
 end

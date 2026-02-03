@@ -19,7 +19,7 @@ This guide captures how we steward the `ports/`, Ruby, and Crystal code in the W
 
 ## 2.1 Trivia-Based Tokens (Whitespace & Comments)
 
-Warp uses trivia-aware tokens for Ruby and Crystal lexers. Whitespace and comments are collected as trivia and attached to tokens as `leading_trivia` or `trailing_trivia` instead of being emitted as standalone whitespace tokens. Newlines remain tokens for grammar-sensitive parsing.
+Warp uses trivia-aware tokens for Ruby and Crystal lexers. Whitespace and comments are collected as trivia and attached to tokens via a single `trivia` array instead of being emitted as standalone whitespace tokens. Newlines remain tokens for grammar-sensitive parsing.
 
 **Guidelines:**
 

@@ -394,26 +394,15 @@ module Warp
             pending << Trivia.new(TriviaKind::Whitespace, tok.start, tok.length)
           when TokenKind::CommentLine
             pending << Trivia.new(TriviaKind::CommentLine, tok.start, tok.length)
-          when TokenKind::Newline
+          when TokenKind::Newline, TokenKind::Eof
             if !pending.empty?
-              if result.size > 0
-                result.last.trailing_trivia.concat(pending)
-                pending.clear
-              else
-                tok.leading_trivia = pending.dup
-                pending.clear
-              end
-            end
-            result << tok
-          when TokenKind::Eof
-            if !pending.empty? && result.size > 0
-              result.last.trailing_trivia.concat(pending)
+              tok.trivia = pending.dup
               pending.clear
             end
             result << tok
           else
             if !pending.empty?
-              tok.leading_trivia = pending.dup
+              tok.trivia = pending.dup
               pending.clear
             end
             result << tok
@@ -421,7 +410,7 @@ module Warp
         end
 
         if !pending.empty? && result.size > 0
-          result.last.trailing_trivia.concat(pending)
+          result.last.trivia.concat(pending)
           pending.clear
         end
 

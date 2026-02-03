@@ -155,7 +155,7 @@ module Warp::Lang::Ruby
         children = [] of GreenNode
 
         # 1. Skip whitespace/newlines to find method name
-        while @pos < @tokens.size && (current.kind == TokenKind::Whitespace || current.kind == TokenKind::Newline)
+        while @pos < @tokens.size && current.kind == TokenKind::Newline
           advance
         end
 
@@ -167,10 +167,6 @@ module Warp::Lang::Ruby
         end
 
         # 3. Optional Parameters
-        if current.kind == TokenKind::Whitespace
-          advance
-        end
-
         if current.kind == TokenKind::LParen
           advance # (
           while @pos < @tokens.size && current.kind != TokenKind::RParen
@@ -193,7 +189,7 @@ module Warp::Lang::Ruby
 
         # 5. Body
         while @pos < @tokens.size && current.kind != TokenKind::End
-          if current.kind == TokenKind::Whitespace || current.kind == TokenKind::Newline || current.kind == TokenKind::CommentLine
+          if current.kind == TokenKind::Newline
             advance
             next
           end
@@ -314,10 +310,6 @@ module Warp::Lang::Ruby
 
         params = [] of GreenNode
         # optional whitespace
-        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
-          advance
-        end
-
         if current.kind == TokenKind::Pipe
           advance
           while @pos < @tokens.size && current.kind != TokenKind::Pipe
@@ -332,7 +324,7 @@ module Warp::Lang::Ruby
         # parse a single expression as block body (simple heuristic)
         body_node : GreenNode? = nil
         while @pos < @tokens.size && current.kind != TokenKind::RBrace
-          if current.kind == TokenKind::Whitespace || current.kind == TokenKind::Newline
+          if current.kind == TokenKind::Newline
             advance
             next
           end
@@ -401,10 +393,6 @@ module Warp::Lang::Ruby
         advance # consume require(_relative)
 
         # skip whitespace
-        while @pos < @tokens.size && current.kind == TokenKind::Whitespace
-          advance
-        end
-
         str_tok = current if current.kind == TokenKind::String
         advance if current.kind == TokenKind::String
 
@@ -420,7 +408,7 @@ module Warp::Lang::Ruby
       # Collect leading trivia (whitespace, comments, newlines)
       private def collect_trivia : Array(Trivia)
         return [] of Trivia if @pos >= @tokens.size
-        current.leading_trivia
+        current.trivia
       end
 
       private def current : Token

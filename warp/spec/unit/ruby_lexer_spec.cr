@@ -76,8 +76,7 @@ describe "Ruby Lexer" do
       error.should eq(Warp::Core::ErrorCode::Success)
       comment_count = 0
       tokens.each do |tok|
-        comment_count += tok.leading_trivia.count { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }
-        comment_count += tok.trailing_trivia.count { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }
+        comment_count += tok.trivia.count { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }
       end
       comment_count.should be >= 1
     end

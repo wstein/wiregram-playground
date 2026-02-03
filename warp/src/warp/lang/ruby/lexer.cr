@@ -11,15 +11,13 @@ module Warp
         property kind : TokenKind
         property start : Int32
         property length : Int32
-        property leading_trivia : Array(Trivia)
-        property trailing_trivia : Array(Trivia)
+        property trivia : Array(Trivia)
 
         def initialize(
           @kind : TokenKind,
           @start : Int32,
           @length : Int32,
-          @leading_trivia : Array(Trivia) = [] of Trivia,
-          @trailing_trivia : Array(Trivia) = [] of Trivia,
+          @trivia : Array(Trivia) = [] of Trivia,
         )
         end
       end
@@ -426,26 +424,15 @@ module Warp
             pending << Trivia.new(TriviaKind::CommentLine, tok.start, tok.length)
           when TokenKind::CommentBlock
             pending << Trivia.new(TriviaKind::CommentBlock, tok.start, tok.length)
-          when TokenKind::Newline
+          when TokenKind::Newline, TokenKind::Eof
             if !pending.empty?
-              if result.size > 0
-                result.last.trailing_trivia.concat(pending)
-                pending.clear
-              else
-                tok.leading_trivia = pending.dup
-                pending.clear
-              end
-            end
-            result << tok
-          when TokenKind::Eof
-            if !pending.empty? && result.size > 0
-              result.last.trailing_trivia.concat(pending)
+              tok.trivia = pending.dup
               pending.clear
             end
             result << tok
           else
             if !pending.empty?
-              tok.leading_trivia = pending.dup
+              tok.trivia = pending.dup
               pending.clear
             end
             result << tok
@@ -453,7 +440,7 @@ module Warp
         end
 
         if !pending.empty? && result.size > 0
-          result.last.trailing_trivia.concat(pending)
+          result.last.trivia.concat(pending)
           pending.clear
         end
 

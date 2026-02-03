@@ -35,7 +35,8 @@ describe "CST trivia (parser-level ignore)" do
     cst2, pe2 = Warp::Lang::Crystal::CST::Parser.parse(with_trivia.to_slice, tokens2)
     pe2.should eq(Warp::Core::ErrorCode::Success)
 
-    cst1.children.size.should eq(cst2.children.size)
-    cst1.children[0].kind.should eq(cst2.children[0].kind)
+    kinds1 = cst1.children.map(&.kind).reject { |k| k == Warp::Lang::Crystal::CST::NodeKind::RawText }
+    kinds2 = cst2.children.map(&.kind).reject { |k| k == Warp::Lang::Crystal::CST::NodeKind::RawText }
+    kinds1.should eq(kinds2)
   end
 end

@@ -75,7 +75,6 @@ module Warp::Lang::Ruby::CST
     getter children : Array(GreenNode)
     getter token : Token?
     getter leading_trivia : Array(Token)
-    getter trailing_trivia : Array(Token)?
   end
 
   class RedNode

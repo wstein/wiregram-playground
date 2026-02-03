@@ -3,7 +3,7 @@
 :toclevels: 3
 
 == Overview
-Warp now supports trivia-aware tokens for Ruby and Crystal lexers. Trivia captures non-semantic source text (whitespace and comments) and attaches it to tokens as leading or trailing trivia instead of emitting standalone whitespace tokens.
+Warp now supports trivia-aware tokens for Ruby and Crystal lexers. Trivia captures non-semantic source text (whitespace and comments) and attaches it to tokens as a single leading trivia array instead of emitting standalone whitespace tokens.
 
 == Rationale
 * Fewer tokens: reduces memory pressure and improves cache locality.
@@ -24,16 +24,14 @@ struct Token
   property kind : TokenKind
   property start : Int32
   property length : Int32
-  property leading_trivia : Array(Trivia)
-  property trailing_trivia : Array(Trivia)
+  property trivia : Array(Trivia)
 end
 ----
 
 == Lexer Behavior
 * Whitespace and comments are collected as trivia.
 * Newlines remain tokens (for grammar-sensitive parsing).
-* Leading trivia is attached to the next meaningful token.
-* Trailing trivia is attached to the previous token when trivia precedes a newline.
+* Trivia is attached to the next token (including newline and EOF).
 
 == Parser & CST Impact
 * Parsers ignore trivia in token streams.
@@ -41,4 +39,4 @@ end
 * Formatter uses trivia slices to preserve exact whitespace.
 
 == Debugging & CLI
-Token dumps include trivia arrays when available so whitespace and comments are visible in diagnostics.
+Token dumps include the trivia array when available so whitespace and comments are visible in diagnostics.
