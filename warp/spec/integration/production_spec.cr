@@ -53,14 +53,14 @@ describe Warp::Production do
         data = ("[[" * 2000 + "1" + "]]" * 2000).encode("UTF-8")
         valid, error = Warp::Production::InputValidator.validate_input(data, "json")
         # Should warn but still be valid (validation happens at parse time)
-        valid.should be_true  # Input validation passes, pattern detection happens later
+        valid.should be_true # Input validation passes, pattern detection happens later
       end
 
       it "detects extremely long lines" do
         # 200KB line
         data = ("a" * 200_000 + "\n").encode("UTF-8")
         valid, error = Warp::Production::InputValidator.validate_input(data, "ruby")
-        valid.should be_true  # Still valid, but would log warning
+        valid.should be_true # Still valid, but would log warning
       end
     end
   end
@@ -164,7 +164,7 @@ describe Warp::Production do
 
       status = Warp::Production::HealthCheck.status
       status.recent_errors.size.should eq(20)
-      status.recent_errors[0].should eq("Error 5")  # First 5 were dropped
+      status.recent_errors[0].should eq("Error 5") # First 5 were dropped
     end
 
     it "exports status to JSON" do
@@ -282,7 +282,7 @@ describe Warp::Production do
         def test
           puts "hello"
         end
-        
+
         /regex_pattern/
         another_var = "string with \#{interpolation}"
       RUBY
@@ -331,7 +331,7 @@ describe Warp::Production do
 
   describe "Integration scenarios" do
     it "handles a complete workflow with metrics tracking" do
-      json_data = %{[1, 2, {\"nested\": true}]}.encode("UTF-8")
+      json_data = %{[1, 2, {"nested": true}]}.encode("UTF-8")
       ruby_data = "class Test\n  attr_reader :value\nend".encode("UTF-8")
 
       json_result = Warp::Production.safe_parse(json_data, "json")
@@ -357,7 +357,7 @@ describe Warp::Production do
 
       # Health status should reflect that we have at least one error and one success
       status = Warp::Production::HealthCheck.status
-      status.recent_errors.size.should be >= 1  # At least one error recorded
+      status.recent_errors.size.should be >= 1 # At least one error recorded
     end
 
     it "maintains metrics history for trend analysis" do

@@ -95,57 +95,41 @@ module Warp
 
       def initialize(@whitespace : UInt64, @op : UInt64)
       end
-
-      def scalar : UInt64
-        ~(@op | @whitespace)
-      end
     end
 
     struct JsonBlock
       getter strings : StringBlock
       getter characters : CharacterBlock
-      getter follows_nonquote_scalar : UInt64
+      getter backslash_mask : UInt64
 
-      def initialize(@strings : StringBlock, @characters : CharacterBlock, @follows_nonquote_scalar : UInt64)
+      def initialize(@strings : StringBlock, @characters : CharacterBlock, @backslash_mask : UInt64)
       end
 
       def structural_start : UInt64
-        potential_structural_start & ~@strings.string_tail
+        # Only true structural characters; include unescaped quotes explicitly
+        # Exclude only *non-quote* bytes that are inside strings. Additionally,
+        # treat any quote immediately preceded by a backslash as escaped and
+        # therefore not a structural position.
+        unescaped_quote = @strings.quote & ~@strings.escaped & ~(@backslash_mask << 1)
+        (@characters.op | unescaped_quote) & ~(@strings.in_string & ~@strings.quote)
       end
 
       def non_quote_inside_string(mask : UInt64) : UInt64
         @strings.non_quote_inside_string(mask)
       end
-
-      private def potential_structural_start : UInt64
-        @characters.op | potential_scalar_start
-      end
-
-      private def potential_scalar_start : UInt64
-        @characters.scalar & ~@follows_nonquote_scalar
-      end
     end
 
     class Scanner
       @string_scanner = StringScanner.new
-      @prev_scalar : UInt64 = 0_u64
 
       def next(backslash : UInt64, quote_mask : UInt64, whitespace : UInt64, op : UInt64) : JsonBlock
         strings = @string_scanner.next(backslash, quote_mask)
         characters = CharacterBlock.new(whitespace, op)
-        nonquote_scalar = characters.scalar & ~strings.quote
-        follows_nonquote_scalar = follows(nonquote_scalar)
-        JsonBlock.new(strings, characters, follows_nonquote_scalar)
+        JsonBlock.new(strings, characters, backslash)
       end
 
       def finish : ErrorCode
         @string_scanner.finish
-      end
-
-      private def follows(match : UInt64) : UInt64
-        result = (match << 1) | (@prev_scalar & 1_u64)
-        @prev_scalar = match >> 63
-        result
       end
     end
 
@@ -297,6 +281,21 @@ module Warp
 
       if error == ErrorCode::Success
         error = scanner.finish
+
+        # If the string scanner reports an UnclosedString, double-check with
+        # the token assembler. TokenAssembler uses explicit string scanning
+        # (IR.scan_string_end) and may be able to validate strings where the
+        # block-local string parity check is conservative (especially with
+        # complex escaped sequences). If TokenAssembler accepts the stream,
+        # prefer that result and continue.
+        if error == ErrorCode::UnclosedString
+          tmp_buf = LexerBuffer.new(indices.to_unsafe, indices.size, indices)
+          token_err = Lexer::TokenAssembler.each_token(bytes, tmp_buf) { }
+          if token_err == ErrorCode::Success
+            error = ErrorCode::Success
+          end
+        end
+
         if error == ErrorCode::Success && !utf8.finish?
           error = ErrorCode::Utf8Error
         end

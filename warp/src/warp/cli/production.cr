@@ -41,7 +41,7 @@ module Warp::Production
       @backend,
       @success,
       @error_message,
-      @patterns_detected
+      @patterns_detected,
     )
     end
 
@@ -84,15 +84,15 @@ module Warp::Production
     # Export metrics as JSON
     def to_json : String
       {
-        "duration_ms" => duration_ms,
+        "duration_ms"     => duration_ms,
         "throughput_mbps" => throughput_mbps,
-        "input_bytes" => input_size,
-        "output_bytes" => output_size,
-        "language" => language,
-        "backend" => backend,
-        "success" => success,
-        "error" => error_message,
-        "patterns" => patterns_detected
+        "input_bytes"     => input_size,
+        "output_bytes"    => output_size,
+        "language"        => language,
+        "backend"         => backend,
+        "success"         => success,
+        "error"           => error_message,
+        "patterns"        => patterns_detected,
       }.to_json
     end
   end
@@ -101,8 +101,8 @@ module Warp::Production
   module InputValidator
     extend self
 
-    MAX_FILE_SIZE = 1024 * 1024 * 1024  # 1 GB limit
-    MAX_UTF8_SEQUENCE_LENGTH = 4         # UTF-8 max bytes per character
+    MAX_FILE_SIZE            = 1024 * 1024 * 1024 # 1 GB limit
+    MAX_UTF8_SEQUENCE_LENGTH = 4                  # UTF-8 max bytes per character
 
     # Validate input for common vulnerabilities
     def validate_input(data : Bytes, language : String) : {Bool, String?}
@@ -234,19 +234,19 @@ module Warp::Production
         @cpu_available,
         @recent_errors,
         @avg_latency_ms,
-        @throughput_mbps
+        @throughput_mbps,
       )
       end
 
       def to_json : String
         {
-          "timestamp" => timestamp.to_s,
-          "healthy" => healthy,
+          "timestamp"           => timestamp.to_s,
+          "healthy"             => healthy,
           "memory_available_mb" => memory_available_mb,
-          "cpu_count" => cpu_available,
-          "recent_errors" => recent_errors,
-          "avg_latency_ms" => avg_latency_ms,
-          "throughput_mbps" => throughput_mbps
+          "cpu_count"           => cpu_available,
+          "recent_errors"       => recent_errors,
+          "avg_latency_ms"      => avg_latency_ms,
+          "throughput_mbps"     => throughput_mbps,
         }.to_json
       end
     end
@@ -281,7 +281,7 @@ module Warp::Production
         timestamp: Time.instant,
         healthy: healthy,
         memory_available_mb: available_memory_mb,
-        cpu_available: 4,  # Placeholder: would use System.cpu_count
+        cpu_available: 4, # Placeholder: would use System.cpu_count
         recent_errors: @@recent_errors,
         avg_latency_ms: avg_latency,
         throughput_mbps: avg_throughput
@@ -290,7 +290,7 @@ module Warp::Production
 
     private def available_memory_mb : UInt64
       # Simplified memory check - in production would use OS calls
-      100_u64  # Placeholder
+      100_u64 # Placeholder
     end
   end
 
@@ -298,7 +298,7 @@ module Warp::Production
   def safe_parse(
     data : Bytes,
     language : String,
-    format : String = "json"
+    format : String = "json",
   ) : {success: Bool, result: String?, metrics: Metrics?, error: String?}
     start_time = Time.instant
 
@@ -322,7 +322,7 @@ module Warp::Production
 
     begin
       result = nil
-      patterns = {"tokens" => (data.size / 10).to_i} of String => Int32  # Placeholder token count
+      patterns = {"tokens" => (data.size / 10).to_i} of String => Int32 # Placeholder token count
 
       case language
       when "json", "ruby", "crystal"
@@ -353,9 +353,9 @@ module Warp::Production
 
       {
         success: true,
-        result: result,
+        result:  result,
         metrics: metrics,
-        error: nil
+        error:   nil,
       }
     rescue ex : Exception
       end_time = Time.instant
@@ -379,9 +379,9 @@ module Warp::Production
 
       {
         success: false,
-        result: nil,
+        result:  nil,
         metrics: metrics,
-        error: error_msg
+        error:   error_msg,
       }
     end
   end
@@ -391,16 +391,16 @@ module Warp::Production
     status = HealthCheck.status
 
     {
-      "version" => "1.0.0",
-      "timestamp" => Time.instant.to_s,
-      "healthy" => status.healthy.to_s,
-      "memory_mb" => status.memory_available_mb.to_s,
-      "cpus" => status.cpu_available.to_s,
-      "avg_latency_ms" => status.avg_latency_ms.round(2).to_s,
-      "throughput_mbps" => status.throughput_mbps.round(2).to_s,
+      "version"             => "1.0.0",
+      "timestamp"           => Time.instant.to_s,
+      "healthy"             => status.healthy.to_s,
+      "memory_mb"           => status.memory_available_mb.to_s,
+      "cpus"                => status.cpu_available.to_s,
+      "avg_latency_ms"      => status.avg_latency_ms.round(2).to_s,
+      "throughput_mbps"     => status.throughput_mbps.round(2).to_s,
       "supported_languages" => "json,ruby,crystal",
-      "backends" => "avx2,sse2,neon,scalar",
-      "recent_errors" => status.recent_errors.last(5).join("|")
+      "backends"            => "avx2,sse2,neon,scalar",
+      "recent_errors"       => status.recent_errors.last(5).join("|"),
     }
   end
 end

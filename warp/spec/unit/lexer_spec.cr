@@ -26,10 +26,11 @@ describe Warp::Lexer do
     sb.non_quote_inside_string(0b1111_u64).should eq(0b11_u64)
     sb.non_quote_outside_string(0b1111_u64).should eq(0b1100_u64)
 
-    cb = Warp::Lexer::CharacterBlock.new(0b10_u64, 0b01_u64)
-    cb.scalar.should eq(~0b11_u64)
+    cb = Warp::Lexer::CharacterBlock.new(0b01_u64, 0b10_u64)
+    # scalar is implied: bits that are neither op nor whitespace
+    (~(cb.op | cb.whitespace)).should eq(~0b11_u64)
 
-    jb = Warp::Lexer::JsonBlock.new(sb, cb, 0b0100_u64)
+    jb = Warp::Lexer::JsonBlock.new(sb, cb)
     jb.structural_start.should_not eq(0_u64)
     jb.non_quote_inside_string(0b1111_u64).should eq(0b11_u64)
   end
@@ -50,7 +51,7 @@ describe Warp::Lexer do
       0xED, 0x80, 0x80,
       0xF0, 0x90, 0x80, 0x80,
       0xF1, 0x80, 0x80, 0x80,
-      0xF4, 0x8F, 0x80, 0x80
+      0xF4, 0x8F, 0x80, 0x80,
     ]
     validator.validate_scalar(bytes.to_unsafe, bytes.size).should be_true
     validator.finish?.should be_true
@@ -59,15 +60,15 @@ describe Warp::Lexer do
   it "runs UTF-8 validation for diverse sequences" do
     payload = Bytes[
       0x7b, 0x22, 0x61, 0x22, 0x3a, 0x22,
-      0xc2, 0xa2,       # U+00A2
-      0xe0, 0xa0, 0x80, # U+0800
-      0xe1, 0x88, 0xb4, # U+1234
-      0xed, 0x9f, 0xbf, # U+D7FF
-      0xee, 0x80, 0x80, # U+E000
+      0xc2, 0xa2,             # U+00A2
+      0xe0, 0xa0, 0x80,       # U+0800
+      0xe1, 0x88, 0xb4,       # U+1234
+      0xed, 0x9f, 0xbf,       # U+D7FF
+      0xee, 0x80, 0x80,       # U+E000
       0xf0, 0x90, 0x80, 0x80, # U+10000
       0xf1, 0x80, 0x80, 0x80,
       0xf4, 0x8f, 0xbf, 0xbf, # U+10FFFF
-      0x22, 0x7d
+      0x22, 0x7d,
     ]
     result = Warp::Lexer.index(payload)
     result.error.should eq(Warp::ErrorCode::Success)

@@ -23,7 +23,7 @@ module CriticalPathOptimization
       @path_name : String,
       @iterations : Int32,
       @total_ms : Float64,
-      @percentage : Float64 = 0.0
+      @percentage : Float64 = 0.0,
     )
     end
 
@@ -92,7 +92,7 @@ module CriticalPathOptimization
       "Whitespace Mask (per block)",
       iterations,
       (elapsed.real * 1000).round(3),
-      15.0  # Estimated percentage
+      15.0 # Estimated percentage
     )
 
     puts "  Time: #{result1.total_ms}ms | Avg: #{result1.avg_us.round(2)}µs per block"
@@ -122,7 +122,7 @@ module CriticalPathOptimization
       "UTF-8 Validation",
       iterations,
       (elapsed.real * 1000).round(3),
-      12.0  # Estimated percentage
+      12.0 # Estimated percentage
     )
 
     puts "  Time: #{result2.total_ms}ms | Avg: #{result2.avg_us.round(2)}µs per pass"

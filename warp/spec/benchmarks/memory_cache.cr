@@ -20,7 +20,7 @@ module MemoryCacheOptimization
       @phase : String,
       @allocations : Int32,
       @total_bytes : Int64,
-      @peak_bytes : Int64
+      @peak_bytes : Int64,
     )
     end
 
@@ -67,7 +67,7 @@ module MemoryCacheOptimization
     # Analyze SIMD output
     result = Warp::Lexer.index(bytes)
     buffer_size = result.buffer.backing.try(&.size) || 0
-    output_size = buffer_size * 4  # UInt32 size
+    output_size = buffer_size * 4 # UInt32 size
 
     puts "SIMD Output:"
     puts "  Structural indices: #{buffer_size} (#{format_bytes(output_size)})"
@@ -115,7 +115,7 @@ module MemoryCacheOptimization
     # Full tokenization
     tokens, error = Warp::Lang::Ruby.scan(bytes)
     token_count = tokens.size
-    token_memory = token_count * 16  # Approximate Token struct size
+    token_memory = token_count * 16 # Approximate Token struct size
 
     puts "Tokenization Output:"
     puts "  Tokens produced: #{token_count} (est. #{format_bytes(token_memory)})"
@@ -159,7 +159,7 @@ module MemoryCacheOptimization
     # Full tokenization
     tokens, error = Warp::Lang::Crystal.scan(bytes)
     token_count = tokens.size
-    token_memory = token_count * 16  # Approximate Token struct size
+    token_memory = token_count * 16 # Approximate Token struct size
 
     puts "Tokenization Output:"
     puts "  Tokens produced: #{token_count} (est. #{format_bytes(token_memory)})"
@@ -280,9 +280,9 @@ module MemoryCacheOptimization
     case bytes
     when 0..1023
       "#{bytes}B"
-    when 1024..1024*1024-1
+    when 1024..1024*1024 - 1
       sprintf("%.1f KB", bytes / 1024.0)
-    when 1024*1024..1024*1024*1024-1
+    when 1024*1024..1024*1024*1024 - 1
       sprintf("%.1f MB", bytes / (1024.0 * 1024.0))
     else
       sprintf("%.1f GB", bytes / (1024.0 * 1024.0 * 1024.0))

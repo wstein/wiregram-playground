@@ -19,8 +19,8 @@ module VectorizationEnhancements
     getter structural : UInt64
     getter quote : UInt64
     getter backslash : UInt64
-    getter heredoc_start : UInt64    # <<, <<-, <<~
-    getter symbol_marker : UInt64    # :symbol patterns
+    getter heredoc_start : UInt64 # <<, <<-, <<~
+    getter symbol_marker : UInt64 # :symbol patterns
 
     def initialize(
       @whitespace : UInt64,
@@ -29,7 +29,7 @@ module VectorizationEnhancements
       @quote : UInt64,
       @backslash : UInt64,
       @heredoc_start : UInt64,
-      @symbol_marker : UInt64
+      @symbol_marker : UInt64,
     )
     end
   end
@@ -53,7 +53,7 @@ module VectorizationEnhancements
       @backslash : UInt64,
       @macro_start : UInt64,
       @macro_end : UInt64,
-      @annotation_start : UInt64
+      @annotation_start : UInt64,
     )
     end
   end
@@ -401,11 +401,11 @@ module VectorizationEnhancements
 
     # Create test masks
     test_masks = [
-      0_u64,                    # Empty
-      0xFFFFFFFFFFFFFFFF_u64,  # Full
-      0x5555555555555555_u64,  # Alternating
-      0xAAAAAAAAAAAAAAAA_u64,  # Alternating (inverse)
-      0x0000000000000001_u64,  # Single bit
+      0_u64,                  # Empty
+      0xFFFFFFFFFFFFFFFF_u64, # Full
+      0x5555555555555555_u64, # Alternating
+      0xAAAAAAAAAAAAAAAA_u64, # Alternating (inverse)
+      0x0000000000000001_u64, # Single bit
     ]
 
     puts "Testing population count implementations:"

@@ -680,6 +680,10 @@ module Warp
       if next_struct > start
         end_idx = next_struct - 1
         return end_idx if bytes[end_idx] == '"'.ord
+        # Robustness: sometimes the next_struct may point to the closing quote
+        # itself (rather than the character after it). In that case treat it
+        # as the end of the string as well.
+        return next_struct if next_struct < bytes.size && bytes[next_struct] == '"'.ord
       end
       i = start
       escaped = false
@@ -702,12 +706,12 @@ module Warp
 
     def self.scan_scalar_end(bytes : Bytes, start : Int32, next_struct : Int32) : Int32
       limit = next_struct >= 0 ? next_struct : bytes.size
-      # Trim trailing whitespace before the next structural.
-      i = limit
-      while i > start + 1
-        c = bytes[i - 1]
-        break unless c == ' '.ord || c == '\t'.ord || c == '\n'.ord || c == '\r'.ord
-        i -= 1
+      # Scan forward from start until the first whitespace or structural boundary.
+      i = start
+      while i < limit
+        c = bytes[i]
+        break if c == ' '.ord || c == '\t'.ord || c == '\n'.ord || c == '\r'.ord
+        i += 1
       end
       i
     end

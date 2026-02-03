@@ -15,8 +15,8 @@ module ComprehensiveBench
   FIXTURES = {
     json: {
       small:  "spec/fixtures/cli/sample.json",
-      medium: "corpus/ruby/05_classes.rb",  # JSON-like structure for fallback
-      large:  "src/warp.cr",                # Use actual source as large test
+      medium: "corpus/ruby/05_classes.rb", # JSON-like structure for fallback
+      large:  "src/warp.cr",               # Use actual source as large test
     },
     ruby: {
       small:  "corpus/ruby/00_simple.rb",
@@ -45,7 +45,7 @@ module ComprehensiveBench
       @language : String,
       @file_size : Int64,
       @iterations : Int32,
-      @total_ms : Float64
+      @total_ms : Float64,
     )
     end
 
@@ -277,22 +277,22 @@ module ComprehensiveBench
   private def output_json(results : Array(BenchmarkResult))
     json_results = results.map do |r|
       {
-        test: r.name,
-        language: r.language,
+        test:            r.name,
+        language:        r.language,
         file_size_bytes: r.file_size,
-        iterations: r.iterations,
-        total_ms: r.total_ms,
-        avg_ms: r.avg_ms.round(3),
+        iterations:      r.iterations,
+        total_ms:        r.total_ms,
+        avg_ms:          r.avg_ms.round(3),
         throughput_mb_s: r.throughput_mb_s.round(2),
-        ops_per_sec: r.ops_per_sec.round(0),
+        ops_per_sec:     r.ops_per_sec.round(0),
       }
     end
 
     json_output = {
-      timestamp: Time.utc.to_s,
-      backend: Warp::Backend.current.name,
+      timestamp:       Time.utc.to_s,
+      backend:         Warp::Backend.current.name,
       crystal_version: Crystal::VERSION,
-      results: json_results,
+      results:         json_results,
     }
 
     puts JSON.pretty_generate(json_output)
