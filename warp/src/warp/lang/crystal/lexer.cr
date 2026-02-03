@@ -103,6 +103,8 @@ module Warp
         end
         simd = SimdIndex.new(simd_result.indices, bytes)
 
+        last_nonspace_kind : TokenKind? = nil
+
         while i < len
           c = bytes[i]
 
@@ -110,6 +112,7 @@ module Warp
           if c == '\n'.ord || c == '\r'.ord
             tokens << Token.new(TokenKind::Newline, i, 1)
             i += 1
+            last_nonspace_kind = TokenKind::Newline
             next
           end
 
@@ -137,26 +140,51 @@ module Warp
           # Macro delimiters {{ and }}
           if c == '{'.ord && i + 1 < len && bytes[i + 1] == '{'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::Macro))
-            end_idx = scan_to_double(bytes, i + 2, '}'.ord.to_u8, '}'.ord.to_u8, simd)
+            backend = Warp::Backend.current
+            indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_macro_interior(
+              bytes,
+              (i + 2).to_u32,
+              backend
+            )
+            closing = indices.reverse.find { |idx| bytes[idx] == '}'.ord }
+            end_idx = if closing && closing.to_i + 1 < len && bytes[closing.to_i + 1] == '}'.ord
+                        closing.to_i
+                      else
+                        scan_to_double(bytes, i + 2, '}'.ord.to_u8, '}'.ord.to_u8, simd)
+                      end
             return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
             tokens << Token.new(TokenKind::MacroStart, i, 2)
             tokens << Token.new(TokenKind::MacroEnd, end_idx, 2)
             i = end_idx + 2
+            last_nonspace_kind = TokenKind::MacroEnd
             state.try(&.pop)
             next
           end
           if c == '}'.ord && i + 1 < len && bytes[i + 1] == '}'.ord
             tokens << Token.new(TokenKind::MacroEnd, i, 2)
             i += 2
+            last_nonspace_kind = TokenKind::MacroEnd
             next
           end
           if c == '{'.ord && i + 1 < len && bytes[i + 1] == '%'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::Macro))
-            end_idx = scan_to_double(bytes, i + 2, '%'.ord.to_u8, '}'.ord.to_u8, simd)
+            backend = Warp::Backend.current
+            indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_macro_interior(
+              bytes,
+              (i + 2).to_u32,
+              backend
+            )
+            closing = indices.reverse.find { |idx| bytes[idx] == '}'.ord }
+            end_idx = if closing && closing.to_i > 0 && bytes[closing.to_i - 1] == '%'.ord
+                        closing.to_i
+                      else
+                        scan_to_double(bytes, i + 2, '%'.ord.to_u8, '}'.ord.to_u8, simd)
+                      end
             return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
             tokens << Token.new(TokenKind::MacroStart, i, 2)
             tokens << Token.new(TokenKind::MacroEnd, end_idx, 2)
             i = end_idx + 2
+            last_nonspace_kind = TokenKind::MacroEnd
             state.try(&.pop)
             next
           end
@@ -164,10 +192,11 @@ module Warp
           # Strings (double-quoted)
           if c == '"'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '"'.ord.to_u8, simd)
+            j = scan_string_with_helpers(bytes, i, '"'.ord.to_u8)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
+            last_nonspace_kind = TokenKind::String
             state.try(&.pop)
             next
           end
@@ -175,10 +204,23 @@ module Warp
           # Strings/char (single-quoted) - treated as String for now
           if c == '\''.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '\''.ord.to_u8, simd)
+            j = scan_string_with_helpers(bytes, i, '\''.ord.to_u8)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
+            last_nonspace_kind = TokenKind::String
+            state.try(&.pop)
+            next
+          end
+
+          # Regex literals (/.../)
+          if c == '/'.ord && should_be_regex(last_nonspace_kind)
+            state.try(&.push(Warp::Lexer::LexerState::State::Regex))
+            j = scan_regex_with_helpers(bytes, i)
+            return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
+            tokens << Token.new(TokenKind::Regex, i, j - i)
+            i = j
+            last_nonspace_kind = TokenKind::Regex
             state.try(&.pop)
             next
           end
@@ -204,6 +246,7 @@ module Warp
                 state.try(&.push(Warp::Lexer::LexerState::State::String))
                 tokens << Token.new(TokenKind::String, i, k - i)
                 i = k
+                last_nonspace_kind = TokenKind::String
                 state.try(&.pop)
                 next
               end
@@ -243,10 +286,16 @@ module Warp
 
             if delimiter_open
               state.try(&.push(Warp::Lexer::LexerState::State::String))
-              j = scan_delimited(bytes, i + 1, delimiter_close.not_nil!.to_u8, simd)
+              close = delimiter_close.not_nil!.to_u8
+              if close == '"'.ord.to_u8 || close == '\''.ord.to_u8
+                j = scan_string_with_helpers(bytes, i + 1, close)
+              else
+                j = scan_delimited(bytes, i + 1, close, simd)
+              end
               return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
               tokens << Token.new(TokenKind::String, i, j - i)
               i = j
+              last_nonspace_kind = TokenKind::String
               state.try(&.pop)
               next
             end
@@ -265,10 +314,12 @@ module Warp
               end
               tokens << Token.new(TokenKind::Float, i, j - i)
               i = j
+              last_nonspace_kind = TokenKind::Float
               next
             end
             tokens << Token.new(TokenKind::Number, i, j - i)
             i = j
+            last_nonspace_kind = TokenKind::Number
             next
           end
 
@@ -285,10 +336,13 @@ module Warp
             txt = String.new(bytes[i, j - i])
             if KEYWORDS[txt]?
               tokens << Token.new(KEYWORDS[txt], i, j - i)
+              last_nonspace_kind = KEYWORDS[txt]
             elsif txt[0].uppercase?
               tokens << Token.new(TokenKind::Constant, i, j - i)
+              last_nonspace_kind = TokenKind::Constant
             else
               tokens << Token.new(TokenKind::Identifier, i, j - i)
+              last_nonspace_kind = TokenKind::Identifier
             end
             i = j
             next
@@ -303,6 +357,7 @@ module Warp
               end
               tokens << Token.new(TokenKind::ClassVar, i, j - i)
               i = j
+              last_nonspace_kind = TokenKind::ClassVar
               next
             elsif i + 1 < len && bytes[i + 1] == '['.ord
               state.try(&.push(Warp::Lexer::LexerState::State::Annotation))
@@ -317,6 +372,7 @@ module Warp
               return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
               tokens << Token.new(TokenKind::Annotation, i, end_idx - i + 1)
               i = end_idx + 1
+              last_nonspace_kind = TokenKind::Annotation
               state.try(&.pop)
               next
             else
@@ -326,6 +382,7 @@ module Warp
               end
               tokens << Token.new(TokenKind::InstanceVar, i, j - i)
               i = j
+              last_nonspace_kind = TokenKind::InstanceVar
               next
             end
           end
@@ -337,6 +394,7 @@ module Warp
             end
             tokens << Token.new(TokenKind::GlobalVar, i, j - i)
             i = j
+            last_nonspace_kind = TokenKind::GlobalVar
             next
           end
 
@@ -345,6 +403,7 @@ module Warp
             if i + 1 < len && bytes[i + 1] == ':'.ord
               tokens << Token.new(TokenKind::DoubleColon, i, 2)
               i += 2
+              last_nonspace_kind = TokenKind::DoubleColon
               next
             elsif i + 1 < len && is_identifier_start(bytes[i + 1])
               j = i + 1
@@ -353,10 +412,12 @@ module Warp
               end
               tokens << Token.new(TokenKind::Symbol, i, j - i)
               i = j
+              last_nonspace_kind = TokenKind::Symbol
               next
             else
               tokens << Token.new(TokenKind::Colon, i, 1)
               i += 1
+              last_nonspace_kind = TokenKind::Colon
               next
             end
           end
@@ -365,78 +426,78 @@ module Warp
 
           # Two-char operators
           if c == '='.ord && next_c == '='.ord
-            tokens << Token.new(TokenKind::EqualEqual, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::EqualEqual, i, 2); i += 2; last_nonspace_kind = TokenKind::EqualEqual; next
           elsif c == '!'.ord && next_c == '='.ord
-            tokens << Token.new(TokenKind::NotEqual, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::NotEqual, i, 2); i += 2; last_nonspace_kind = TokenKind::NotEqual; next
           elsif c == '<'.ord && next_c == '='.ord
-            tokens << Token.new(TokenKind::LessEqual, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::LessEqual, i, 2); i += 2; last_nonspace_kind = TokenKind::LessEqual; next
           elsif c == '>'.ord && next_c == '='.ord
-            tokens << Token.new(TokenKind::GreaterEqual, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::GreaterEqual, i, 2); i += 2; last_nonspace_kind = TokenKind::GreaterEqual; next
           elsif c == '&'.ord && next_c == '&'.ord
-            tokens << Token.new(TokenKind::LogicalAnd, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::LogicalAnd, i, 2); i += 2; last_nonspace_kind = TokenKind::LogicalAnd; next
           elsif c == '|'.ord && next_c == '|'.ord
-            tokens << Token.new(TokenKind::LogicalOr, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::LogicalOr, i, 2); i += 2; last_nonspace_kind = TokenKind::LogicalOr; next
           elsif c == '*'.ord && next_c == '*'.ord
-            tokens << Token.new(TokenKind::Power, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::Power, i, 2); i += 2; last_nonspace_kind = TokenKind::Power; next
           elsif c == '<'.ord && next_c == '<'.ord
-            tokens << Token.new(TokenKind::LeftShift, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::LeftShift, i, 2); i += 2; last_nonspace_kind = TokenKind::LeftShift; next
           elsif c == '>'.ord && next_c == '>'.ord
-            tokens << Token.new(TokenKind::RightShift, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::RightShift, i, 2); i += 2; last_nonspace_kind = TokenKind::RightShift; next
           elsif c == '-'.ord && next_c == '>'.ord
-            tokens << Token.new(TokenKind::Arrow, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::Arrow, i, 2); i += 2; last_nonspace_kind = TokenKind::Arrow; next
           elsif c == '='.ord && next_c == '>'.ord
-            tokens << Token.new(TokenKind::FatArrow, i, 2); i += 2; next
+            tokens << Token.new(TokenKind::FatArrow, i, 2); i += 2; last_nonspace_kind = TokenKind::FatArrow; next
           end
 
           case c
           when '('.ord
-            tokens << Token.new(TokenKind::LParen, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::LParen, i, 1); i += 1; last_nonspace_kind = TokenKind::LParen; next
           when ')'.ord
-            tokens << Token.new(TokenKind::RParen, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::RParen, i, 1); i += 1; last_nonspace_kind = TokenKind::RParen; next
           when '{'.ord
-            tokens << Token.new(TokenKind::LBrace, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::LBrace, i, 1); i += 1; last_nonspace_kind = TokenKind::LBrace; next
           when '}'.ord
-            tokens << Token.new(TokenKind::RBrace, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::RBrace, i, 1); i += 1; last_nonspace_kind = TokenKind::RBrace; next
           when '['.ord
-            tokens << Token.new(TokenKind::LBracket, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::LBracket, i, 1); i += 1; last_nonspace_kind = TokenKind::LBracket; next
           when ']'.ord
-            tokens << Token.new(TokenKind::RBracket, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::RBracket, i, 1); i += 1; last_nonspace_kind = TokenKind::RBracket; next
           when ','.ord
-            tokens << Token.new(TokenKind::Comma, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Comma, i, 1); i += 1; last_nonspace_kind = TokenKind::Comma; next
           when '.'.ord
-            tokens << Token.new(TokenKind::Dot, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Dot, i, 1); i += 1; last_nonspace_kind = TokenKind::Dot; next
           when '+'.ord
-            tokens << Token.new(TokenKind::Plus, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Plus, i, 1); i += 1; last_nonspace_kind = TokenKind::Plus; next
           when '-'.ord
-            tokens << Token.new(TokenKind::Minus, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Minus, i, 1); i += 1; last_nonspace_kind = TokenKind::Minus; next
           when '*'.ord
-            tokens << Token.new(TokenKind::Star, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Star, i, 1); i += 1; last_nonspace_kind = TokenKind::Star; next
           when '/'.ord
-            tokens << Token.new(TokenKind::Slash, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Slash, i, 1); i += 1; last_nonspace_kind = TokenKind::Slash; next
           when '%'.ord
-            tokens << Token.new(TokenKind::Percent, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Percent, i, 1); i += 1; last_nonspace_kind = TokenKind::Percent; next
           when '='.ord
-            tokens << Token.new(TokenKind::Equal, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Equal, i, 1); i += 1; last_nonspace_kind = TokenKind::Equal; next
           when '!'.ord
-            tokens << Token.new(TokenKind::Not, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Not, i, 1); i += 1; last_nonspace_kind = TokenKind::Not; next
           when '<'.ord
-            tokens << Token.new(TokenKind::LessThan, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::LessThan, i, 1); i += 1; last_nonspace_kind = TokenKind::LessThan; next
           when '>'.ord
-            tokens << Token.new(TokenKind::GreaterThan, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::GreaterThan, i, 1); i += 1; last_nonspace_kind = TokenKind::GreaterThan; next
           when '&'.ord
-            tokens << Token.new(TokenKind::Ampersand, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Ampersand, i, 1); i += 1; last_nonspace_kind = TokenKind::Ampersand; next
           when '|'.ord
-            tokens << Token.new(TokenKind::Pipe, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Pipe, i, 1); i += 1; last_nonspace_kind = TokenKind::Pipe; next
           when '^'.ord
-            tokens << Token.new(TokenKind::Caret, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Caret, i, 1); i += 1; last_nonspace_kind = TokenKind::Caret; next
           when '~'.ord
-            tokens << Token.new(TokenKind::Tilde, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Tilde, i, 1); i += 1; last_nonspace_kind = TokenKind::Tilde; next
           when ';'.ord
-            tokens << Token.new(TokenKind::Semicolon, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Semicolon, i, 1); i += 1; last_nonspace_kind = TokenKind::Semicolon; next
           when '?'.ord
-            tokens << Token.new(TokenKind::Question, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::Question, i, 1); i += 1; last_nonspace_kind = TokenKind::Question; next
           when '@'.ord
-            tokens << Token.new(TokenKind::At, i, 1); i += 1; next
+            tokens << Token.new(TokenKind::At, i, 1); i += 1; last_nonspace_kind = TokenKind::At; next
           end
 
           tokens << Token.new(TokenKind::Unknown, i, 1)
@@ -505,6 +566,35 @@ module Warp
         Warp::Lang::Common::SimdLexingUtils.scan_delimited(bytes, start, delimiter, false, backend) do |_b|
           false
         end
+      end
+
+      private def self.scan_string_with_helpers(bytes : Bytes, start : Int32, quote_char : UInt8) : Int32
+        backend = Warp::Backend.current
+        indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_string_interior(
+          bytes,
+          (start + 1).to_u32,
+          quote_char,
+          backend
+        )
+        end_idx = indices.reverse.find { |idx| bytes[idx] == quote_char }
+        return -1 unless end_idx
+        end_idx.to_i + 1
+      end
+
+      private def self.scan_regex_with_helpers(bytes : Bytes, start : Int32) : Int32
+        backend = Warp::Backend.current
+        indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_regex_interior(
+          bytes,
+          (start + 1).to_u32,
+          backend
+        )
+        end_idx = indices.reverse.find { |idx| bytes[idx] == '/'.ord }
+        return -1 unless end_idx
+        i = end_idx.to_i + 1
+        while i < bytes.size && regex_modifier?(bytes[i])
+          i += 1
+        end
+        i
       end
 
       private def self.scan_to_double(bytes : Bytes, start : Int32, a : UInt8, b : UInt8, simd : SimdIndex? = nil) : Int32
@@ -585,6 +675,23 @@ module Warp
         (c >= 'a'.ord && c <= 'z'.ord) || (c >= 'A'.ord && c <= 'Z'.ord)
       end
 
+      private def self.regex_modifier?(b : UInt8) : Bool
+        b == 'i'.ord.to_u8 || b == 'm'.ord.to_u8 || b == 'x'.ord.to_u8
+      end
+
+      private def self.should_be_regex(last_kind : TokenKind?) : Bool
+        return true if last_kind == nil
+        case last_kind
+        when TokenKind::LParen, TokenKind::LBracket, TokenKind::LBrace, TokenKind::Comma, TokenKind::Semicolon,
+             TokenKind::Newline, TokenKind::Return, TokenKind::Do, TokenKind::If, TokenKind::Unless, TokenKind::While,
+             TokenKind::Equal, TokenKind::LessEqual, TokenKind::GreaterEqual, TokenKind::LogicalAnd, TokenKind::LogicalOr,
+             TokenKind::Arrow, TokenKind::FatArrow
+          true
+        else
+          false
+        end
+      end
+
       private def self.scan_percent_delimited(bytes : Bytes, start : Int32, close : UInt8, lit_type : UInt8) : Int32
         len = bytes.size
         i = start
@@ -596,6 +703,31 @@ module Warp
 
         # for %r (regex), we need to handle modifiers after the closing delimiter
         is_regex = lit_type == 'r'.ord.to_u8 || lit_type == 'R'.ord.to_u8
+
+        if is_regex && close == '/'.ord.to_u8
+          indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_regex_interior(
+            bytes,
+            start.to_u32,
+            backend
+          )
+          end_idx = indices.reverse.find { |idx| bytes[idx] == '/'.ord }
+          if end_idx
+            end_i = end_idx.to_i + 1
+            while end_i < len && regex_modifier?(bytes[end_i])
+              end_i += 1
+            end
+            return end_i
+          end
+        elsif close == '"'.ord.to_u8 || close == '\''.ord.to_u8
+          indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_string_interior(
+            bytes,
+            start.to_u32,
+            close,
+            backend
+          )
+          end_idx = indices.reverse.find { |idx| bytes[idx] == close }
+          return end_idx.to_i + 1 if end_idx
+        end
 
         while i < len
           block_len = len - i

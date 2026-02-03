@@ -229,7 +229,7 @@ module Warp
           # strings
           if c == '"'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '"'.ord.to_u8, false, simd)
+            j = scan_string_with_helpers(bytes, i, '"'.ord.to_u8)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -240,7 +240,7 @@ module Warp
 
           if c == '\''.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '\''.ord.to_u8, false, simd)
+            j = scan_string_with_helpers(bytes, i, '\''.ord.to_u8)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -252,7 +252,7 @@ module Warp
           # regex simple form when in expression position
           if c == '/'.ord && should_be_regex(last_nonspace_kind)
             state.try(&.push(Warp::Lexer::LexerState::State::Regex))
-            j = scan_delimited(bytes, i, '/'.ord.to_u8, true, simd)
+            j = scan_regex_with_helpers(bytes, i)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::Regex, i, j - i)
             i = j
@@ -561,6 +561,35 @@ module Warp
         end
       end
 
+      private def self.scan_string_with_helpers(bytes : Bytes, start : Int32, quote_char : UInt8) : Int32
+        backend = Warp::Backend.current
+        indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_string_interior(
+          bytes,
+          (start + 1).to_u32,
+          quote_char,
+          backend
+        )
+        end_idx = indices.reverse.find { |idx| bytes[idx] == quote_char }
+        return -1 unless end_idx
+        end_idx.to_i + 1
+      end
+
+      private def self.scan_regex_with_helpers(bytes : Bytes, start : Int32) : Int32
+        backend = Warp::Backend.current
+        indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_regex_interior(
+          bytes,
+          (start + 1).to_u32,
+          backend
+        )
+        end_idx = indices.reverse.find { |idx| bytes[idx] == '/'.ord }
+        return -1 unless end_idx
+        i = end_idx.to_i + 1
+        while i < bytes.size && regex_modifier?(bytes[i])
+          i += 1
+        end
+        i
+      end
+
       private def self.regex_modifier?(b : UInt8) : Bool
         b == 'i'.ord.to_u8 || b == 'm'.ord.to_u8 || b == 'x'.ord.to_u8 || b == 'o'.ord.to_u8
       end
@@ -581,6 +610,31 @@ module Warp
 
         # for %r (regex), we need to handle modifiers after the closing delimiter
         is_regex = lit_type == 'r'.ord.to_u8 || lit_type == 'R'.ord.to_u8
+
+        if is_regex && close == '/'.ord.to_u8
+          indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_regex_interior(
+            bytes,
+            start.to_u32,
+            backend
+          )
+          end_idx = indices.reverse.find { |idx| bytes[idx] == '/'.ord }
+          if end_idx
+            end_i = end_idx.to_i + 1
+            while end_i < len && regex_modifier?(bytes[end_i])
+              end_i += 1
+            end
+            return end_i
+          end
+        elsif close == '"'.ord.to_u8 || close == '\''.ord.to_u8
+          indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_string_interior(
+            bytes,
+            start.to_u32,
+            close,
+            backend
+          )
+          end_idx = indices.reverse.find { |idx| bytes[idx] == close }
+          return end_idx.to_i + 1 if end_idx
+        end
 
         while i < len
           block_len = len - i

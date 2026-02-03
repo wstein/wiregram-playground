@@ -70,6 +70,7 @@ module Warp
         MacroVar
         Symbol
         String
+        Regex
         Char
         Number
         Float

@@ -20,9 +20,9 @@ module SimdVsScalarCrystal
     # Warm up
     5.times { Warp::Lang::Crystal::Lexer.scan(bytes) }
 
-    start_time = Time.monotonic
+    start_time = Time.instant
     iterations.times { Warp::Lang::Crystal::Lexer.scan(bytes) }
-    elapsed = Time.monotonic - start_time
+    elapsed = Time.instant - start_time
 
     throughput_mbps = (bytes.size.to_f * iterations) / elapsed.total_seconds / (1024 * 1024)
     {backend_name, throughput_mbps}

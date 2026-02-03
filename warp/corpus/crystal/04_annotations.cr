@@ -1,0 +1,41 @@
+# Crystal annotations for type checking and documentation
+
+@[Deprecated("Use new_method instead")]
+def old_method
+  "deprecated"
+end
+
+@[Link("m")]
+lib LibM
+  fun sqrt(x : Float64) : Float64
+end
+
+@[Extern]
+class ExternalClass
+end
+
+@[Windows]
+fun windows_only
+  puts "Windows only"
+end
+
+@[Raises(ArgumentError)]
+def may_raise
+  raise ArgumentError.new("error")
+end
+
+@[AlwaysInline]
+def inline_method
+  42
+end
+
+# Custom annotations
+@[MyCustom(value: 123, name: "test")]
+class AnnotatedClass
+end
+
+annotation MyCustom
+  def to_s
+    "Custom annotation"
+  end
+end
