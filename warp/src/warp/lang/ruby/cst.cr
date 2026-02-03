@@ -51,13 +51,13 @@ module Warp::Lang::Ruby
       getter kind : NodeKind
       getter children : Array(GreenNode)
       getter token : Token?
-      getter leading_trivia : Array(Token)
+      getter leading_trivia : Array(Trivia)
 
       def initialize(
         @kind : NodeKind,
         @children : Array(GreenNode) = [] of GreenNode,
         @token : Token? = nil,
-        @leading_trivia : Array(Token) = [] of Token,
+        @leading_trivia : Array(Trivia) = [] of Trivia,
       )
       end
     end
@@ -79,7 +79,7 @@ module Warp::Lang::Ruby
         @green.token
       end
 
-      def leading_trivia : Array(Token)
+      def leading_trivia : Array(Trivia)
         @green.leading_trivia
       end
 
@@ -418,20 +418,9 @@ module Warp::Lang::Ruby
       end
 
       # Collect leading trivia (whitespace, comments, newlines)
-      private def collect_trivia : Array(Token)
-        trivia = [] of Token
-
-        while @pos < @tokens.size
-          kind = current.kind
-          if kind == TokenKind::Whitespace || kind == TokenKind::Newline || kind == TokenKind::CommentLine
-            trivia << current
-            advance
-          else
-            break
-          end
-        end
-
-        trivia
+      private def collect_trivia : Array(Trivia)
+        return [] of Trivia if @pos >= @tokens.size
+        current.leading_trivia
       end
 
       private def current : Token

@@ -56,7 +56,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       case value
       when Nil
@@ -84,7 +84,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       if value.empty?
         io << "[]"
@@ -120,7 +120,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       if value.empty?
         io << "{}"
@@ -217,7 +217,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       case node.kind
       when AST::NodeKind::Root
@@ -255,7 +255,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       pairs = node.children
       if pairs.empty?
@@ -288,7 +288,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       values = node.children
       if values.empty?
@@ -321,7 +321,7 @@ module Warp
       node : CST::RedNode,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       write_cst_trivia(io, doc, node.leading_trivia, indent, newline, level)
       case node.kind
@@ -350,7 +350,7 @@ module Warp
       node : CST::RedNode,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       pairs = node.children
       if pairs.empty?
@@ -379,7 +379,7 @@ module Warp
       node : CST::RedNode,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       values = node.children
       if values.empty?
@@ -408,7 +408,7 @@ module Warp
       trivia : Array(CST::Token),
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Nil
       return if trivia.empty?
       trivia.each do |token|
@@ -421,6 +421,8 @@ module Warp
           io << (" " * (level * indent))
           io << String.new(doc.bytes[token.start, token.length])
           io << newline
+        when CST::TokenKind::Whitespace, CST::TokenKind::Newline
+          io << String.new(doc.bytes[token.start, token.length])
         else
         end
       end
@@ -458,7 +460,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Int32
       entry = doc.tape[index]
       case entry.type
@@ -496,7 +498,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Int32
       end_index = doc.tape[start_index].b
       if end_index == start_index + 1
@@ -542,7 +544,7 @@ module Warp
       pretty : Bool,
       indent : Int32,
       newline : String,
-      level : Int32
+      level : Int32,
     ) : Int32
       end_index = doc.tape[start_index].b
       if end_index == start_index + 1

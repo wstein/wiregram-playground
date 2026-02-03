@@ -5,6 +5,24 @@ module Warp
     module Crystal
       alias ErrorCode = Warp::Core::ErrorCode
 
+      # Trivia kinds stored alongside tokens for whitespace/comments.
+      enum TriviaKind
+        Whitespace
+        Newline
+        CommentLine
+        CommentBlock
+      end
+
+      # Trivia carries non-semantic source text (whitespace/comments).
+      struct Trivia
+        property kind : TriviaKind
+        property start : Int32
+        property length : Int32
+
+        def initialize(@kind : TriviaKind, @start : Int32, @length : Int32)
+        end
+      end
+
       enum TokenKind
         # Keywords
         Def
@@ -115,8 +133,16 @@ module Warp
         property kind : TokenKind
         property start : Int32
         property length : Int32
+        property leading_trivia : Array(Trivia)
+        property trailing_trivia : Array(Trivia)
 
-        def initialize(@kind : TokenKind, @start : Int32, @length : Int32)
+        def initialize(
+          @kind : TokenKind,
+          @start : Int32,
+          @length : Int32,
+          @leading_trivia : Array(Trivia) = [] of Trivia,
+          @trailing_trivia : Array(Trivia) = [] of Trivia,
+        )
         end
       end
     end

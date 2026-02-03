@@ -43,7 +43,7 @@ module Warp::Lang::Crystal
             CST::NodeKind::MethodDef,
             [] of CST::GreenNode,
             nil,
-            [] of Warp::Lang::Crystal::Token,
+            [] of Warp::Lang::Crystal::Trivia,
             payload,
           )
 

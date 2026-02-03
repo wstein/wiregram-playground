@@ -6,6 +6,24 @@
 module Warp
   module Lang
     module Ruby
+      # Trivia kinds stored alongside tokens for whitespace/comments.
+      enum TriviaKind
+        Whitespace
+        Newline
+        CommentLine
+        CommentBlock
+      end
+
+      # Trivia carries non-semantic source text (whitespace/comments).
+      struct Trivia
+        property kind : TriviaKind
+        property start : Int32
+        property length : Int32
+
+        def initialize(@kind : TriviaKind, @start : Int32, @length : Int32)
+        end
+      end
+
       # Ruby TokenKind enum: Ruby-specific lexical categories
       # TODO: Expand to include Ruby tokens (IDENTIFIER, KEYWORD, HEREDOC, etc.)
       enum TokenKind

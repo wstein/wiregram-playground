@@ -17,6 +17,16 @@ This guide captures how we steward the `ports/`, Ruby, and Crystal code in the W
 3. **Testing**: Run `crystal spec` after changing ports or Ruby code to ensure the round-trip validator, CLI integration, and corpus tests still pass. Use targeted specs (e.g., `crystal spec spec/integration/cli_spec.cr`) for faster feedback.
 4. **Documentation**: Update `docs/` or `GUILD.md` when you change how ports interact with the CLI or validation tooling. Add RBS/RBI artifacts to `annotations/` or `sorbet/` if you expose new Ruby APIs.
 
+## 2.1 Trivia-Based Tokens (Whitespace & Comments)
+
+Warp uses trivia-aware tokens for Ruby and Crystal lexers. Whitespace and comments are collected as trivia and attached to tokens as `leading_trivia` or `trailing_trivia` instead of being emitted as standalone whitespace tokens. Newlines remain tokens for grammar-sensitive parsing.
+
+**Guidelines:**
+
+- Preserve trivia when you modify lexers or parsers; avoid reintroducing standalone whitespace tokens.
+- When adding tests, validate both the meaningful tokens and the attached trivia.
+- Formatter and CST code should rely on trivia for exact whitespace reconstruction.
+
 ## 3. Git Workflow (Vendor-style Branches)
 
 We borrow the vendor branch pattern for port maintenance to isolate upstream syncs:

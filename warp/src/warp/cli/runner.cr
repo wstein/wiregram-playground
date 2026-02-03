@@ -1501,6 +1501,18 @@ YAML
       json.object do
         json.field "kind", node.kind.to_s
         json.field "text", node.text
+        json.field "leading_trivia" do
+          json.array do
+            node.leading_trivia.each do |tr|
+              json.object do
+                json.field "kind", tr.kind.to_s
+                json.field "start", tr.start
+                json.field "length", tr.length
+                json.field "text", slice_text(bytes, tr.start, tr.length)
+              end
+            end
+          end
+        end
         if payload = node.method_payload
           json.field "method_payload" do
             json.object do
@@ -1677,6 +1689,30 @@ YAML
                     json.field "start", tok.start
                     json.field "length", tok.length
                     json.field "text", slice_text(bytes, tok.start, tok.length)
+                    json.field "leading_trivia" do
+                      json.array do
+                        tok.leading_trivia.each do |tr|
+                          json.object do
+                            json.field "kind", tr.kind.to_s
+                            json.field "start", tr.start
+                            json.field "length", tr.length
+                            json.field "text", slice_text(bytes, tr.start, tr.length)
+                          end
+                        end
+                      end
+                    end
+                    json.field "trailing_trivia" do
+                      json.array do
+                        tok.trailing_trivia.each do |tr|
+                          json.object do
+                            json.field "kind", tr.kind.to_s
+                            json.field "start", tr.start
+                            json.field "length", tr.length
+                            json.field "text", slice_text(bytes, tr.start, tr.length)
+                          end
+                        end
+                      end
+                    end
                   end
                 end
               end
@@ -1725,6 +1761,30 @@ YAML
                   json.field "start", tok.start
                   json.field "length", tok.length
                   json.field "text", slice_text(bytes, tok.start, tok.length)
+                  json.field "leading_trivia" do
+                    json.array do
+                      tok.leading_trivia.each do |tr|
+                        json.object do
+                          json.field "kind", tr.kind.to_s
+                          json.field "start", tr.start
+                          json.field "length", tr.length
+                          json.field "text", slice_text(bytes, tr.start, tr.length)
+                        end
+                      end
+                    end
+                  end
+                  json.field "trailing_trivia" do
+                    json.array do
+                      tok.trailing_trivia.each do |tr|
+                        json.object do
+                          json.field "kind", tr.kind.to_s
+                          json.field "start", tr.start
+                          json.field "length", tr.length
+                          json.field "text", slice_text(bytes, tr.start, tr.length)
+                        end
+                      end
+                    end
+                  end
                 end
               end
             end

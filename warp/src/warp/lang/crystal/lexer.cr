@@ -381,7 +381,51 @@ module Warp
         end
 
         tokens << Token.new(TokenKind::Eof, len, 0)
-        {tokens, Warp::Core::ErrorCode::Success, 0}
+        {attach_trivia(tokens), Warp::Core::ErrorCode::Success, 0}
+      end
+
+      private def self.attach_trivia(tokens : Array(Token)) : Array(Token)
+        result = [] of Token
+        pending = [] of Trivia
+
+        tokens.each do |tok|
+          case tok.kind
+          when TokenKind::Whitespace
+            pending << Trivia.new(TriviaKind::Whitespace, tok.start, tok.length)
+          when TokenKind::CommentLine
+            pending << Trivia.new(TriviaKind::CommentLine, tok.start, tok.length)
+          when TokenKind::Newline
+            if !pending.empty?
+              if result.size > 0
+                result.last.trailing_trivia.concat(pending)
+                pending.clear
+              else
+                tok.leading_trivia = pending.dup
+                pending.clear
+              end
+            end
+            result << tok
+          when TokenKind::Eof
+            if !pending.empty? && result.size > 0
+              result.last.trailing_trivia.concat(pending)
+              pending.clear
+            end
+            result << tok
+          else
+            if !pending.empty?
+              tok.leading_trivia = pending.dup
+              pending.clear
+            end
+            result << tok
+          end
+        end
+
+        if !pending.empty? && result.size > 0
+          result.last.trailing_trivia.concat(pending)
+          pending.clear
+        end
+
+        result
       end
 
       private def self.is_identifier_start(c : UInt8) : Bool

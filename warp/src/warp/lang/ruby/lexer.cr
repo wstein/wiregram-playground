@@ -11,8 +11,16 @@ module Warp
         property kind : TokenKind
         property start : Int32
         property length : Int32
+        property leading_trivia : Array(Trivia)
+        property trailing_trivia : Array(Trivia)
 
-        def initialize(@kind : TokenKind, @start : Int32, @length : Int32)
+        def initialize(
+          @kind : TokenKind,
+          @start : Int32,
+          @length : Int32,
+          @leading_trivia : Array(Trivia) = [] of Trivia,
+          @trailing_trivia : Array(Trivia) = [] of Trivia,
+        )
         end
       end
 
@@ -403,7 +411,53 @@ module Warp
         end
 
         tokens << Token.new(TokenKind::Eof, len, 0)
-        {tokens, ErrorCode::Success, 0}
+        {attach_trivia(tokens), ErrorCode::Success, 0}
+      end
+
+      private def self.attach_trivia(tokens : Array(Token)) : Array(Token)
+        result = [] of Token
+        pending = [] of Trivia
+
+        tokens.each do |tok|
+          case tok.kind
+          when TokenKind::Whitespace
+            pending << Trivia.new(TriviaKind::Whitespace, tok.start, tok.length)
+          when TokenKind::CommentLine
+            pending << Trivia.new(TriviaKind::CommentLine, tok.start, tok.length)
+          when TokenKind::CommentBlock
+            pending << Trivia.new(TriviaKind::CommentBlock, tok.start, tok.length)
+          when TokenKind::Newline
+            if !pending.empty?
+              if result.size > 0
+                result.last.trailing_trivia.concat(pending)
+                pending.clear
+              else
+                tok.leading_trivia = pending.dup
+                pending.clear
+              end
+            end
+            result << tok
+          when TokenKind::Eof
+            if !pending.empty? && result.size > 0
+              result.last.trailing_trivia.concat(pending)
+              pending.clear
+            end
+            result << tok
+          else
+            if !pending.empty?
+              tok.leading_trivia = pending.dup
+              pending.clear
+            end
+            result << tok
+          end
+        end
+
+        if !pending.empty? && result.size > 0
+          result.last.trailing_trivia.concat(pending)
+          pending.clear
+        end
+
+        result
       end
 
       private def self.match_literal(bytes : Bytes, start : Int32, literal : String) : Bool

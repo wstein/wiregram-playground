@@ -48,14 +48,14 @@ module Warp::Lang::Crystal
       getter kind : NodeKind
       getter children : Array(GreenNode)
       getter text : String?
-      getter leading_trivia : Array(Warp::Lang::Crystal::Token)
+      getter leading_trivia : Array(Warp::Lang::Crystal::Trivia)
       getter method_payload : MethodDefPayload?
 
       def initialize(
         @kind : NodeKind,
         @children : Array(GreenNode) = [] of GreenNode,
         @text : String? = nil,
-        @leading_trivia : Array(Warp::Lang::Crystal::Token) = [] of Warp::Lang::Crystal::Token,
+        @leading_trivia : Array(Warp::Lang::Crystal::Trivia) = [] of Warp::Lang::Crystal::Trivia,
         @method_payload : MethodDefPayload? = nil,
       )
       end
@@ -77,7 +77,7 @@ module Warp::Lang::Crystal
         @green.text
       end
 
-      def leading_trivia : Array(Warp::Lang::Crystal::Token)
+      def leading_trivia : Array(Warp::Lang::Crystal::Trivia)
         @green.leading_trivia
       end
 
@@ -500,23 +500,12 @@ module Warp::Lang::Crystal
         advance if current.kind == TokenKind::End
 
         payload = CST::MethodDefPayload.new(method_name, params, return_type, body_text, had_parens, original_source)
-        GreenNode.new(NodeKind::MethodDef, [] of GreenNode, nil, [] of Warp::Lang::Crystal::Token, payload)
+        GreenNode.new(NodeKind::MethodDef, [] of GreenNode, nil, [] of Warp::Lang::Crystal::Trivia, payload)
       end
 
-      private def collect_trivia : Array(Warp::Lang::Crystal::Token)
-        trivia = [] of Warp::Lang::Crystal::Token
-
-        while @pos < @tokens.size
-          kind = current.kind
-          if kind == TokenKind::Whitespace || kind == TokenKind::Newline || kind == TokenKind::CommentLine
-            trivia << current
-            advance
-          else
-            break
-          end
-        end
-
-        trivia
+      private def collect_trivia : Array(Warp::Lang::Crystal::Trivia)
+        return [] of Warp::Lang::Crystal::Trivia if @pos >= @tokens.size
+        current.leading_trivia
       end
 
       private def current : Warp::Lang::Crystal::Token
@@ -528,20 +517,9 @@ module Warp::Lang::Crystal
         @pos += 1 if @pos < @tokens.size
       end
 
-      private def collect_trivia : Array(Warp::Lang::Crystal::Token)
-        trivia = [] of Warp::Lang::Crystal::Token
-
-        while @pos < @tokens.size
-          kind = current.kind
-          if kind == TokenKind::Whitespace || kind == TokenKind::Newline || kind == TokenKind::CommentLine
-            trivia << current
-            advance
-          else
-            break
-          end
-        end
-
-        trivia
+      private def collect_trivia : Array(Warp::Lang::Crystal::Trivia)
+        return [] of Warp::Lang::Crystal::Trivia if @pos >= @tokens.size
+        current.leading_trivia
       end
 
       private def current : Warp::Lang::Crystal::Token

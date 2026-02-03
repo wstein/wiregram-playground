@@ -74,8 +74,11 @@ describe "Ruby Lexer" do
       tokens, error = Warp::Lang::Ruby::Lexer.scan(source.to_slice)
 
       error.should eq(Warp::Core::ErrorCode::Success)
-      kinds = tokens.map(&.kind)
-      comment_count = kinds.count { |k| k == Warp::Lang::Ruby::TokenKind::CommentLine }
+      comment_count = 0
+      tokens.each do |tok|
+        comment_count += tok.leading_trivia.count { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }
+        comment_count += tok.trailing_trivia.count { |tr| tr.kind == Warp::Lang::Ruby::TriviaKind::CommentLine }
+      end
       comment_count.should be >= 1
     end
 

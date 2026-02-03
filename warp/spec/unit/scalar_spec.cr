@@ -35,7 +35,7 @@ describe "Scalar-only and trailing scalar cases" do
   it "accepts string scalar roots" do
     parser = Warp::Parser.new
     parser.parse_document(%("hello").to_slice).error.success?.should be_true
-    parser.parse_document(%("\"quoted\"").to_slice).error.success?.should be_true
+    parser.parse_document(%(""quoted"").to_slice).error.success?.should be_true
   end
 
   it "lexer and TokenAssembler emit tokens for scalar-only inputs" do
