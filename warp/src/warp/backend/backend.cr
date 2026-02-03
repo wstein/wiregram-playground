@@ -36,6 +36,26 @@ module Warp
         true
       end
 
+      # Optional alignment check - enabled via WARP_STRICT_ALIGNMENT=1. Returns
+      # `ErrorCode::SimdAlignmentError` when the pointer is not aligned to the
+      # expected SIMD width for strict backends.
+      # Default alignment check by offset. Backends may override for architecture-specific widths.
+      def check_alignment_offset(offset : Int32) : Warp::Core::ErrorCode
+        if ENV["WARP_STRICT_ALIGNMENT"]? == "1"
+          if (offset % 16) != 0
+            return Warp::Core::ErrorCode::SimdAlignmentError
+          end
+        end
+        Warp::Core::ErrorCode::Success
+      end
+
+      # Convenience shim preserving the (deprecated) pointer API for callers that
+      # previously passed a pointer directly. This computes an offset of zero and
+      # delegates to the offset-based check.
+      def check_alignment(ptr : Pointer(UInt8)) : Warp::Core::ErrorCode
+        check_alignment_offset(0)
+      end
+
       # Default scalar fallback for 16-byte UTF-8 validation. Backends may override.
       def validate_block(ptr : Pointer(UInt8), state : UInt32*) : Bool
         val = state.value

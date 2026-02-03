@@ -41,6 +41,13 @@ module Warp
               break
             end
 
+            # Optional strict alignment check (configurable via ENV)
+            err = backend.check_alignment_offset(offset)
+            if err != Warp::Core::ErrorCode::Success
+              @error = err
+              break
+            end
+
             # Get SIMD masks for structural characters
             masks = backend.build_masks(ptr + offset, block_len)
 
@@ -91,21 +98,12 @@ module Warp
           # - Operators (=, +, -, etc.)
           # - Comments (# and /* */)
 
-          # Start with quotes and operators
-          structural = masks.quote
+          structural = compute_common_structural(masks, block_len, ptr)
 
-          # Also include control characters which may include structural chars
-          structural |= masks.control
-
-          # We'll need to manually add braces, brackets, parentheses, colons
-          # by scanning the byte block directly
+          # Add remaining Crystal-specific structural bytes not covered by masks.op
           (0...block_len).each do |i|
             byte = ptr[i]
-            # Check for Crystal structural characters
-            if byte == '{'.ord.to_u8 || byte == '}'.ord.to_u8 ||
-               byte == '['.ord.to_u8 || byte == ']'.ord.to_u8 ||
-               byte == '('.ord.to_u8 || byte == ')'.ord.to_u8 ||
-               byte == ':'.ord.to_u8 || byte == ','.ord.to_u8 ||
+            if byte == '('.ord.to_u8 || byte == ')'.ord.to_u8 ||
                byte == ';'.ord.to_u8 || byte == '='.ord.to_u8 ||
                byte == '@'.ord.to_u8 || byte == '%'.ord.to_u8 ||
                byte == '.'.ord.to_u8 || byte == '#'.ord.to_u8 ||

@@ -262,6 +262,13 @@ module Warp
           break
         end
 
+        # Check alignment before calling backend mask builder (optional strict mode)
+        err = backend.check_alignment_offset(offset)
+        if err != Warp::Core::ErrorCode::Success
+          error = err
+          break
+        end
+
         masks = backend.build_masks_with_state(ptr + offset, block_len, state)
         block = scanner.next(masks.backslash, masks.quote, masks.whitespace, masks.op)
 

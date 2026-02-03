@@ -22,6 +22,18 @@ module Warp
         protected def backend
           Warp::Backend.current
         end
+
+        protected def compute_common_structural(
+          masks : Warp::Lexer::Masks,
+          block_len : Int32,
+          ptr : Pointer(UInt8),
+        ) : UInt64
+          structural = masks.quote | masks.control | masks.op
+          if block_len < 64
+            structural &= (1_u64 << block_len) - 1_u64
+          end
+          structural
+        end
       end
 
       # Result of a structural scan operation

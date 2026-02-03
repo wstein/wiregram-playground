@@ -14,7 +14,7 @@ module Warp
     # validation, unclosed strings, number/literal validation failures,
     # IO errors, etc.). Use `ErrorCode#success?` to test for success.
     enum ErrorCode : Int32
-      Success = 0
+      Success                 = 0
       Capacity
       Memalloc
       TapeError
@@ -47,6 +47,8 @@ module Warp
       OutOfBounds
       TrailingContent
       OutOfCapacity
+      SimdBackendError
+      SimdAlignmentError
       NumErrorCodes
 
       def success? : Bool
