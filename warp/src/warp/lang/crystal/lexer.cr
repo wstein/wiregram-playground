@@ -75,7 +75,24 @@ module Warp
         end
       end
 
+      class StatefulLexer
+        @bytes : Bytes
+        @state : Warp::Lexer::LexerState?
+
+        def initialize(@bytes : Bytes, @state : Warp::Lexer::LexerState? = nil)
+        end
+
+        def scan_all : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+          Warp::Lang::Crystal.scan_bytes(@bytes, @state)
+        end
+      end
+
       def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+        lexer = StatefulLexer.new(bytes, state)
+        lexer.scan_all
+      end
+
+      def self.scan_bytes(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         tokens = [] of Token
         i = 0
         len = bytes.size
@@ -289,7 +306,14 @@ module Warp
               next
             elsif i + 1 < len && bytes[i + 1] == '['.ord
               state.try(&.push(Warp::Lexer::LexerState::State::Annotation))
-              end_idx = scan_to_op_byte(bytes, i + 2, ']'.ord.to_u8, simd)
+              backend = Warp::Backend.current
+              indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_annotation_interior(
+                bytes,
+                (i + 1).to_u32,
+                backend
+              )
+              closing = indices.find { |idx| bytes[idx] == ']'.ord }
+              end_idx = closing ? closing.to_i : scan_to_op_byte(bytes, i + 2, ']'.ord.to_u8, simd)
               return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
               tokens << Token.new(TokenKind::Annotation, i, end_idx - i + 1)
               i = end_idx + 1
@@ -470,51 +494,17 @@ module Warp
         idx = simd.next_index_of(start, '\n'.ord.to_u8, '\r'.ord.to_u8)
         return idx if idx >= 0
         backend = Warp::Backend.current
-        ptr = bytes.to_unsafe
-        i = start
-        while i < len
-          block_len = len - i
-          block_len = 64 if block_len > 64
-          mask = backend.newline_mask(ptr + i, block_len)
-          if mask != 0
-            return i + mask.trailing_zeros_count
-          end
-          i += 64
-        end
-        len
+        Warp::Lang::Common::SimdLexingUtils.scan_to_line_end(bytes, start, backend)
       end
 
       private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8, simd : SimdIndex? = nil) : Int32
         len = bytes.size
         i = start + 1
         return -1 if i >= len
-
-        if simd
-          simd.not_nil!.next_index_of(i, delimiter)
-        end
-
         backend = Warp::Backend.current
-        escape_scanner = Warp::Lexer::EscapeScanner.new
-        ptr = bytes.to_unsafe
-
-        while i < len
-          block_len = len - i
-          block_len = 64 if block_len > 64
-
-          masks = backend.build_masks(ptr + i, block_len)
-          backslash = masks.backslash
-          delim_mask = build_byte_mask(ptr + i, block_len, delimiter)
-          escaped = escape_scanner.next(backslash).escaped
-          unescaped = delim_mask & ~escaped
-
-          if unescaped != 0
-            return i + unescaped.trailing_zeros_count + 1
-          end
-
-          i += 64
+        Warp::Lang::Common::SimdLexingUtils.scan_delimited(bytes, start, delimiter, false, backend) do |_b|
+          false
         end
-
-        -1
       end
 
       private def self.scan_to_double(bytes : Bytes, start : Int32, a : UInt8, b : UInt8, simd : SimdIndex? = nil) : Int32
@@ -590,16 +580,6 @@ module Warp
         -1
       end
 
-      private def self.build_byte_mask(ptr : Pointer(UInt8), block_len : Int32, target : UInt8) : UInt64
-        mask = 0_u64
-        i = 0
-        while i < block_len
-          mask |= (1_u64 << i) if ptr[i] == target
-          i += 1
-        end
-        mask
-      end
-
       private def self.is_percent_literal_type(c : UInt8) : Bool
         # %w, %i, %r, %q, %s, %x, %W, %I, %Q, %R, %S, %X
         (c >= 'a'.ord && c <= 'z'.ord) || (c >= 'A'.ord && c <= 'Z'.ord)
@@ -623,7 +603,7 @@ module Warp
 
           masks = backend.build_masks(ptr + i, block_len)
           backslash = masks.backslash
-          delim_mask = build_byte_mask(ptr + i, block_len, close)
+          delim_mask = Warp::Lang::Common::SimdLexingUtils.build_byte_mask(ptr + i, block_len, close)
           escaped = escape_scanner.next(backslash).escaped
           unescaped = delim_mask & ~escaped
 

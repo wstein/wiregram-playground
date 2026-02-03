@@ -54,6 +54,7 @@ require "./warp/parser"
 
 # Common language infrastructure
 require "./warp/lang/common/simd_scanner"
+require "./warp/lang/common/simd_lexing_utils"
 require "./warp/lang/common/state_aware_simd_helpers"
 require "./warp/lang/common/unicode_simd"
 require "./warp/lang/common/number_simd"

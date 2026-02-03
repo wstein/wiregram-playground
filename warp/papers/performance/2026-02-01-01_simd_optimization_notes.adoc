@@ -190,6 +190,36 @@ export WARP_BACKEND_LOG=1
 # Output: warp backend=avx2
 ----
 
+=== CLI Backend Override (Dump/Transpile)
+
+The CLI now accepts a backend override flag for experiments and reproducible benchmarks:
+
+[source,bash]
+----
+# Force scalar backend for dump pipeline
+warp dump full --lang ruby --backend scalar spec/fixtures/cli/rb_simple.rb
+
+# Force AVX2 backend for transpile
+warp transpile ruby --backend avx2 --source corpus/ruby/10_complex.rb
+----
+
+The CLI override uses the same backend selector as the environment variable and
+supports: `scalar`, `sse2`, `avx`, `avx2`, `avx512`, `neon`, `armv6`.
+
+=== SIMD vs Scalar Benchmarks
+
+Two comparison scripts were added to measure SIMD speedups against the scalar backend
+on representative Ruby and Crystal files:
+
+[source,bash]
+----
+crystal run bench/simd_vs_scalar_ruby.cr --release
+crystal run bench/simd_vs_scalar_crystal.cr --release
+----
+
+These benchmarks report MB/s throughput and speedup ratios for available backends
+on the current system.
+
 === Example Output
 
 [source]

@@ -26,19 +26,29 @@ module Warp
         ) : Array(UInt32)
           indices = [] of UInt32
           i = start
+          escaped = false
 
           while i < bytes.size
             byte = bytes[i]
 
-            # Check for quote termination
-            if byte == quote_char
-              indices << i.to_u32
-              break
+            if escaped
+              escaped = false
+              i += 1
+              next
             end
 
             # Check for escape sequence
             if byte == '\\'.ord
               indices << i.to_u32
+              escaped = true
+              i += 1
+              next
+            end
+
+            # Check for quote termination
+            if byte == quote_char
+              indices << i.to_u32
+              break
             end
 
             # Check for interpolation marker (#{) in double-quoted strings
@@ -100,24 +110,42 @@ module Warp
         ) : Array(UInt32)
           indices = [] of UInt32
           i = start
+          escaped = false
+          in_class = false
 
           while i < bytes.size
             byte = bytes[i]
 
-            # Check for regex terminator
-            if byte == '/'.ord
-              indices << i.to_u32
-              break
+            if escaped
+              escaped = false
+              i += 1
+              next
             end
 
-            # Check for escape sequence
             if byte == '\\'.ord
               indices << i.to_u32
+              escaped = true
+              i += 1
+              next
             end
 
-            # Check for character class start/end
-            if byte == '['.ord || byte == ']'.ord
+            # Track character classes
+            if byte == '['.ord
               indices << i.to_u32
+              in_class = true
+              i += 1
+              next
+            elsif byte == ']'.ord
+              indices << i.to_u32
+              in_class = false
+              i += 1
+              next
+            end
+
+            # Check for regex terminator (only when not in character class)
+            if !in_class && byte == '/'.ord
+              indices << i.to_u32
+              break
             end
 
             i += 1
@@ -136,9 +164,25 @@ module Warp
           indices = [] of UInt32
           i = start
           nesting_level = 0
+          in_string = false
+          string_quote = 0_u8
+          escaped = false
 
           while i < bytes.size
             byte = bytes[i]
+
+            if in_string
+              if escaped
+                escaped = false
+              elsif byte == '\\'.ord
+                escaped = true
+              elsif byte == string_quote
+                indices << i.to_u32
+                in_string = false
+              end
+              i += 1
+              next
+            end
 
             case byte
             when '{'.ord
@@ -151,8 +195,10 @@ module Warp
                 break
               end
             when '"'.ord, '\''.ord
-              # Track string boundaries within macros
               indices << i.to_u32
+              in_string = true
+              string_quote = byte
+              escaped = false
             end
 
             i += 1
@@ -171,9 +217,25 @@ module Warp
           indices = [] of UInt32
           i = start
           nesting_level = 0
+          in_string = false
+          string_quote = 0_u8
+          escaped = false
 
           while i < bytes.size
             byte = bytes[i]
+
+            if in_string
+              if escaped
+                escaped = false
+              elsif byte == '\\'.ord
+                escaped = true
+              elsif byte == string_quote
+                indices << i.to_u32
+                in_string = false
+              end
+              i += 1
+              next
+            end
 
             case byte
             when '['.ord
@@ -189,6 +251,9 @@ module Warp
               indices << i.to_u32
             when '"'.ord, '\''.ord
               indices << i.to_u32
+              in_string = true
+              string_quote = byte
+              escaped = false
             end
 
             i += 1

@@ -3,6 +3,7 @@ require "file_utils"
 require "json"
 require "../parallel/cpu_detector"
 require "../parallel/file_processor"
+require "./benchmark_json"
 
 module Warp::CLI
   enum TranspileTarget
@@ -31,6 +32,7 @@ module Warp::CLI
       return run_transpile(args[1..]) if args.first? == "transpile"
       return run_dump(args[1..]) if args.first? == "dump"
       return run_detect(args[1..]) if args.first? == "detect"
+      return BenchmarkJson.run(args[1..]) if args.first? == "bench-json"
       if args.first? == "version" || args.first? == "-v" || args.first? == "--version"
         puts Warp.version_string
         return 0
@@ -50,6 +52,7 @@ Usage:
   warp transpile [target] [options]
   warp dump <simd|tokens|tape|soa|cst|dom|ast|full> [options] <file>
   warp detect patterns [options] <file>
+  warp bench-json [options]
   warp version
 
 Targets:
@@ -65,6 +68,7 @@ Commands:
   transpile     Transpile between Ruby and Crystal
   dump          Inspect pipeline stages for a file
   detect        Detect language-specific patterns
+  bench-json    Generate structured JSON benchmarks
   version       Show version information
   help          Show this help message
 TXT
@@ -80,6 +84,7 @@ Options:
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
   --perf                 Report SIMD timing/throughput
+  --backend=NAME         Backend override: scalar|sse2|avx|avx2|avx512|neon|armv6
   -h, --help             Show this help message
 
 Examples:
@@ -104,6 +109,7 @@ Options:
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
   --perf                 Report SIMD timing/throughput
+  --backend=NAME         Backend override: scalar|sse2|avx|avx2|avx512|neon|armv6
   -h, --help             Show this help message
 TXT
     end
@@ -127,6 +133,7 @@ Options:
   --dry-run               Parse/validate without writing output files
   --stdout                Write output to stdout
   -v, --verbose           Print detailed system and worker information
+  --backend=NAME          Backend override: scalar|sse2|avx|avx2|avx512|neon|armv6
 TXT
     end
 
@@ -224,6 +231,7 @@ YAML
       parallel_workers : Int32? = nil
       verbose = false
       dry_run = false
+      backend_override : String? = nil
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
@@ -242,10 +250,14 @@ YAML
         p.on("--dry-run", "Parse/validate without writing output files") { dry_run = true }
         p.on("--stdout", "Write output to stdout") { stdout = true }
         p.on("-v", "--verbose", "Print detailed information about system and workers") { verbose = true }
+        p.on("--backend=NAME", "Backend override: scalar|sse2|avx|avx2|avx512|neon|armv6") { |v| backend_override = v }
       end
 
       parsed_args = args || [] of String
       parser.parse(parsed_args)
+      if backend_override
+        return 1 unless apply_backend_override(backend_override.not_nil!)
+      end
       if parsed_args.size > 0 && source_path == "."
         source_path = parsed_args[0]
       end
@@ -415,6 +427,7 @@ YAML
       format_name = "pretty"
       jsonc = false
       perf = false
+      backend_override : String? = nil
 
       parser = OptionParser.new do |p|
         p.banner = dump_stage_usage(stage)
@@ -422,10 +435,15 @@ YAML
         p.on("-f FORMAT", "--format=FORMAT", "Output format: pretty|json") { |v| format_name = v }
         p.on("--jsonc", "Enable JSONC parsing (JSON only)") { jsonc = true }
         p.on("--perf", "Report SIMD timing/throughput") { perf = true }
+        p.on("--backend=NAME", "Backend override: scalar|sse2|avx|avx2|avx512|neon|armv6") { |v| backend_override = v }
         p.on("-h", "--help", "Show this help message") { puts dump_stage_usage(stage); exit 0 }
       end
 
       parser.parse(args)
+
+      if backend_override
+        return 1 unless apply_backend_override(backend_override.not_nil!)
+      end
 
       if args.empty?
         puts "Missing file argument."
@@ -487,6 +505,16 @@ YAML
       else
         nil
       end
+    end
+
+    private def self.apply_backend_override(name : String) : Bool
+      backend = Warp::Backend.select_by_name(name)
+      unless backend
+        puts "Unknown or unavailable backend: #{name}"
+        return false
+      end
+      Warp::Backend.reset(backend)
+      true
     end
 
     private def self.resolve_dump_language(lang_name : String, path : String, bytes : Bytes, jsonc : Bool) : Tuple(DumpLanguage, Bool)?

@@ -77,7 +77,24 @@ module Warp
         end
       end
 
+      class StatefulLexer
+        @bytes : Bytes
+        @state : Warp::Lexer::LexerState?
+
+        def initialize(@bytes : Bytes, @state : Warp::Lexer::LexerState? = nil)
+        end
+
+        def scan_all : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+          Warp::Lang::Ruby.scan_bytes(@bytes, @state)
+        end
+      end
+
       def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+        lexer = StatefulLexer.new(bytes, state)
+        lexer.scan_all
+      end
+
+      def self.scan_bytes(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         # Module-level compatibility: this method is used internally by tests and other code.
         tokens = [] of Token
         i = 0
@@ -159,36 +176,47 @@ module Warp
               if j < len
                 j += 1
               end
-              # search for delimiter at line start
-              k = j
-              found = -1
-              while k < len
-                line_start = k
-                # skip leading whitespace using built-in scan
-                while k < len && (bytes[k] == ' '.ord || bytes[k] == '\t'.ord)
-                  k += 1
-                end
-                # match delimiter
-                if match_literal(bytes, k, delim)
-                  k += delim.bytesize
-                  # ensure end of line
-                  if k >= len || bytes[k] == '\n'.ord || bytes[k] == '\r'.ord
-                    found = k
-                    # consume rest of line using SIMD
-                    k = scan_to_line_end(bytes, k, simd)
-                    if k < len
-                      k += 1
-                    end
-                    break
-                  end
-                end
-                # advance to next line using SIMD
+              backend = Warp::Backend.current
+              terminator_indices = Warp::Lang::Common::StateAwareSimdHelpers.scan_heredoc_content(
+                bytes,
+                j.to_u32,
+                delim,
+                backend
+              )
+              terminator_idx = terminator_indices.find { |idx| match_literal(bytes, idx.to_i, delim) }
+
+              if terminator_idx
+                k = terminator_idx.to_i + delim.bytesize
                 k = scan_to_line_end(bytes, k, simd)
-                if k < len
-                  k += 1
+                k += 1 if k < len
+                end_idx = k
+              else
+                # search for delimiter at line start (fallback)
+                k = j
+                found = -1
+                while k < len
+                  # skip leading whitespace using built-in scan
+                  while k < len && (bytes[k] == ' '.ord || bytes[k] == '\t'.ord)
+                    k += 1
+                  end
+                  # match delimiter
+                  if match_literal(bytes, k, delim)
+                    k += delim.bytesize
+                    # ensure end of line
+                    if k >= len || bytes[k] == '\n'.ord || bytes[k] == '\r'.ord
+                      found = k
+                      # consume rest of line using SIMD
+                      k = scan_to_line_end(bytes, k, simd)
+                      k += 1 if k < len
+                      break
+                    end
+                  end
+                  # advance to next line using SIMD
+                  k = scan_to_line_end(bytes, k, simd)
+                  k += 1 if k < len
                 end
+                end_idx = (found >= 0) ? found : k
               end
-              end_idx = (found >= 0) ? found : k
               state.try(&.push(Warp::Lexer::LexerState::State::Heredoc))
               tokens << Token.new(TokenKind::Heredoc, i, end_idx - i)
               state.try(&.pop)
@@ -520,67 +548,17 @@ module Warp
         idx = simd.next_index_of(start, '\n'.ord.to_u8, '\r'.ord.to_u8)
         return idx if idx >= 0
         backend = Warp::Backend.current
-        ptr = bytes.to_unsafe
-        i = start
-        while i < len
-          block_len = len - i
-          block_len = 64 if block_len > 64
-          mask = backend.newline_mask(ptr + i, block_len)
-          if mask != 0
-            return i + mask.trailing_zeros_count
-          end
-          i += 64
-        end
-        len
+        Warp::Lang::Common::SimdLexingUtils.scan_to_line_end(bytes, start, backend)
       end
 
       private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8, allow_modifiers : Bool = false, simd : SimdIndex? = nil) : Int32
         len = bytes.size
         i = start + 1
         return -1 if i >= len
-
-        if simd
-          simd.not_nil!.next_index_of(i, delimiter)
-        end
-
         backend = Warp::Backend.current
-        escape_scanner = Warp::Lexer::EscapeScanner.new
-        ptr = bytes.to_unsafe
-
-        while i < len
-          block_len = len - i
-          block_len = 64 if block_len > 64
-
-          masks = backend.build_masks(ptr + i, block_len)
-          backslash = masks.backslash
-          delim_mask = build_byte_mask(ptr + i, block_len, delimiter)
-          escaped = escape_scanner.next(backslash).escaped
-          unescaped = delim_mask & ~escaped
-
-          if unescaped != 0
-            end_idx = i + unescaped.trailing_zeros_count + 1
-            if allow_modifiers
-              while end_idx < len && regex_modifier?(bytes[end_idx])
-                end_idx += 1
-              end
-            end
-            return end_idx
-          end
-
-          i += 64
+        Warp::Lang::Common::SimdLexingUtils.scan_delimited(bytes, start, delimiter, allow_modifiers, backend) do |b|
+          regex_modifier?(b)
         end
-
-        -1
-      end
-
-      private def self.build_byte_mask(ptr : Pointer(UInt8), block_len : Int32, target : UInt8) : UInt64
-        mask = 0_u64
-        i = 0
-        while i < block_len
-          mask |= (1_u64 << i) if ptr[i] == target
-          i += 1
-        end
-        mask
       end
 
       private def self.regex_modifier?(b : UInt8) : Bool
@@ -610,7 +588,7 @@ module Warp
 
           masks = backend.build_masks(ptr + i, block_len)
           backslash = masks.backslash
-          delim_mask = build_byte_mask(ptr + i, block_len, close)
+          delim_mask = Warp::Lang::Common::SimdLexingUtils.build_byte_mask(ptr + i, block_len, close)
           escaped = escape_scanner.next(backslash).escaped
           unescaped = delim_mask & ~escaped
 

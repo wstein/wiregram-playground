@@ -1,0 +1,86 @@
+= Phase 2: Stateful Lexer Integration and SIMD Helpers
+:toc: left
+:toclevels: 3
+:doctype: article
+:icons: font
+:source-highlighter: pygments
+
+== Summary
+
+Phase 2 integrates state-aware SIMD helpers into the Ruby and Crystal lexers and
+introduces a stateful lexer wrapper to prepare for incremental parsing. The changes
+retain current APIs while establishing a clean path for streaming/partial lexing.
+
+== Stateful Lexer Architecture
+
+=== Motivation
+
+Incremental parsing requires a lexer that can preserve state and resume scanning
+from an arbitrary offset. Phase 2 adds a stateful wrapper to both lexers so a
+future incremental parser can reuse the same core logic without rewriting the
+lexing pipeline.
+
+=== Design
+
+Each language now exposes a `StatefulLexer` class with:
+
+* `@bytes` input buffer
+* `@state` stack (`Warp::Lexer::LexerState`)
+* `scan_all` method (current full-scan behavior)
+
+This establishes a stateful entry point while keeping the existing static
+`Lexer.scan` APIs intact.
+
+== State-Aware SIMD Helpers
+
+The lexers now integrate the `StateAwareSimdHelpers` module for:
+
+* Ruby string and regex scanning (escape-aware)
+* Ruby heredoc terminator detection
+* Crystal annotation scanning
+
+These helpers accelerate scanning within known parsing contexts and reduce the
+amount of scalar work needed to detect terminators and escape sequences.
+
+== Cross-Language SIMD Utilities
+
+A new common module (`SimdLexingUtils`) deduplicates shared SIMD utilities:
+
+* `scan_to_line_end` — newline scanning with SIMD masks
+* `scan_delimited` — delimited literal scanning with escape handling
+* `build_byte_mask` — fast byte mask construction
+
+Ruby and Crystal lexers now call the shared utilities to reduce duplicated code.
+
+== End-to-End Pipeline Tests
+
+New integration tests validate the full pipeline for Ruby and Crystal:
+
+* `dump full` outputs all stages: simd → tokens → tape → cst
+* JSON-format dumps include each stage object
+
+These tests ensure that SIMD indices, tokenization, tape generation, and CST
+construction work together across the entire pipeline.
+
+== Benchmarks
+
+Added benchmarks compare SIMD backends against scalar fallback on
+representative files:
+
+[source,bash]
+----
+crystal run bench/simd_vs_scalar_ruby.cr --release
+crystal run bench/simd_vs_scalar_crystal.cr --release
+----
+
+== Backend Selection Support
+
+The CLI now supports explicit backend overrides via `--backend`, enabling
+repeatable benchmarking across SIMD and scalar paths. All backends remain
+selectable via the existing `WARP_BACKEND` environment variable.
+
+== Next Steps
+
+* Extend `StatefulLexer` with incremental `next_token` API.
+* Integrate state-aware helpers deeper into macro scanning.
+* Add performance telemetry and CI regression gates.
