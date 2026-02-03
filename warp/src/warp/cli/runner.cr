@@ -1475,6 +1475,18 @@ YAML
             end
           end
         end
+        json.field "trailing_trivia" do
+          json.array do
+            node.trailing_trivia.each do |tr|
+              json.object do
+                json.field "kind", tr.kind.to_s
+                json.field "start", tr.start
+                json.field "length", tr.length
+                json.field "text", slice_text(bytes, tr.start, tr.length)
+              end
+            end
+          end
+        end
         json.field "children" do
           json.array do
             node.children.each do |child|
@@ -1504,6 +1516,18 @@ YAML
         json.field "leading_trivia" do
           json.array do
             node.leading_trivia.each do |tr|
+              json.object do
+                json.field "kind", tr.kind.to_s
+                json.field "start", tr.start
+                json.field "length", tr.length
+                json.field "text", slice_text(bytes, tr.start, tr.length)
+              end
+            end
+          end
+        end
+        json.field "trailing_trivia" do
+          json.array do
+            node.trailing_trivia.each do |tr|
               json.object do
                 json.field "kind", tr.kind.to_s
                 json.field "start", tr.start

@@ -10,6 +10,17 @@ This document describes the CST-based transformation mappings between Ruby and C
 
 The bidirectional transpiler maps language-specific syntax between Ruby and Crystal while preserving semantics. Each mapping is handled at the CST level, ensuring accuracy and maintainability.
 
+== CST Trivia Guarantees
+
+The CST builder attaches both leading and trailing trivia to nodes so mapping
+cases can preserve formatting across transformations. Trailing trivia includes
+EOF trivia to ensure final newlines and trailing comments are retained.
+
+**Guarantees:**
+* Leading trivia is attached to the first token of a node.
+* Trailing trivia is attached to the last token of a node.
+* Formatter emits leading + trailing trivia verbatim for round-trip fidelity.
+
 == Require Statements
 
 === Case 1: Crystal `require` → Ruby `require_relative`

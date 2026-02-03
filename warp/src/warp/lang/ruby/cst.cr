@@ -52,12 +52,14 @@ module Warp::Lang::Ruby
       getter children : Array(GreenNode)
       getter token : Token?
       getter leading_trivia : Array(Trivia)
+      getter trailing_trivia : Array(Trivia)
 
       def initialize(
         @kind : NodeKind,
         @children : Array(GreenNode) = [] of GreenNode,
         @token : Token? = nil,
         @leading_trivia : Array(Trivia) = [] of Trivia,
+        @trailing_trivia : Array(Trivia) = [] of Trivia,
       )
       end
     end
@@ -81,6 +83,10 @@ module Warp::Lang::Ruby
 
       def leading_trivia : Array(Trivia)
         @green.leading_trivia
+      end
+
+      def trailing_trivia : Array(Trivia)
+        @green.trailing_trivia
       end
 
       def children : Array(RedNode)
@@ -143,7 +149,8 @@ module Warp::Lang::Ruby
           end
         end
 
-        GreenNode.new(NodeKind::Root, children, leading_trivia: trivia)
+        eof_trivia = @tokens.size > 0 ? @tokens[-1].trivia : [] of Trivia
+        GreenNode.new(NodeKind::Root, children, leading_trivia: trivia, trailing_trivia: eof_trivia)
       end
 
       # Parse method definition: def name(params) ... end
@@ -200,7 +207,8 @@ module Warp::Lang::Ruby
         # consume 'end' if present
         advance if current.kind == TokenKind::End
 
-        GreenNode.new(NodeKind::MethodDef, children, def_token, trivia)
+        trailing = collect_trailing_trivia
+        GreenNode.new(NodeKind::MethodDef, children, def_token, trivia, trailing)
       end
 
       # Parse a basic expression supporting Pratt precedence
@@ -409,6 +417,23 @@ module Warp::Lang::Ruby
       private def collect_trivia : Array(Trivia)
         return [] of Trivia if @pos >= @tokens.size
         current.trivia
+      end
+
+      # Collect trailing trivia from the next token (including EOF)
+      private def collect_trailing_trivia : Array(Trivia)
+        return [] of Trivia if @pos >= @tokens.size
+        i = @pos
+        while i < @tokens.size
+          tr = @tokens[i].trivia
+          return tr unless tr.empty?
+          # Skip pure newline tokens to find EOF-attached trivia
+          if @tokens[i].kind == TokenKind::Newline
+            i += 1
+            next
+          end
+          break
+        end
+        [] of Trivia
       end
 
       private def current : Token

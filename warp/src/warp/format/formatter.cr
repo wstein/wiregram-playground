@@ -41,6 +41,7 @@ module Warp
       root.children.each do |child|
         write_cst_node(builder, doc, child, indent, newline, 0)
       end
+      write_cst_trivia(builder, doc, root.trailing_trivia, indent, newline, 0)
       builder.to_s
     end
 
@@ -342,6 +343,7 @@ module Warp
       when CST::NodeKind::True, CST::NodeKind::False, CST::NodeKind::Null
         write_cst_slice(io, doc, node)
       end
+      write_cst_trivia(io, doc, node.trailing_trivia, indent, newline, level)
     end
 
     private def self.write_cst_object(

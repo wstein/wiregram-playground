@@ -44,6 +44,7 @@ module Warp::Lang::Crystal
             [] of CST::GreenNode,
             nil,
             [] of Warp::Lang::Crystal::Trivia,
+            [] of Warp::Lang::Crystal::Trivia,
             payload,
           )
 

@@ -49,6 +49,7 @@ module Warp::Lang::Crystal
       getter children : Array(GreenNode)
       getter text : String?
       getter leading_trivia : Array(Warp::Lang::Crystal::Trivia)
+      getter trailing_trivia : Array(Warp::Lang::Crystal::Trivia)
       getter method_payload : MethodDefPayload?
 
       def initialize(
@@ -56,6 +57,7 @@ module Warp::Lang::Crystal
         @children : Array(GreenNode) = [] of GreenNode,
         @text : String? = nil,
         @leading_trivia : Array(Warp::Lang::Crystal::Trivia) = [] of Warp::Lang::Crystal::Trivia,
+        @trailing_trivia : Array(Warp::Lang::Crystal::Trivia) = [] of Warp::Lang::Crystal::Trivia,
         @method_payload : MethodDefPayload? = nil,
       )
       end
@@ -79,6 +81,10 @@ module Warp::Lang::Crystal
 
       def leading_trivia : Array(Warp::Lang::Crystal::Trivia)
         @green.leading_trivia
+      end
+
+      def trailing_trivia : Array(Warp::Lang::Crystal::Trivia)
+        @green.trailing_trivia
       end
 
       def method_payload : MethodDefPayload?
@@ -180,7 +186,8 @@ module Warp::Lang::Crystal
           children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
         end
 
-        GreenNode.new(NodeKind::Root, children)
+        eof_trivia = @tokens.size > 0 ? @tokens[-1].trivia : [] of Warp::Lang::Crystal::Trivia
+        GreenNode.new(NodeKind::Root, children, nil, trivia, eof_trivia)
       end
 
       private def parse_expression : GreenNode
@@ -493,13 +500,29 @@ module Warp::Lang::Crystal
 
         advance if current.kind == TokenKind::End
 
+        trailing = collect_trailing_trivia
         payload = CST::MethodDefPayload.new(method_name, params, return_type, body_text, had_parens, original_source)
-        GreenNode.new(NodeKind::MethodDef, [] of GreenNode, nil, [] of Warp::Lang::Crystal::Trivia, payload)
+        GreenNode.new(NodeKind::MethodDef, [] of GreenNode, nil, [] of Warp::Lang::Crystal::Trivia, trailing, payload)
       end
 
       private def collect_trivia : Array(Warp::Lang::Crystal::Trivia)
         return [] of Warp::Lang::Crystal::Trivia if @pos >= @tokens.size
         current.trivia
+      end
+
+      private def collect_trailing_trivia : Array(Warp::Lang::Crystal::Trivia)
+        return [] of Warp::Lang::Crystal::Trivia if @pos >= @tokens.size
+        i = @pos
+        while i < @tokens.size
+          tr = @tokens[i].trivia
+          return tr unless tr.empty?
+          if @tokens[i].kind == TokenKind::Newline
+            i += 1
+            next
+          end
+          break
+        end
+        [] of Warp::Lang::Crystal::Trivia
       end
 
       private def current : Warp::Lang::Crystal::Token

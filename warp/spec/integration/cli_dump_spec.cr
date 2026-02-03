@@ -20,6 +20,8 @@ describe "CLI dump integration" do
     root.should_not be_nil
     root["leading_trivia"].should_not be_nil
     root["leading_trivia"].as_a?.should_not be_nil
+    root["trailing_trivia"].should_not be_nil
+    root["trailing_trivia"].as_a?.should_not be_nil
   end
 
   it "dumps Crystal CST JSON including leading_trivia" do
@@ -32,5 +34,7 @@ describe "CLI dump integration" do
     root.should_not be_nil
     root["leading_trivia"].should_not be_nil
     root["leading_trivia"].as_a?.should_not be_nil
+    root["trailing_trivia"].should_not be_nil
+    root["trailing_trivia"].as_a?.should_not be_nil
   end
 end

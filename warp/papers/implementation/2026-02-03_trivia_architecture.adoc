@@ -38,5 +38,42 @@ end
 * CST builders attach trivia to nodes for lossless reconstruction.
 * Formatter uses trivia slices to preserve exact whitespace.
 
+== CST Node Trivia Model
+Token trivia is sufficient for linear token streams, but CST nodes require
+both leading and trailing trivia because node boundaries are hierarchical and
+not directly derivable from neighboring tokens.
+
+[source,crystal]
+----
+abstract class CST::Node
+  property leading_trivia : Array(Trivia) = [] of Trivia
+  property trailing_trivia : Array(Trivia) = [] of Trivia
+  property start_position : Int32
+  property end_position : Int32
+end
+----
+
+=== Leading Trivia
+Leading trivia belongs to the first token owned by a node. For multi-token
+nodes (e.g., method definitions), the leading trivia is taken from the first
+token that begins the node.
+
+=== Trailing Trivia
+Trailing trivia belongs to the last token owned by a node and includes any
+whitespace/comments that occur immediately after the node’s closing token.
+Trailing trivia explicitly includes EOF trivia to preserve final newlines and
+comments at the end of a file.
+
+=== CST Builder Responsibilities
+* Track each node’s start and end positions.
+* Attach leading_trivia from the node’s first token.
+* Attach trailing_trivia from the node’s closing token (including EOF).
+* Preserve trivia even when nodes span multiple tokens and nested blocks.
+
+=== Formatter Responsibilities
+* Emit leading_trivia before node content.
+* Emit trailing_trivia after node content.
+* Preserve exact whitespace and comment placement for round-trip fidelity.
+
 == Debugging & CLI
 Token dumps include the trivia array when available so whitespace and comments are visible in diagnostics.
