@@ -41,6 +41,7 @@ module Warp
         For
         In
         Do
+        When
         Return
         Break
         Next

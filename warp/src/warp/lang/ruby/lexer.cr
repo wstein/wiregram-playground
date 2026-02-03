@@ -535,7 +535,7 @@ module Warp
         case last_kind
         when TokenKind::LParen, TokenKind::LBracket, TokenKind::LBrace, TokenKind::Comma, TokenKind::Semicolon,
              TokenKind::Newline, TokenKind::Return, TokenKind::Do, TokenKind::If, TokenKind::Unless, TokenKind::While,
-             TokenKind::Equal, TokenKind::Match, TokenKind::NotMatch, TokenKind::Tilde
+             TokenKind::When, TokenKind::Equal, TokenKind::Match, TokenKind::NotMatch, TokenKind::Tilde
           true
         else
           false
@@ -636,28 +636,53 @@ module Warp
           return end_idx.to_i + 1 if end_idx
         end
 
+        # For paired delimiters like %Q{...}, %w{...}, etc., we need to handle nested quotes
+        # Track if we're inside a string literal within the percent literal
+        in_string = false
+        string_delim = 0u8
+        escaped = false
+
         while i < len
-          block_len = len - i
-          block_len = 64 if block_len > 64
+          byte = bytes[i]
 
-          masks = backend.build_masks(ptr + i, block_len)
-          backslash = masks.backslash
-          delim_mask = Warp::Lang::Common::SimdLexingUtils.build_byte_mask(ptr + i, block_len, close)
-          escaped = escape_scanner.next(backslash).escaped
-          unescaped = delim_mask & ~escaped
+          if escaped
+            escaped = false
+            i += 1
+            next
+          end
 
-          if unescaped != 0
-            end_idx = i + unescaped.trailing_zeros_count + 1
+          if byte == '\\'.ord
+            escaped = true
+            i += 1
+            next
+          end
+
+          # Track nested strings
+          if !in_string && (byte == '"'.ord || byte == '\''.ord)
+            in_string = true
+            string_delim = byte
+            i += 1
+            next
+          elsif in_string && byte == string_delim
+            in_string = false
+            i += 1
+            next
+          end
+
+          # Check for closing delimiter (only outside of nested strings)
+          if !in_string && byte == close
             # for %r, consume trailing modifiers
             if is_regex
+              end_idx = i + 1
               while end_idx < len && regex_modifier?(bytes[end_idx])
                 end_idx += 1
               end
+              return end_idx
             end
-            return end_idx
+            return i + 1
           end
 
-          i += 64
+          i += 1
         end
 
         -1
