@@ -77,7 +77,9 @@ module Warp
       @prev_in_string : UInt64 = 0_u64
 
       def next(backslash : UInt64, quote_mask : UInt64) : StringBlock
-        escaped = @escape_scanner.next(backslash).escaped
+        escaped_chars = @escape_scanner.next(backslash).escaped
+        # Only mark positions as escaped if they're also quotes (not backslashes)
+        escaped = escaped_chars & quote_mask
         quote = quote_mask & ~escaped
         in_string = Lexer.prefix_xor(quote) ^ @prev_in_string
         @prev_in_string = (in_string & 0x8000000000000000_u64) == 0 ? 0_u64 : 0xFFFFFFFFFFFFFFFF_u64
@@ -106,12 +108,12 @@ module Warp
       end
 
       def structural_start : UInt64
-        # Only true structural characters; include unescaped quotes explicitly
-        # Exclude only *non-quote* bytes that are inside strings. Additionally,
-        # treat any quote immediately preceded by a backslash as escaped and
-        # therefore not a structural position.
+        # Structural characters: ops and unescaped quotes (both opening and closing).
+        # TokenAssembler will use scan_string_end to identify opening quotes; if a quote
+        # doesn't match to a closing quote, it's treated as a closing quote and skipped.
         unescaped_quote = @strings.quote & ~@strings.escaped & ~(@backslash_mask << 1)
-        (@characters.op | unescaped_quote) & ~(@strings.in_string & ~@strings.quote)
+        opening_quote = unescaped_quote & @strings.in_string
+        (@characters.op | opening_quote)
       end
 
       def non_quote_inside_string(mask : UInt64) : UInt64
@@ -241,7 +243,7 @@ module Warp
       end
     end
 
-    def self.index(bytes : Bytes) : LexerResult
+    def self.index(bytes : Bytes, state : LexerState? = nil) : LexerResult
       ptr = bytes.to_unsafe
       len = bytes.size
       indices = Array(UInt32).new
@@ -260,7 +262,7 @@ module Warp
           break
         end
 
-        masks = backend.build_masks(ptr + offset, block_len)
+        masks = backend.build_masks_with_state(ptr + offset, block_len, state)
         block = scanner.next(masks.backslash, masks.quote, masks.whitespace, masks.op)
 
         structural = block.structural_start
@@ -290,7 +292,7 @@ module Warp
         # prefer that result and continue.
         if error == ErrorCode::UnclosedString
           tmp_buf = LexerBuffer.new(indices.to_unsafe, indices.size, indices)
-          token_err = Lexer::TokenAssembler.each_token(bytes, tmp_buf) { }
+          token_err = Lexer::TokenAssembler.each_token(bytes, tmp_buf, state) { }
           if token_err == ErrorCode::Success
             error = ErrorCode::Success
           end
@@ -302,8 +304,24 @@ module Warp
         if error == ErrorCode::Success && unescaped_error != 0
           error = ErrorCode::UnescapedChars
         end
+
+        # If there are no structural indices, we defer to TokenAssembler to
+        # handle scalar-only inputs. However, if the entire input is only
+        # whitespace, report Empty here so callers get an explicit result.
         if error == ErrorCode::Success && indices.empty?
-          error = ErrorCode::Empty
+          only_ws = true
+          i = 0
+          while i < len
+            c = ptr[i]
+            if c != ' '.ord && c != '\t'.ord && c != '\n'.ord && c != '\r'.ord
+              only_ws = false
+              break
+            end
+            i += 1
+          end
+          if only_ws
+            error = ErrorCode::Empty
+          end
         end
       end
 

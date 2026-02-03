@@ -38,7 +38,7 @@ module Warp
         "when"   => TokenKind::When,
       }
 
-      def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+      def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         # Module-level compatibility: this method is used internally by tests and other code.
         tokens = [] of Token
         i = 0
@@ -71,9 +71,11 @@ module Warp
 
           # comments
           if c == '#'.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::Comment))
             j = scan_to_line_end(bytes, i + 1)
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
+            state.try(&.pop)
             next
           end
 
@@ -142,7 +144,9 @@ module Warp
                 end
               end
               end_idx = (found >= 0) ? found : k
+              state.try(&.push(Warp::Lexer::LexerState::State::Heredoc))
               tokens << Token.new(TokenKind::Heredoc, i, end_idx - i)
+              state.try(&.pop)
               i = end_idx
               last_nonspace_kind = TokenKind::Heredoc
               next
@@ -151,30 +155,36 @@ module Warp
 
           # strings
           if c == '"'.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::String))
             j = scan_delimited(bytes, i, '"'.ord.to_u8)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
             last_nonspace_kind = TokenKind::String
+            state.try(&.pop)
             next
           end
 
           if c == '\''.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::String))
             j = scan_delimited(bytes, i, '\''.ord.to_u8)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
             last_nonspace_kind = TokenKind::String
+            state.try(&.pop)
             next
           end
 
           # regex simple form when in expression position
           if c == '/'.ord && should_be_regex(last_nonspace_kind)
+            state.try(&.push(Warp::Lexer::LexerState::State::Regex))
             j = scan_delimited(bytes, i, '/'.ord.to_u8, true)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::Regex, i, j - i)
             i = j
             last_nonspace_kind = TokenKind::Regex
+            state.try(&.pop)
             next
           end
 
@@ -357,9 +367,11 @@ module Warp
                 # use SIMD-driven delimiter scanning for efficiency
                 k = scan_percent_delimited(bytes, d + 1, close, lit_type)
                 if k > 0
+                  state.try(&.push(Warp::Lexer::LexerState::State::String))
                   tokens << Token.new(TokenKind::String, i, k - i)
                   i = k
                   last_nonspace_kind = TokenKind::String
+                  state.try(&.pop)
                   next
                 end
               end
@@ -661,8 +673,8 @@ module Warp
 
       # Expose a `Lexer` class for compatibility with existing callers/tests.
       class Lexer
-        def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
-          Warp::Lang::Ruby.scan(bytes)
+        def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+          Warp::Lang::Ruby.scan(bytes, state)
         end
       end
     end

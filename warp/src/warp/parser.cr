@@ -16,14 +16,29 @@ module Warp
     DEFAULT_MAX_DEPTH = 1024
 
     @max_depth : Int32
+    @lexer_state : Lexer::LexerState
 
     # Create a new Parser.
     #
     # max_depth - maximum nesting depth allowed when parsing a document.
     def initialize(@max_depth : Int32 = DEFAULT_MAX_DEPTH)
+      @lexer_state = Lexer::LexerState.new
     end
 
     def finalize
+    end
+
+    # Expose parser-controlled lexer state for coordinated transitions.
+    def lexer_state : Lexer::LexerState
+      @lexer_state
+    end
+
+    def push_state(state : Lexer::LexerState::State)
+      @lexer_state.push(state)
+    end
+
+    def pop_state : Lexer::LexerState::State?
+      @lexer_state.pop
     end
 
     # Iterate tokens found in `bytes` in structural order.
@@ -37,7 +52,7 @@ module Warp
       lexer = lexer_indexes(bytes, padded)
       return lexer.error unless lexer.error.success?
 
-      Lexer::TokenAssembler.each_token(bytes, lexer.buffer, &block)
+      Lexer::TokenAssembler.each_token(bytes, lexer.buffer, @lexer_state, &block)
     end
 
     # Parse the complete document and return an `IR::Result` with
@@ -51,7 +66,7 @@ module Warp
       padded : Bool = false,
       validate_literals : Bool = false,
       validate_numbers : Bool = false,
-      jsonc : Bool = false
+      jsonc : Bool = false,
     ) : IR::Result
       if jsonc
         tokens, error = Lexer::TokenScanner.scan(bytes, true)
@@ -145,8 +160,8 @@ module Warp
     end
 
     private def lexer_fallback(bytes : Bytes) : LexerResult
-      Lexer.index(bytes)
+      @lexer_state.reset
+      Lexer.index(bytes, @lexer_state)
     end
-
   end
 end

@@ -5,6 +5,27 @@ module Warp
       abstract def all_digits16?(ptr : Pointer(UInt8)) : Bool
       abstract def newline_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
 
+      # State-aware mask builder. Defaults to root behavior when no state is provided.
+      # This keeps SIMD/backends unchanged while allowing context-specific adjustments.
+      def build_masks_with_state(ptr : Pointer(UInt8), block_len : Int32, state : Lexer::LexerState? = nil) : Lexer::Masks
+        masks = build_masks(ptr, block_len)
+        return masks unless state
+
+        case state.current
+        when Lexer::LexerState::State::String,
+             Lexer::LexerState::State::StringEscape,
+             Lexer::LexerState::State::Comment,
+             Lexer::LexerState::State::Regex,
+             Lexer::LexerState::State::Heredoc,
+             Lexer::LexerState::State::Macro,
+             Lexer::LexerState::State::Annotation
+          # In string/comment-like contexts, structural operators are not meaningful.
+          Lexer::Masks.new(masks.backslash, masks.quote, masks.whitespace, 0_u64, masks.control, masks.utf8_lead)
+        else
+          masks
+        end
+      end
+
       # Default scalar fallback for ASCII probe. Backends may override with SIMD.
       def ascii_block?(ptr : Pointer(UInt8)) : Bool
         i = 0

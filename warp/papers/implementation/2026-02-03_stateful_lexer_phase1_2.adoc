@@ -1,0 +1,88 @@
+= Stateful Lexer Architecture (Phase 1 & 2)
+:toc:
+:toclevels: 3
+
+== Overview
+This document introduces a stateful, stack-driven lexer architecture with parser-controlled transitions and state-aware SIMD mask building. The goal is to correct escape handling, reduce structural ambiguity, and enable context-specific fast paths.
+
+== Problem Summary
+The previous stateless lexers:
+
+* Treated all quotes equally, causing ambiguity between opening and closing quotes.
+* Had limited context for escape sequences, leading to brittle string handling.
+* Offered no parser-lexer coordination, making nested or language-specific constructs hard to model.
+
+== Phase 1: Stateful Lexer Foundation
+
+=== Lexer State Stack
+A small, explicit stack maintains lexing context:
+
+[source,crystal]
+----
+class LexerState
+  enum State
+    Root
+    ObjectKey
+    ObjectValue
+    ArrayElement
+    String
+    StringEscape
+    Comment
+    Regex
+    Heredoc
+    Macro
+    Annotation
+  end
+
+  property stack : Array(State) = [] of State
+
+  def current : State
+    stack.last? || State::Root
+  end
+
+  def push(state : State)
+    stack << state
+  end
+
+  def pop : State?
+    stack.pop?
+  end
+
+  def reset
+    stack.clear
+  end
+end
+----
+
+=== Parser-Controlled Transitions
+The parser owns a `LexerState` instance and passes it into lexer/token assembly. This enables future state-aware transitions for string/object/array contexts and error reporting.
+
+=== Language-Specific Hooks
+Ruby and Crystal lexers now push/pop state on:
+
+* String literals
+* Regex literals
+* Heredocs
+* Macros and annotations
+* Comment regions
+
+This preserves compatibility while allowing context-aware behavior.
+
+== Phase 2: State-Aware SIMD
+
+=== Context-Aware Masks
+The backend exposes `build_masks_with_state`, which wraps existing SIMD mask generation and applies context-specific adjustments.
+
+In string-like states (`String`, `Regex`, `Heredoc`, `Comment`, etc.), operator masks are neutralized to avoid false structural hits inside string content. This keeps escape handling robust without sacrificing the existing SIMD fast paths for root contexts.
+
+== Benefits
+
+* Correct escape handling and string boundary detection.
+* Parser-controlled transitions allow precise context for nested structures.
+* SIMD can adapt to context without re-architecting the backend implementations.
+
+== Next Steps
+
+* Integrate state transitions in higher-level parsers for JSON and other languages.
+* Add deeper context-specific SIMD paths for regex, heredocs, and macros.
+* Extend tests to cover nested state stacks and context transitions.

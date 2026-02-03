@@ -30,7 +30,7 @@ describe Warp::Lexer do
     # scalar is implied: bits that are neither op nor whitespace
     (~(cb.op | cb.whitespace)).should eq(~0b11_u64)
 
-    jb = Warp::Lexer::JsonBlock.new(sb, cb)
+    jb = Warp::Lexer::JsonBlock.new(sb, cb, 0_u64)
     jb.structural_start.should_not eq(0_u64)
     jb.non_quote_inside_string(0b1111_u64).should eq(0b11_u64)
   end

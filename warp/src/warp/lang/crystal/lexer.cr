@@ -42,7 +42,7 @@ module Warp
         "super"      => TokenKind::Super,
       }
 
-      def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+      def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         tokens = [] of Token
         i = 0
         len = bytes.size
@@ -70,19 +70,23 @@ module Warp
 
           # Comments (# ... end-of-line)
           if c == '#'.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::Comment))
             j = scan_to_line_end(bytes, i + 1)
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
+            state.try(&.pop)
             next
           end
 
           # Macro delimiters {{ and }}
           if c == '{'.ord && i + 1 < len && bytes[i + 1] == '{'.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::Macro))
             end_idx = scan_to_double(bytes, i + 2, '}'.ord.to_u8, '}'.ord.to_u8)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
             tokens << Token.new(TokenKind::MacroStart, i, 2)
             tokens << Token.new(TokenKind::MacroEnd, end_idx, 2)
             i = end_idx + 2
+            state.try(&.pop)
             next
           end
           if c == '}'.ord && i + 1 < len && bytes[i + 1] == '}'.ord
@@ -91,29 +95,35 @@ module Warp
             next
           end
           if c == '{'.ord && i + 1 < len && bytes[i + 1] == '%'.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::Macro))
             end_idx = scan_to_double(bytes, i + 2, '%'.ord.to_u8, '}'.ord.to_u8)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
             tokens << Token.new(TokenKind::MacroStart, i, 2)
             tokens << Token.new(TokenKind::MacroEnd, end_idx, 2)
             i = end_idx + 2
+            state.try(&.pop)
             next
           end
 
           # Strings (double-quoted)
           if c == '"'.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::String))
             j = scan_delimited(bytes, i, '"'.ord.to_u8)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
+            state.try(&.pop)
             next
           end
 
           # Strings/char (single-quoted) - treated as String for now
           if c == '\''.ord
+            state.try(&.push(Warp::Lexer::LexerState::State::String))
             j = scan_delimited(bytes, i, '\''.ord.to_u8)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
+            state.try(&.pop)
             next
           end
 
@@ -135,8 +145,10 @@ module Warp
               # use SIMD-driven delimiter scanning for efficiency
               k = scan_percent_delimited(bytes, d + 1, close, lit_type)
               if k > 0
+                state.try(&.push(Warp::Lexer::LexerState::State::String))
                 tokens << Token.new(TokenKind::String, i, k - i)
                 i = k
+                state.try(&.pop)
                 next
               end
             end
@@ -174,10 +186,12 @@ module Warp
             end
 
             if delimiter_open
+              state.try(&.push(Warp::Lexer::LexerState::State::String))
               j = scan_delimited(bytes, i + 1, delimiter_close.not_nil!.to_u8)
               return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
               tokens << Token.new(TokenKind::String, i, j - i)
               i = j
+              state.try(&.pop)
               next
             end
           end
@@ -235,10 +249,12 @@ module Warp
               i = j
               next
             elsif i + 1 < len && bytes[i + 1] == '['.ord
+              state.try(&.push(Warp::Lexer::LexerState::State::Annotation))
               end_idx = scan_to_op_byte(bytes, i + 2, ']'.ord.to_u8)
               return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
               tokens << Token.new(TokenKind::Annotation, i, end_idx - i + 1)
               i = end_idx + 1
+              state.try(&.pop)
               next
             else
               j = i + 1
@@ -653,8 +669,8 @@ module Warp
       end
 
       class Lexer
-        def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
-          Warp::Lang::Crystal.scan(bytes)
+        def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
+          Warp::Lang::Crystal.scan(bytes, state)
         end
       end
     end

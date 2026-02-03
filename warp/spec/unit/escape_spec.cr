@@ -2,14 +2,14 @@ require "../spec_helper"
 
 describe "Escape and string edge cases" do
   it "parses escaped quotes in JSON strings (integration)" do
-    json = %({"a":"\\","b":"\"quoted\"","c":"end"})
+    json = %q({"a":"foo\\bar","b":"He said \"hello\"","c":"end"})
     parser = Warp::Parser.new
     result = parser.parse_document(json.to_slice)
     result.error.success?.should be_true
   end
 
   it "StringScanner and EscapeScanner produce consistent masks" do
-    json = %({"a":"\\","b":"\"quoted\"","c":"end"})
+    json = %q({"a":"foo\\bar","b":"He said \"hello\"","c":"end"})
     bytes = json.to_slice
     ptr = bytes.to_unsafe
     masks = Warp::Backend.current.build_masks(ptr, bytes.size)
@@ -28,7 +28,7 @@ describe "Escape and string edge cases" do
   end
 
   it "TokenAssembler emits string tokens for escaped strings" do
-    json = %({"a":"\\","b":"\"quoted\"","c":"end"})
+    json = %q({"a":"foo\\bar","b":"He said \"hello\"","c":"end"})
     bytes = json.to_slice
     stage1 = Warp::Lexer.index(bytes)
     stage1.error.success?.should be_true
@@ -58,7 +58,6 @@ describe "Escape and string edge cases" do
     masks = Warp::Backend.current.build_masks(ptr, bytes.size)
     jb = Warp::Lexer::Scanner.new.next(masks.backslash, masks.quote, masks.whitespace, masks.op)
     (jb.structural_start & jb.strings.escaped).should eq(0_u64)
-
   end
 
   it "parses root string with multiple escapes" do
