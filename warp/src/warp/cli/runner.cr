@@ -232,6 +232,7 @@ YAML
       verbose = false
       dry_run = false
       backend_override : String? = nil
+      inspect = false
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
@@ -244,6 +245,7 @@ YAML
         p.on("--inline-rbs=BOOL", "Parse inline # @rbs comments (default true)") { |v| inline_rbs = (v != "false") }
         p.on("--generate-rbs=BOOL", "Generate .rbs signature files (default false)") { |v| generate_rbs = (v != "false") }
         p.on("--generate-rbi=BOOL", "Generate .rbi annotation files (default false)") { |v| generate_rbi = (v != "false") }
+        p.on("--inspect", "Show pipeline internals (source CST, target CST, transformations)") { inspect = true }
         p.on("--parallel=N", "Use N parallel workers (default: CPU cores)") do |v|
           parallel_workers = v.to_i? || Warp::Parallel::CPUDetector.cpu_count
         end
@@ -317,6 +319,12 @@ YAML
       if files.empty?
         puts "No source files found."
         return 1
+      end
+
+      # Handle --inspect flag for single file debugging
+      if inspect && files.size == 1
+        inspect_transpilation_pipeline(files[0], target, config)
+        return 0
       end
 
       # Determine parallelism
@@ -2478,6 +2486,139 @@ YAML
         end
         puts "  elapsed_ms: #{elapsed_ms.round(3)}" if perf
       end
+    end
+
+    private def self.inspect_transpilation_pipeline(file_path : String, target : TranspileTarget, config : ProjectConfig) : Nil
+      unless File.exists?(file_path) && File.file?(file_path)
+        puts "Error: File not found: #{file_path}"
+        return
+      end
+
+      bytes = File.read(file_path).to_slice
+      target_name = case target
+                    when TranspileTarget::Ruby
+                      "Ruby"
+                    when TranspileTarget::Crystal
+                      "Crystal"
+                    else
+                      "Unknown"
+                    end
+
+      puts "=== Transpilation Pipeline Inspector ==="
+      puts "File: #{file_path}"
+      puts "Target: #{target_name}"
+      puts
+
+      case target
+      when TranspileTarget::Ruby
+        # Transpile Crystal -> Ruby
+        puts "[INPUT: Crystal Source]"
+        puts "Size: #{bytes.size} bytes"
+        puts "Preview:"
+        puts bytes.to_s[0...500]
+        puts
+
+        puts "[LEXING Crystal]"
+        c_tokens, c_lex_error, _ = Warp::Lang::Crystal::Lexer.scan(bytes)
+        if c_lex_error != Warp::Core::ErrorCode::Success
+          puts "ERROR: Lexing failed (#{c_lex_error})"
+          return
+        end
+        puts "✓ Lexing successful: #{c_tokens.size} tokens"
+        puts
+
+        puts "[PARSING Crystal CST]"
+        c_cst, c_parse_error = Warp::Lang::Crystal::CST::Parser.parse(bytes, c_tokens)
+        if c_parse_error != Warp::Core::ErrorCode::Success
+          puts "ERROR: Parsing failed (#{c_parse_error})"
+          return
+        end
+        puts "✓ Parsing successful"
+        puts "  CST nodes: #{count_cst_nodes(c_cst)}"
+        puts
+
+        puts "[TRANSPILING Crystal -> Ruby]"
+        result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(bytes)
+        if result.error != Warp::Core::ErrorCode::Success
+          puts "ERROR: Transpilation failed (#{result.error})"
+          return
+        end
+        puts "✓ Transpilation successful"
+        puts "  Output size: #{result.output.size} bytes"
+        puts
+
+        puts "[OUTPUT: Ruby Source]"
+        puts "Preview:"
+        puts result.output[0...500]
+      when TranspileTarget::Crystal
+        # Transpile Ruby -> Crystal
+        puts "[INPUT: Ruby Source]"
+        puts "Size: #{bytes.size} bytes"
+        puts "Preview:"
+        puts bytes.to_s[0...500]
+        puts
+
+        puts "[LEXING Ruby]"
+        r_tokens, r_lex_error, _ = Warp::Lang::Ruby::Lexer.scan(bytes)
+        if r_lex_error != Warp::Core::ErrorCode::Success
+          puts "ERROR: Lexing failed (#{r_lex_error})"
+          return
+        end
+        puts "✓ Lexing successful: #{r_tokens.size} tokens"
+        puts
+
+        puts "[PARSING Ruby CST]"
+        r_cst, r_parse_error = Warp::Lang::Ruby::CST::Parser.parse(bytes, r_tokens)
+        if r_parse_error != Warp::Core::ErrorCode::Success
+          puts "ERROR: Parsing failed (#{r_parse_error})"
+          return
+        end
+        puts "✓ Parsing successful"
+        puts
+
+        puts "[SEMANTIC ANALYSIS]"
+        annotations = Warp::Lang::Ruby::Annotations::AnnotationStore.new
+        if r_cst
+          analyzer = Warp::Lang::Ruby::SemanticAnalyzer.new(bytes, r_tokens, r_cst, annotations)
+          context = analyzer.analyze
+          puts "✓ Analysis complete"
+          puts "  Diagnostics: #{context.diagnostics.size}"
+        else
+          puts "ERROR: No CST to analyze"
+          return
+        end
+        puts
+
+        puts "[BUILDING Crystal CST]"
+        builder = Warp::Lang::Crystal::CSTBuilder.new
+        crystal_doc = builder.build_from_context(context)
+        puts "✓ Crystal CST built"
+        puts
+
+        puts "[EMITTING Crystal Source]"
+        result = Warp::Lang::Ruby::CSTToCSTTranspiler.transpile(bytes)
+        if result.error != Warp::Core::ErrorCode::Success
+          puts "ERROR: Transpilation failed (#{result.error})"
+          return
+        end
+        puts "✓ Transpilation successful"
+        puts "  Output size: #{result.output.size} bytes"
+        puts
+
+        puts "[OUTPUT: Crystal Source]"
+        puts "Preview:"
+        puts result.output[0...500]
+      else
+        puts "Inspect not supported for this target"
+      end
+    end
+
+    private def self.count_cst_nodes(node : Warp::Lang::Crystal::CST::GreenNode) : Int32
+      count = 1
+      node.children.each { |child| count += count_cst_nodes(child) }
+      count
+    rescue
+      1
     end
   end
 end

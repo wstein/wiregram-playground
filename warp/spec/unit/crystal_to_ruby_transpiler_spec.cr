@@ -243,4 +243,49 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     # Crystal &.method is converted to Ruby symbol-to-proc &:method which is idiomatic and valid
     result.output.includes?(".map(&:kind)").should eq(true)
   end
+
+  it "removes hex literal suffixes (_u8, _u16, etc)" do
+    source = <<-CR
+      when 0xC2_u8..0xDF_u8
+        remaining = 1
+      when 0xE0_u8
+        remaining = 2
+        first_min = 0xA0_u8
+    CR
+
+    result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
+    result.error.should eq(Warp::Core::ErrorCode::Success)
+
+    output = result.output
+    # Hex literals should have suffixes removed
+    output.includes?("0xC2_u8").should eq(false)
+    output.includes?("0xDF_u8").should eq(false)
+    output.includes?("0xE0_u8").should eq(false)
+    output.includes?("0xA0_u8").should eq(false)
+    # But the hex values themselves should be present
+    output.includes?("0xC2").should eq(true)
+    output.includes?("0xDF").should eq(true)
+    output.includes?("0xE0").should eq(true)
+    output.includes?("0xA0").should eq(true)
+  end
+
+  it "removes octal and binary literal suffixes" do
+    source = <<-CR
+      x = 0o755_u16
+      y = 0b1010_i32
+      z = 0755_i64
+    CR
+
+    result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
+    result.error.should eq(Warp::Core::ErrorCode::Success)
+
+    output = result.output
+    # Suffixes should be removed
+    output.includes?("_u16").should eq(false)
+    output.includes?("_i32").should eq(false)
+    output.includes?("_i64").should eq(false)
+    # But the literals themselves should be present
+    output.includes?("0o755").should eq(true)
+    output.includes?("0b1010").should eq(true)
+  end
 end

@@ -37,3 +37,36 @@ mappings:
     Net::HTTP: HTTP::Client
   classes:
     OpenStruct: OpenStruct
+
+# Standard library mappings for require statements
+# Crystal require names → Ruby require names
+stdlib_mappings:
+  # Testing libraries
+  spec: rspec # Crystal `require "spec"` → Ruby `require "rspec"`
+
+  # Data formats
+  json: json # Both use same name
+  yaml: yaml # Both use same name
+
+  # Collections and data structures
+  set: set # Both use same name
+
+  # Utilities
+  http: net/http # Crystal HTTP → Ruby Net::HTTP
+  socket: socket # Both use same name
+  io: io # Both use same name
+  time: time # Both use same name
+  date: date # Both use same name
+  digest: digest # Both use same name
+
+  # Concurrency
+  fiber: fiber # Crystal Fiber → Ruby Fiber (different semantics but same name)
+
+  # File operations
+  file_utils: fileutils # Crystal FileUtils → Ruby FileUtils (case-insensitive)
+
+  # String processing
+  string_scanner: strscan # Crystal StringScanner → Ruby StringScanner (strscan gem)
+
+  # Regular expressions
+  regex: regexp # Both support regex

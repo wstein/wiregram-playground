@@ -34,7 +34,17 @@ module Warp
           transformer = CrystalToRubyTransformer.new(bytes, cfg)
           ruby_output = transformer.visit(crystal_root)
 
+          # Step 4: Remove Crystal numeric type suffixes from the final output
+          ruby_output = remove_numeric_suffixes(ruby_output)
+
           Result.new(ruby_output, Warp::Core::ErrorCode::Success, [] of String)
+        end
+
+        private def self.remove_numeric_suffixes(text : String) : String
+          # Remove Crystal numeric type suffixes (_u8, _i32, _f64, etc.)
+          # Handles: decimal (42_u64), hex (0xC2_u8), octal (0o77_u8), binary (0b1010_u8), float (3.14_f64)
+          # Pattern: optional underscore (for formatting) followed by type suffix
+          text.gsub(/_?(?:[ui](?:8|16|32|64|size)|f(?:32|64))(?![a-zA-Z0-9_])/, "")
         end
       end
 
@@ -157,9 +167,10 @@ module Warp
 
         private def transform_body(body : String) : String
           # 1. Remove Crystal numeric suffixes (_u64, _i32, _f64, etc.)
-          # Match patterns like 42_u64, 100_i32, 3.14_f64, 1_000_000_u64
-          # Also handle _u, _i, _f without type size, and signed/unsigned variants
-          body = body.gsub(/_(?:[ui](?:8|16|32|64|size)|f(?:32|64))(?![a-zA-Z0-9_])/, "")
+          # Handles: decimal (42_u64), hex (0xC2_u8), octal (0o77_u8), binary (0b1010_u8), float (3.14_f64)
+          # Pattern: optional underscore (for formatting) followed by type suffix
+          # Examples: 0xC2_u8, 42_u64, 0b1010_i32, 3.14_f64, 1_000_000_u64
+          body = body.gsub(/_?(?:[ui](?:8|16|32|64|size)|f(?:32|64))(?![a-zA-Z0-9_])/, "")
 
           # 2. Transform {} of Key => Value to {} (remove Crystal-style hash type annotations)
           # MUST come before tuple transformation to avoid double-matching
