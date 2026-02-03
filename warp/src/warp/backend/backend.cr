@@ -36,18 +36,40 @@ module Warp
         true
       end
 
-      # Optional alignment check - enabled via WARP_STRICT_ALIGNMENT=1. Returns
-      # `ErrorCode::SimdAlignmentError` when the pointer is not aligned to the
-      # expected SIMD width for strict backends.
-      # Default alignment check by offset. Backends may override for architecture-specific widths.
+      # Optional alignment check (configurable via environment variables).
+      # Modes: WARP_ALIGNMENT_MODE=off|strict|warn (default: off).
+      # Bytes: WARP_ALIGNMENT_BYTES=16 (default: 16).
+      # Legacy: WARP_STRICT_ALIGNMENT=1 enables strict mode.
       def check_alignment_offset(offset : Int32) : Warp::Core::ErrorCode
-        if ENV["WARP_STRICT_ALIGNMENT"]? == "1"
-          if (offset % 16) != 0
-            return Warp::Core::ErrorCode::SimdAlignmentError
+        mode = alignment_mode
+        bytes = alignment_bytes
+        return Warp::Core::ErrorCode::Success if mode == "off"
+
+        if (offset % bytes) != 0
+          if mode == "warn"
+            unless @@alignment_warned
+              @@alignment_warned = true
+              STDERR.puts "[warp] SIMD alignment warning: offset #{offset} not aligned to #{bytes} bytes"
+            end
+            return Warp::Core::ErrorCode::Success
           end
+          return Warp::Core::ErrorCode::SimdAlignmentError
         end
+
         Warp::Core::ErrorCode::Success
       end
+
+      private def alignment_mode : String
+        return "strict" if ENV["WARP_STRICT_ALIGNMENT"]? == "1"
+        (ENV["WARP_ALIGNMENT_MODE"]? || "off").downcase
+      end
+
+      private def alignment_bytes : Int32
+        bytes = (ENV["WARP_ALIGNMENT_BYTES"]? || "16").to_i?
+        (bytes && bytes > 0) ? bytes : 16
+      end
+
+      @@alignment_warned : Bool = false
 
       # Convenience shim preserving the (deprecated) pointer API for callers that
       # previously passed a pointer directly. This computes an offset of zero and

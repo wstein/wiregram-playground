@@ -31,6 +31,8 @@ These tests are designed to be minimal and deterministic, focusing on missed lin
 - **Line coverage**: Use integration tests to bring core modules above 90% quickly; unit tests close remaining gaps.
 - **Branch coverage**: Add explicit tests for error branches (invalid literals, invalid numbers, malformed strings).
 - **SIMD paths**: Validate NEON behavior on AArch64 with small, controlled inputs; retain scalar fallbacks as cross-checks for debugging.
+- **SIMD alignment**: Exercise alignment modes via `WARP_ALIGNMENT_MODE=off|strict|warn` and `WARP_ALIGNMENT_BYTES` in unit tests.
+- **Benchmarks**: Track SIMD vs scalar with repeatable CSV benchmarks and corpus profiles.
 - **Tooling**: Crystal 1.19 lacks built-in coverage; use kcov with a dedicated spec runner.
 
 == Recommendations and Ratings
@@ -41,6 +43,8 @@ These tests are designed to be minimal and deterministic, focusing on missed lin
 | Targeted unit gaps | Add minimal tests for missed lines/branches | High | 5/5
 | Deterministic fixtures | Use short, synthetic JSON to cover edge cases | Medium | 4/5
 | SIMD sanity tests | Verify NEON masks on known inputs | Medium | 4/5
+| SIMD alignment tests | Validate strict/warn modes and offsets | Medium | 4/5
+| SIMD benchmark tracking | Capture repeatable CSV profiles for regressions | Medium | 4/5
 | Error-path coverage | Explicitly test invalid UTF-8, unclosed strings, invalid numbers | High | 5/5
 | Test data scaling | Add large fixtures only for performance profiling | Low | 2/5
 | Branch-focused assertions | Ensure each error branch is exercised | Medium | 4/5

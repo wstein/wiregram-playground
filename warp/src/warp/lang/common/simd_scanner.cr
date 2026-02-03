@@ -23,6 +23,10 @@ module Warp
           Warp::Backend.current
         end
 
+        # Optional reset hook for reusing scanner instances.
+        def reset
+        end
+
         protected def compute_common_structural(
           masks : Warp::Lexer::Masks,
           block_len : Int32,

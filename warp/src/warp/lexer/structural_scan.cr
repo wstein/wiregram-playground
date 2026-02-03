@@ -89,6 +89,11 @@ module Warp
       def finish : ErrorCode
         @prev_in_string == 0 ? ErrorCode::Success : ErrorCode::UnclosedString
       end
+
+      def reset
+        @escape_scanner = EscapeScanner.new
+        @prev_in_string = 0_u64
+      end
     end
 
     struct CharacterBlock

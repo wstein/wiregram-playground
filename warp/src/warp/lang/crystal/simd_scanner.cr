@@ -87,6 +87,13 @@ module Warp
           "crystal"
         end
 
+        def reset
+          @indices.clear
+          @error = Warp::Core::ErrorCode::Success
+          @string_scanner.reset
+          @prev_scalar = 0_u64
+        end
+
         private def compute_crystal_structural(masks : Warp::Lexer::Masks, block_len : Int32, ptr : Pointer(UInt8)) : UInt64
           # Crystal structural characters include:
           # - Quotes (single, double) for strings
