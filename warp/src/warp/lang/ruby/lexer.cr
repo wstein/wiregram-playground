@@ -78,10 +78,15 @@ module Warp
 
           # comments
           if c == '#'.ord
-            j = i + 1
-            while j < len && bytes[j] != '\n'.ord && bytes[j] != '\r'.ord
-              j += 1
-            end
+            j = if ENV["WARP_SIMD_RUBY"]? == "1"
+                  scan_to_line_end(bytes, i + 1)
+                else
+                  k = i + 1
+                  while k < len && bytes[k] != '\n'.ord && bytes[k] != '\r'.ord
+                    k += 1
+                  end
+                  k
+                end
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
             next
@@ -498,6 +503,24 @@ module Warp
         else
           false
         end
+      end
+
+      private def self.scan_to_line_end(bytes : Bytes, start : Int32) : Int32
+        len = bytes.size
+        return len if start >= len
+        backend = Warp::Backend.current
+        ptr = bytes.to_unsafe
+        i = start
+        while i < len
+          block_len = len - i
+          block_len = 64 if block_len > 64
+          mask = backend.newline_mask(ptr + i, block_len)
+          if mask != 0
+            return i + mask.trailing_zeros_count
+          end
+          i += 64
+        end
+        len
       end
 
       # Expose a `Lexer` class for compatibility with existing callers/tests.

@@ -77,10 +77,15 @@ module Warp
 
           # Comments (# ... end-of-line)
           if c == '#'.ord
-            j = i + 1
-            while j < len && bytes[j] != '\n'.ord && bytes[j] != '\r'.ord
-              j += 1
-            end
+            j = if ENV["WARP_SIMD_CRYSTAL"]? == "1"
+                  scan_to_line_end(bytes, i + 1)
+                else
+                  k = i + 1
+                  while k < len && bytes[k] != '\n'.ord && bytes[k] != '\r'.ord
+                    k += 1
+                  end
+                  k
+                end
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
             next
@@ -383,6 +388,24 @@ module Warp
 
       private def self.is_identifier_char(c : UInt8) : Bool
         is_identifier_start(c) || (c >= '0'.ord && c <= '9'.ord)
+      end
+
+      private def self.scan_to_line_end(bytes : Bytes, start : Int32) : Int32
+        len = bytes.size
+        return len if start >= len
+        backend = Warp::Backend.current
+        ptr = bytes.to_unsafe
+        i = start
+        while i < len
+          block_len = len - i
+          block_len = 64 if block_len > 64
+          mask = backend.newline_mask(ptr + i, block_len)
+          if mask != 0
+            return i + mask.trailing_zeros_count
+          end
+          i += 64
+        end
+        len
       end
 
       class Lexer

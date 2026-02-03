@@ -27,6 +27,16 @@ describe "SIMD scanning via dump CLI" do
     stdout_text.includes?("json").should be_true
   end
 
+  it "outputs SIMD timing in JSON when perf enabled" do
+    stdout_text, stderr_text, status = run_warp_cli(["dump", "simd", "--lang", "json", "--format", "json", "--perf", "spec/fixtures/cli/sample.json"])
+
+    status.success?.should be_true
+    stderr_text.empty?.should be_true
+
+    data = JSON.parse(stdout_text).as_h
+    data["elapsed_ms"].should_not be_nil
+  end
+
   it "outputs SIMD structural indices for Ruby" do
     stdout_text, stderr_text, status = run_warp_cli(["dump", "simd", "--lang", "ruby", "spec/fixtures/cli/rb_simple.rb"])
 

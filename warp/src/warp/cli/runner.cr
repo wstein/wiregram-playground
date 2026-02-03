@@ -77,6 +77,7 @@ Options:
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
   --enhanced             Use enhanced SIMD detection (JSON only)
+  --perf                 Report SIMD timing/throughput
   -h, --help             Show this help message
 
 Examples:
@@ -101,6 +102,7 @@ Options:
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
   --enhanced             Use enhanced SIMD detection (JSON only)
+  --perf                 Report SIMD timing/throughput
   -h, --help             Show this help message
 TXT
     end
@@ -412,6 +414,7 @@ YAML
       format_name = "pretty"
       jsonc = false
       enhanced = false
+      perf = false
 
       parser = OptionParser.new do |p|
         p.banner = dump_stage_usage(stage)
@@ -419,6 +422,7 @@ YAML
         p.on("-f FORMAT", "--format=FORMAT", "Output format: pretty|json") { |v| format_name = v }
         p.on("--jsonc", "Enable JSONC parsing (JSON only)") { jsonc = true }
         p.on("--enhanced", "Use enhanced SIMD detection (JSON only)") { enhanced = true }
+        p.on("--perf", "Report SIMD timing/throughput") { perf = true }
         p.on("-h", "--help", "Show this help message") { puts dump_stage_usage(stage); exit 0 }
       end
 
@@ -456,7 +460,7 @@ YAML
 
       case stage
       when "simd"
-        return dump_simd_stage(lang, bytes, format, path, enhanced)
+        return dump_simd_stage(lang, bytes, format, path, enhanced, perf)
       when "tokens"
         return dump_tokens_stage(lang, bytes, format, path, jsonc_effective)
       when "tape"
@@ -470,7 +474,7 @@ YAML
       when "ast"
         return dump_ast_stage(lang, bytes, format, path, jsonc_effective)
       when "full"
-        return dump_full_stage(lang, bytes, format, path, jsonc_effective, enhanced)
+        return dump_full_stage(lang, bytes, format, path, jsonc_effective, enhanced, perf)
       else
         puts "Unknown dump target: #{stage}"
         return 1
@@ -557,7 +561,8 @@ YAML
       nil
     end
 
-    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, enhanced : Bool = false) : Int32
+    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, enhanced : Bool = false, perf : Bool = false) : Int32
+      start_time = Time.instant
       scan_result : Warp::Lang::Common::ScanResult = case lang
       when DumpLanguage::Json
         json_result = enhanced ? Warp::Lexer::EnhancedSimdScan.index(bytes) : Warp::Lexer.index(bytes)
@@ -575,6 +580,11 @@ YAML
         return 1
       end
 
+      elapsed = perf ? (Time.instant - start_time) : Time::Span.zero
+      elapsed_ms = elapsed.total_milliseconds
+      mb = bytes.size / (1024.0 * 1024.0)
+      mb_per_s = perf && elapsed.total_seconds > 0 ? mb / elapsed.total_seconds : 0.0
+
       indices = scan_result.indices
 
       case format
@@ -582,6 +592,9 @@ YAML
         io = STDOUT
         io.puts "SIMD structural indices (#{scan_result.language}, #{indices.size} found)"
         io.puts "index   offset   byte  char"
+        if perf
+          io.puts "elapsed_ms #{elapsed_ms.round(3)}  mb_per_s #{mb_per_s.round(3)}"
+        end
         indices.each_with_index do |idx_u32, i|
           idx = idx_u32.to_i
           byte = idx < bytes.size ? bytes[idx] : 0_u8
@@ -594,6 +607,10 @@ YAML
             json.field "stage", "simd"
             json.field "language", dump_language_label(lang)
             json.field "count", indices.size
+            if perf
+              json.field "elapsed_ms", elapsed_ms
+              json.field "mb_per_s", mb_per_s
+            end
             json.field "indices" do
               json.array do
                 indices.each_with_index do |idx_u32, i|
@@ -849,23 +866,23 @@ YAML
       0
     end
 
-    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool, enhanced : Bool) : Int32
+    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool, enhanced : Bool, perf : Bool) : Int32
       case format
       when DumpFormat::Pretty
         io = STDOUT
-        dump_full_stage_pretty(io, lang, bytes, path, jsonc, enhanced)
+        dump_full_stage_pretty(io, lang, bytes, path, jsonc, enhanced, perf)
       when DumpFormat::Json
-        dump_full_stage_json(lang, bytes, path, jsonc, enhanced)
+        dump_full_stage_json(lang, bytes, path, jsonc, enhanced, perf)
       end
 
       0
     end
 
-    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool)
+    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool, perf : Bool)
       io.puts "Full dump (#{dump_language_label(lang)})"
 
       io.puts "\n== simd =="
-      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path, enhanced)
+      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path, enhanced, perf)
 
       io.puts "\n== tokens =="
       dump_tokens_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
@@ -886,14 +903,14 @@ YAML
       dump_ast_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
     end
 
-    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool)
+    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool, perf : Bool)
       JSON.build(STDOUT) do |json|
         json.object do
           json.field "language", dump_language_label(lang)
           json.field "stages" do
             json.object do
               json.field "simd" do
-                write_json_simd_all_langs(json, lang, bytes, path, enhanced)
+                write_json_simd_all_langs(json, lang, bytes, path, enhanced, perf)
               end
               json.field "tokens" do
                 write_json_tokens(json, lang, bytes, jsonc, path)
@@ -1566,7 +1583,8 @@ YAML
       end
     end
 
-    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String, enhanced : Bool)
+    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String, enhanced : Bool, perf : Bool)
+      start_time = Time.instant
       scan_result : Warp::Lang::Common::ScanResult = case lang
       when DumpLanguage::Json
         json_result = enhanced ? Warp::Lexer::EnhancedSimdScan.index(bytes) : Warp::Lexer.index(bytes)
@@ -1579,10 +1597,19 @@ YAML
         Warp::Lang::Common::ScanResult.new(Array(UInt32).new, Warp::Core::ErrorCode::Empty, "unknown")
       end
 
+      elapsed = perf ? (Time.instant - start_time) : Time::Span.zero
+      elapsed_ms = elapsed.total_milliseconds
+      mb = bytes.size / (1024.0 * 1024.0)
+      mb_per_s = perf && elapsed.total_seconds > 0 ? mb / elapsed.total_seconds : 0.0
+
       if scan_result.error.success?
         indices = scan_result.indices
         json.object do
           json.field "count", indices.size
+          if perf
+            json.field "elapsed_ms", elapsed_ms
+            json.field "mb_per_s", mb_per_s
+          end
           json.field "indices" do
             json.array do
               indices.each_with_index do |idx_u32, i|

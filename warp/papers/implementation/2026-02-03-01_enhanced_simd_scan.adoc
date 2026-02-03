@@ -39,6 +39,12 @@ Enable enhanced SIMD in `dump simd`:
 warp dump simd --lang json --enhanced path/to/file.json
 ----
 
+To report SIMD timing/throughput:
+
+----
+warp dump simd --lang json --enhanced --perf path/to/file.json
+----
+
 The enhanced scan is also respected in `dump full` when the same flag is used.
 
 == Notes

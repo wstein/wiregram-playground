@@ -105,7 +105,8 @@ module Warp
                byte == ':'.ord.to_u8 || byte == ','.ord.to_u8 ||
                byte == ';'.ord.to_u8 || byte == '='.ord.to_u8 ||
                byte == '.'.ord.to_u8 || byte == '#'.ord.to_u8 ||
-               byte == '/'.ord.to_u8
+               byte == '/'.ord.to_u8 || byte == '%'.ord.to_u8 ||
+               byte == '@'.ord.to_u8 || byte == '$'.ord.to_u8
               structural |= (1_u64 << i)
             end
 
