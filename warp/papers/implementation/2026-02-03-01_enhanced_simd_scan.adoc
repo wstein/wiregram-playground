@@ -10,7 +10,7 @@ This document describes the enhanced SIMD scanning path for JSON that extends th
 
 The enhanced scan is designed to be backward compatible with the existing structural scan and can be enabled via the CLI.
 
-SIMD is always enabled for all languages; when SIMD instructions are unavailable, the scalar backend is used automatically.
+SIMD scanning is used when available; when SIMD instructions are unavailable the scalar backend is used as a fallback. For testing or debugging, the scalar backend can be forced via `WARP_BACKEND=scalar`.
 
 == Implementation
 

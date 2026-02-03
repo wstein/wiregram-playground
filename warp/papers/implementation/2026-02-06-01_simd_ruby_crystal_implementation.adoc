@@ -52,7 +52,7 @@ Implementation details:
 - Processes 64-byte blocks using backend SIMD optimizations
 - UTF-8 validation built into the scanning process
 - Uses bitmask-based character detection
-- Fallback scalar implementation available
+- SIMD scanning is mandatory; when SIMD instructions are unavailable, the scalar backend is used as a fallback.
 
 ==== Crystal
 
@@ -106,7 +106,7 @@ The Crystal lexer (`src/warp/lang/crystal/lexer.cr`) now includes:
 Both lexers now use the `whitespace` mask from backends (detecting space/tab) for:
 - Efficient boundary detection in percent literals
 - Heredoc delimiter line scanning
-- Word/pattern boundary identification
+- Word boundary identification
 
 The whitespace masks are more efficient than word boundaries for these purposes, as they're already computed by all SIMD backends (Scalar, AVX2, AVX, AVX512, SSE2, NEON, ARMv6).
 
@@ -116,7 +116,7 @@ With SIMD integration, the lexers achieve:
 - 0% unknown token ratio across all Ruby corpus files (2,000+ tokens tested)
 - Efficient escape sequence handling via escape scanner + SIMD masks
 - Proper detection of complex patterns (percent literals, heredocs, annotations, macros)
-- No fallback paths; SIMD is mandatory with scalar backend as last resort
+- No optional fallback paths; SIMD is mandatory across supported architectures
 == Usage
 
 === Command Line
@@ -264,7 +264,7 @@ The SIMD implementation provides:
   - AVX2 (Intel, AMD)
   - SSE2 (x86)
   - NEON (ARM)
-  - Scalar fallback (all platforms)
+   - Scalar mode is not exposed as a fallback path
 
 - **UTF-8 validation**: Integrated with scanning pass (no extra overhead)
 - **Low memory overhead**: Streaming index collection

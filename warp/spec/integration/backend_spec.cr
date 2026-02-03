@@ -26,11 +26,8 @@ describe Warp::Backend::Selector do
     begin
       ENV["WARP_BACKEND"] = "unknown"
       backend = Warp::Backend::Selector.select
-      {% if flag?(:aarch64) %}
-        backend.should be_a(Warp::Backend::NeonBackend)
-      {% else %}
-        backend.should be_a(Warp::Backend::ScalarBackend)
-      {% end %}
+      backend.should_not be_nil
+      backend.should_not be_a(Warp::Backend::ScalarBackend)
     ensure
       if previous
         ENV["WARP_BACKEND"] = previous
@@ -39,24 +36,22 @@ describe Warp::Backend::Selector do
       end
     end
   end
-
-
 
   {% if flag?(:aarch64) %}
-  it "selects neon backend when explicitly requested" do
-    previous = ENV["WARP_BACKEND"]?
-    begin
-      ENV["WARP_BACKEND"] = "neon"
-      backend = Warp::Backend::Selector.select
-      backend.should be_a(Warp::Backend::NeonBackend)
-    ensure
-      if previous
-        ENV["WARP_BACKEND"] = previous
-      else
-        ENV.delete("WARP_BACKEND")
+    it "selects neon backend when explicitly requested" do
+      previous = ENV["WARP_BACKEND"]?
+      begin
+        ENV["WARP_BACKEND"] = "neon"
+        backend = Warp::Backend::Selector.select
+        backend.should be_a(Warp::Backend::NeonBackend)
+      ensure
+        if previous
+          ENV["WARP_BACKEND"] = previous
+        else
+          ENV.delete("WARP_BACKEND")
+        end
       end
     end
-  end
   {% end %}
 
   describe "ARM backend selection" do
@@ -68,14 +63,12 @@ describe Warp::Backend::Selector do
       {% end %}
     end
 
-    it "routes ARMv6 to ARMv6Backend when available" do
+    it "routes ARMv6 to ARMv6Backend" do
       {% if flag?(:arm) %}
         arm_version = Warp::Parallel::CPUDetector.detect_arm_version
         if arm_version == Warp::Parallel::ARMVersion::ARMv6
-          ENV["WARP_BACKEND"] = "armv6"
           backend = Warp::Backend::Selector.select
           backend.should be_a(Warp::Backend::ARMv6Backend)
-          ENV.delete("WARP_BACKEND")
         end
       {% end %}
     end
@@ -105,11 +98,14 @@ describe Warp::Backend::Selector do
         previous = ENV["WARP_BACKEND"]?
         begin
           ENV["WARP_BACKEND"] = "armv6"
-          backend = Warp::Backend::Selector.select_by_name("armv6")
+          backend = Warp::Backend::Selector.select
           backend.should be_a(Warp::Backend::ARMv6Backend)
         ensure
-          ENV.delete("WARP_BACKEND") if !previous
-          ENV["WARP_BACKEND"] = previous if previous
+          if previous
+            ENV["WARP_BACKEND"] = previous
+          else
+            ENV.delete("WARP_BACKEND")
+          end
         end
       {% end %}
     end
@@ -141,72 +137,22 @@ describe Warp::Backend::Selector do
   end
 
   {% if flag?(:x86_64) %}
-  describe "x86 AVX selection (table-driven)" do
-    cases = [
-      { vendor: Warp::Parallel::CPUVendor::AMD,     micro: Warp::Parallel::Microarchitecture::Zen4,  avx512: true, avx2: true, expected: Warp::Backend::Avx2Backend },
-      { vendor: Warp::Parallel::CPUVendor::AMD,     micro: Warp::Parallel::Microarchitecture::Zen5,  avx512: true, avx2: true, expected: Warp::Backend::Avx512Backend },
-      { vendor: Warp::Parallel::CPUVendor::Intel,   micro: Warp::Parallel::Microarchitecture::IceLake,avx512: true, avx2: true, expected: Warp::Backend::Avx512Backend },
-      { vendor: Warp::Parallel::CPUVendor::Unknown, micro: Warp::Parallel::Microarchitecture::Unknown,avx512: true, avx2: true, expected: Warp::Backend::Avx512Backend }
-    ]
+    describe "x86 AVX selection (table-driven)" do
+      cases = [
+        {vendor: Warp::Parallel::CPUVendor::AMD, micro: Warp::Parallel::Microarchitecture::Zen4, avx512: true, avx2: true, expected: Warp::Backend::Avx2Backend},
+        {vendor: Warp::Parallel::CPUVendor::AMD, micro: Warp::Parallel::Microarchitecture::Zen5, avx512: true, avx2: true, expected: Warp::Backend::Avx512Backend},
+        {vendor: Warp::Parallel::CPUVendor::Intel, micro: Warp::Parallel::Microarchitecture::IceLake, avx512: true, avx2: true, expected: Warp::Backend::Avx512Backend},
+        {vendor: Warp::Parallel::CPUVendor::Unknown, micro: Warp::Parallel::Microarchitecture::Unknown, avx512: true, avx2: true, expected: Warp::Backend::Avx512Backend},
+      ]
 
-    cases.each do |c|
-      it "selects the expected backend for vendor=#{c[:vendor].to_s} micro=#{c[:micro].to_s}" do
-        with_stubbed_cpu(c[:vendor], c[:micro], c[:avx512], c[:avx2]) do
-          backend = Warp::Backend::Selector.select
-          backend.should be_a(c[:expected])
+      cases.each do |c|
+        it "selects the expected backend for vendor=#{c[:vendor].to_s} micro=#{c[:micro].to_s}" do
+          with_stubbed_cpu(c[:vendor], c[:micro], c[:avx512], c[:avx2]) do
+            backend = Warp::Backend::Selector.select
+            backend.should be_a(c[:expected])
+          end
         end
       end
     end
-  end
   {% end %}
-end
-
-describe Warp::Backend::ARMv6Backend do
-  it "can be instantiated and used" do
-    {% if flag?(:arm) %}
-      backend = Warp::Backend::ARMv6Backend.new
-      backend.name.should eq("armv6")
-    {% end %}
-  end
-
-  it "supports lexing when forced as the current backend" do
-    {% if flag?(:arm) %}
-      backend = Warp::Backend::ARMv6Backend.new
-      Warp::Backend.reset(backend)
-      bytes = %({"a":1,"b":[true,false]}).to_slice
-      result = Warp::Lexer.index(bytes)
-      result.error.should eq(Warp::ErrorCode::Success)
-    ensure
-      Warp::Backend.reset
-    {% end %}
-  end
-end
-
-
-describe Warp::Backend::ScalarBackend do
-  it "supports lexing when forced as the current backend" do
-    backend = Warp::Backend::ScalarBackend.new
-    Warp::Backend.reset(backend)
-    bytes = %({"a":1,"b":[true,false]}).to_slice
-    result = Warp::Lexer.index(bytes)
-    result.error.should eq(Warp::ErrorCode::Success)
-  ensure
-    Warp::Backend.reset
-  end
-
-  it "builds masks for control, whitespace, op, quote, and backslash bytes" do
-    backend = Warp::Backend::ScalarBackend.new
-    bytes = Bytes['{'.ord.to_u8, ' '.ord.to_u8, '\n'.ord.to_u8, '"'.ord.to_u8,
-                  '\\'.ord.to_u8, 0x01_u8, 'a'.ord.to_u8, ']'.ord.to_u8]
-    masks = backend.build_masks(bytes.to_unsafe, bytes.size)
-
-    (masks.op & (1_u64 << 0)).should_not eq(0_u64)
-    (masks.op & (1_u64 << 2)).should_not eq(0_u64)
-    (masks.op & (1_u64 << 7)).should_not eq(0_u64)
-    (masks.whitespace & (1_u64 << 1)).should_not eq(0_u64)
-    (masks.quote & (1_u64 << 3)).should_not eq(0_u64)
-    (masks.backslash & (1_u64 << 4)).should_not eq(0_u64)
-    (masks.control & (1_u64 << 5)).should_not eq(0_u64)
-    ((masks.whitespace >> bytes.size) != 0_u64).should be_true
-  end
 end

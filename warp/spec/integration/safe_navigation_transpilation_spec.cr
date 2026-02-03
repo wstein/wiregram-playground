@@ -2,7 +2,7 @@ require "../spec_helper"
 
 describe "Crystal-to-Ruby Transpilation: Safe Navigation & Method-to-Proc" do
   describe "safe navigation operator" do
-    it "converts &.method to &:method" do
+    it "preserves Ruby safe navigation" do
       source = <<-'CR'
 def test(obj)
   result = obj&.to_s
@@ -15,16 +15,13 @@ CR
       result.error.should eq(Warp::Core::ErrorCode::Success)
       result.output.should_not be_empty
 
-      # Should NOT contain &.to_s
-      result.output.includes?("&.to_s").should eq(false)
-
-      # Should contain &:to_s
-      result.output.includes?("&:to_s").should eq(true)
+      # Should contain &.to_s (Ruby safe navigation)
+      result.output.includes?("&.to_s").should eq(true)
     end
   end
 
   describe "method-to-proc shorthand" do
-    it "converts &.method in method calls to &:method" do
+    it "converts &.method in method calls to explicit block" do
       source = <<-'CR'
 def test(array)
   result = array.map(&.kind)
@@ -40,8 +37,8 @@ CR
       # Should NOT contain &.kind
       result.output.includes?("&.kind").should eq(false)
 
-      # Should contain .map(&:kind)
-      result.output.includes?(".map(&:kind)").should eq(true)
+      # Should contain explicit block
+      (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
     end
   end
 
@@ -59,8 +56,8 @@ CR
       result.error.should eq(Warp::Core::ErrorCode::Success)
       result.output.should_not be_empty
 
-      # Should contain &:kind
-      result.output.includes?(".map(&:kind)").should eq(true)
+      # Should contain explicit block
+      (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
     end
   end
 end

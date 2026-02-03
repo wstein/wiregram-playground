@@ -19,7 +19,7 @@ module Warp
           # x86_64: Prefer AVX2 if available, fall back to SSE2, then scalar
           select_x86_backend
         {% else %}
-          ScalarBackend.new
+          raise "SIMD backend not available for this architecture"
         {% end %}
       end
 
@@ -30,7 +30,7 @@ module Warp
         case arm_version
         when Warp::Parallel::ARMVersion::ARMv6
           # ARMv6 (Raspberry Pi 1/Zero) - no NEON support
-          # Use ARMv6-optimized scalar backend
+          # Use the ARMv6-optimized backend to provide better performance than generic scalar
           return ARMv6Backend.new
         when Warp::Parallel::ARMVersion::ARMv7
           # ARMv7 (Raspberry Pi 2) - has NEON but with limitations
@@ -88,7 +88,7 @@ module Warp
         end
 
         # Last resort: scalar
-        ScalarBackend.new
+        return ScalarBackend.new
       end
 
       private def self.can_use_avx512? : Bool
@@ -147,14 +147,6 @@ module Warp
 
       private def self.build_override_backend(name : String) : Base?
         case name
-        when "scalar"
-          ScalarBackend.new
-        when "armv6"
-          {% if flag?(:arm) %}
-            ARMv6Backend.new
-          {% else %}
-            nil
-          {% end %}
         when "neon"
           {% if flag?(:aarch64) || flag?(:arm) %}
             NeonBackend.new
@@ -201,6 +193,15 @@ module Warp
           {% else %}
             nil
           {% end %}
+        when "armv6"
+          {% if flag?(:arm) %}
+            ARMv6Backend.new
+          {% else %}
+            nil
+          {% end %}
+        when "scalar"
+          # Scalar backend is always available as a fallback
+          ScalarBackend.new
         else
           nil
         end
@@ -209,13 +210,30 @@ module Warp
 
     @@current : Base? = nil
     @@logged : Bool = false
+    @@no_simd_logged : Bool = false
 
     def self.current : Base
       unless @@current
         @@current = Selector.select
         log_selection(@@current.not_nil!)
+        report_no_simd_if_needed(@@current.not_nil!)
       end
       @@current.not_nil!
+    end
+
+    private def self.report_no_simd_if_needed(backend : Base) : Nil
+      return if @@no_simd_logged
+      @@no_simd_logged = true
+      # Only print if we selected Scalar and CPU reports no SIMD capability
+      begin
+        capability = Warp::Parallel::CPUDetector.detect_simd
+        if backend.is_a?(ScalarBackend) && capability == Warp::Parallel::SIMDCapability::None
+          STDERR.puts "warp backend=scalar (no SIMD instructions detected on this CPU)"
+        end
+      rescue ex
+        # Be conservative: don't crash if CPU detection fails
+        STDERR.puts "warp backend=scalar (no SIMD instructions detected or CPU detection failed)"
+      end
     end
 
     def self.reset(backend : Base? = nil)

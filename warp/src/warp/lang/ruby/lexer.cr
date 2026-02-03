@@ -44,11 +44,50 @@ module Warp
         "when"   => TokenKind::When,
       }
 
+      private struct SimdIndex
+        @indices : Array(UInt32)
+        @bytes : Bytes
+
+        def initialize(@indices : Array(UInt32), @bytes : Bytes)
+        end
+
+        def next_index_of(start : Int32, a : UInt8, b : UInt8? = nil) : Int32
+          i = lower_bound(start)
+          while i < @indices.size
+            idx = @indices[i].to_i
+            byte = @bytes[idx]
+            return idx if byte == a || (b && byte == b)
+            i += 1
+          end
+          -1
+        end
+
+        private def lower_bound(target : Int32) : Int32
+          left = 0
+          right = @indices.size
+          while left < right
+            mid = (left + right) // 2
+            if @indices[mid].to_i < target
+              left = mid + 1
+            else
+              right = mid
+            end
+          end
+          left
+        end
+      end
+
       def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         # Module-level compatibility: this method is used internally by tests and other code.
         tokens = [] of Token
         i = 0
         len = bytes.size
+
+        simd_result = Warp::Lang::Ruby.simd_scan(bytes)
+        if simd_result.error != ErrorCode::Success && simd_result.error != ErrorCode::Empty
+          return {tokens, simd_result.error, 0}
+        end
+        simd = SimdIndex.new(simd_result.indices, bytes)
 
         last_nonspace_kind : TokenKind? = nil
 
@@ -78,7 +117,7 @@ module Warp
           # comments
           if c == '#'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::Comment))
-            j = scan_to_line_end(bytes, i + 1)
+            j = scan_to_line_end(bytes, i + 1, simd)
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
             state.try(&.pop)
@@ -116,7 +155,7 @@ module Warp
               # fall through to operator handling
             else
               # move to next line start using SIMD
-              j = scan_to_line_end(bytes, j)
+              j = scan_to_line_end(bytes, j, simd)
               if j < len
                 j += 1
               end
@@ -136,7 +175,7 @@ module Warp
                   if k >= len || bytes[k] == '\n'.ord || bytes[k] == '\r'.ord
                     found = k
                     # consume rest of line using SIMD
-                    k = scan_to_line_end(bytes, k)
+                    k = scan_to_line_end(bytes, k, simd)
                     if k < len
                       k += 1
                     end
@@ -144,7 +183,7 @@ module Warp
                   end
                 end
                 # advance to next line using SIMD
-                k = scan_to_line_end(bytes, k)
+                k = scan_to_line_end(bytes, k, simd)
                 if k < len
                   k += 1
                 end
@@ -162,7 +201,7 @@ module Warp
           # strings
           if c == '"'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '"'.ord.to_u8)
+            j = scan_delimited(bytes, i, '"'.ord.to_u8, false, simd)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -173,7 +212,7 @@ module Warp
 
           if c == '\''.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '\''.ord.to_u8)
+            j = scan_delimited(bytes, i, '\''.ord.to_u8, false, simd)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -185,7 +224,7 @@ module Warp
           # regex simple form when in expression position
           if c == '/'.ord && should_be_regex(last_nonspace_kind)
             state.try(&.push(Warp::Lexer::LexerState::State::Regex))
-            j = scan_delimited(bytes, i, '/'.ord.to_u8, true)
+            j = scan_delimited(bytes, i, '/'.ord.to_u8, true, simd)
             return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::Regex, i, j - i)
             i = j
@@ -475,9 +514,11 @@ module Warp
         end
       end
 
-      private def self.scan_to_line_end(bytes : Bytes, start : Int32) : Int32
+      private def self.scan_to_line_end(bytes : Bytes, start : Int32, simd : SimdIndex) : Int32
         len = bytes.size
         return len if start >= len
+        idx = simd.next_index_of(start, '\n'.ord.to_u8, '\r'.ord.to_u8)
+        return idx if idx >= 0
         backend = Warp::Backend.current
         ptr = bytes.to_unsafe
         i = start
@@ -493,10 +534,14 @@ module Warp
         len
       end
 
-      private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8, allow_modifiers : Bool = false) : Int32
+      private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8, allow_modifiers : Bool = false, simd : SimdIndex? = nil) : Int32
         len = bytes.size
         i = start + 1
         return -1 if i >= len
+
+        if simd
+          simd.not_nil!.next_index_of(i, delimiter)
+        end
 
         backend = Warp::Backend.current
         escape_scanner = Warp::Lexer::EscapeScanner.new

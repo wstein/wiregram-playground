@@ -86,14 +86,7 @@ module Warp
 
         private def visit_raw_text(node : CST::GreenNode) : String
           text = node.text || ""
-          # Post-process: normalize require statements
-          text = text.gsub(%r{\brequire(?!_relative)\s+(['"])\.\./}, "require_relative \\1../")
-          text = text.gsub(%r{\brequire(?!_relative)\s+(['"])\./}, "require_relative \\1./")
-          # Normalize duplicate slashes: ".//" → "./"
-          text = text.gsub(/require_relative\s+(['"])\.\/+/, "require_relative \\1./")
-          # Transform &.method to &:method
-          text = text.gsub(/&\.([a-zA-Z_][a-zA-Z0-9_]*[!?]?)/, "&:\\1")
-          text
+          apply_token_mappings(text)
         end
 
         private def visit_method_def(node : CST::GreenNode) : String
@@ -192,10 +185,79 @@ module Warp
             end
           end
 
-          # 5. Transform &.method to &:method
-          body = body.gsub(/&\.([a-zA-Z_][a-zA-Z0-9_]*[!?]?)/, "&:\\1")
+          # 5. Transform block shorthand &.method to explicit Ruby block when used as argument
+          apply_token_mappings(body)
+        end
 
-          body
+        private struct Edit
+          getter start : Int32
+          getter end_pos : Int32
+          getter text : String
+
+          def initialize(@start : Int32, @end_pos : Int32, @text : String)
+          end
+        end
+
+        private def apply_token_mappings(text : String) : String
+          bytes = text.to_slice
+          tokens, error, _ = Lexer.scan(bytes)
+          return text unless error == Warp::Core::ErrorCode::Success
+
+          edits = [] of Edit
+          prev_kind : TokenKind? = nil
+
+          i = 0
+          while i < tokens.size
+            tok = tokens[i]
+
+            if tok.kind == TokenKind::Require
+              j = i + 1
+              while j < tokens.size && tokens[j].kind == TokenKind::Newline
+                j += 1
+              end
+              if j < tokens.size && tokens[j].kind == TokenKind::String
+                raw = String.new(bytes[tokens[j].start, tokens[j].length])
+                if raw.starts_with?("\"./") || raw.starts_with?("\"../") || raw.starts_with?("'./") || raw.starts_with?("'../")
+                  edits << Edit.new(tok.start, tok.start + tok.length, "require_relative")
+                end
+              end
+            end
+
+            if tok.kind == TokenKind::Ampersand && i + 2 < tokens.size
+              if tokens[i + 1].kind == TokenKind::Dot && tokens[i + 2].kind == TokenKind::Identifier
+                if prev_kind == TokenKind::LParen || prev_kind == TokenKind::Comma
+                  method_name = String.new(bytes[tokens[i + 2].start, tokens[i + 2].length])
+                  replacement = "{ |n| n.#{method_name} }"
+                  start_pos = tok.start
+                  end_pos = tokens[i + 2].start + tokens[i + 2].length
+                  edits << Edit.new(start_pos, end_pos, replacement)
+                end
+              end
+            end
+
+            prev_kind = tok.kind unless tok.kind == TokenKind::Newline
+            i += 1
+          end
+
+          apply_edits(bytes, edits)
+        end
+
+        private def apply_edits(bytes : Bytes, edits : Array(Edit)) : String
+          return String.new(bytes) if edits.empty?
+          sorted = edits.sort_by(&.start)
+          output = String::Builder.new
+          pos = 0
+          sorted.each do |edit|
+            if edit.start > pos
+              output.write(bytes[pos...edit.start])
+            end
+            output << edit.text
+            pos = edit.end_pos
+          end
+          if pos < bytes.size
+            output.write(bytes[pos..-1])
+          end
+          output.to_s
         end
 
         private def build_sorbet_sig(payload : CST::MethodDefPayload) : String?

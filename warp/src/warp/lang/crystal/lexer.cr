@@ -42,10 +42,49 @@ module Warp
         "super"      => TokenKind::Super,
       }
 
+      private struct SimdIndex
+        @indices : Array(UInt32)
+        @bytes : Bytes
+
+        def initialize(@indices : Array(UInt32), @bytes : Bytes)
+        end
+
+        def next_index_of(start : Int32, a : UInt8, b : UInt8? = nil) : Int32
+          i = lower_bound(start)
+          while i < @indices.size
+            idx = @indices[i].to_i
+            byte = @bytes[idx]
+            return idx if byte == a || (b && byte == b)
+            i += 1
+          end
+          -1
+        end
+
+        private def lower_bound(target : Int32) : Int32
+          left = 0
+          right = @indices.size
+          while left < right
+            mid = (left + right) // 2
+            if @indices[mid].to_i < target
+              left = mid + 1
+            else
+              right = mid
+            end
+          end
+          left
+        end
+      end
+
       def self.scan(bytes : Bytes, state : Warp::Lexer::LexerState? = nil) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         tokens = [] of Token
         i = 0
         len = bytes.size
+
+        simd_result = Warp::Lang::Crystal.simd_scan(bytes)
+        if simd_result.error != Warp::Core::ErrorCode::Success && simd_result.error != Warp::Core::ErrorCode::Empty
+          return {tokens, simd_result.error, 0}
+        end
+        simd = SimdIndex.new(simd_result.indices, bytes)
 
         while i < len
           c = bytes[i]
@@ -71,7 +110,7 @@ module Warp
           # Comments (# ... end-of-line)
           if c == '#'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::Comment))
-            j = scan_to_line_end(bytes, i + 1)
+            j = scan_to_line_end(bytes, i + 1, simd)
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
             state.try(&.pop)
@@ -81,7 +120,7 @@ module Warp
           # Macro delimiters {{ and }}
           if c == '{'.ord && i + 1 < len && bytes[i + 1] == '{'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::Macro))
-            end_idx = scan_to_double(bytes, i + 2, '}'.ord.to_u8, '}'.ord.to_u8)
+            end_idx = scan_to_double(bytes, i + 2, '}'.ord.to_u8, '}'.ord.to_u8, simd)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
             tokens << Token.new(TokenKind::MacroStart, i, 2)
             tokens << Token.new(TokenKind::MacroEnd, end_idx, 2)
@@ -96,7 +135,7 @@ module Warp
           end
           if c == '{'.ord && i + 1 < len && bytes[i + 1] == '%'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::Macro))
-            end_idx = scan_to_double(bytes, i + 2, '%'.ord.to_u8, '}'.ord.to_u8)
+            end_idx = scan_to_double(bytes, i + 2, '%'.ord.to_u8, '}'.ord.to_u8, simd)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
             tokens << Token.new(TokenKind::MacroStart, i, 2)
             tokens << Token.new(TokenKind::MacroEnd, end_idx, 2)
@@ -108,7 +147,7 @@ module Warp
           # Strings (double-quoted)
           if c == '"'.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '"'.ord.to_u8)
+            j = scan_delimited(bytes, i, '"'.ord.to_u8, simd)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -119,7 +158,7 @@ module Warp
           # Strings/char (single-quoted) - treated as String for now
           if c == '\''.ord
             state.try(&.push(Warp::Lexer::LexerState::State::String))
-            j = scan_delimited(bytes, i, '\''.ord.to_u8)
+            j = scan_delimited(bytes, i, '\''.ord.to_u8, simd)
             return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
@@ -187,7 +226,7 @@ module Warp
 
             if delimiter_open
               state.try(&.push(Warp::Lexer::LexerState::State::String))
-              j = scan_delimited(bytes, i + 1, delimiter_close.not_nil!.to_u8)
+              j = scan_delimited(bytes, i + 1, delimiter_close.not_nil!.to_u8, simd)
               return {tokens, Warp::Core::ErrorCode::StringError, i} if j < 0
               tokens << Token.new(TokenKind::String, i, j - i)
               i = j
@@ -250,7 +289,7 @@ module Warp
               next
             elsif i + 1 < len && bytes[i + 1] == '['.ord
               state.try(&.push(Warp::Lexer::LexerState::State::Annotation))
-              end_idx = scan_to_op_byte(bytes, i + 2, ']'.ord.to_u8)
+              end_idx = scan_to_op_byte(bytes, i + 2, ']'.ord.to_u8, simd)
               return {tokens, Warp::Core::ErrorCode::StringError, i} if end_idx < 0
               tokens << Token.new(TokenKind::Annotation, i, end_idx - i + 1)
               i = end_idx + 1
@@ -425,9 +464,11 @@ module Warp
         is_identifier_start(c) || (c >= '0'.ord && c <= '9'.ord)
       end
 
-      private def self.scan_to_line_end(bytes : Bytes, start : Int32) : Int32
+      private def self.scan_to_line_end(bytes : Bytes, start : Int32, simd : SimdIndex) : Int32
         len = bytes.size
         return len if start >= len
+        idx = simd.next_index_of(start, '\n'.ord.to_u8, '\r'.ord.to_u8)
+        return idx if idx >= 0
         backend = Warp::Backend.current
         ptr = bytes.to_unsafe
         i = start
@@ -443,10 +484,14 @@ module Warp
         len
       end
 
-      private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8) : Int32
+      private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8, simd : SimdIndex? = nil) : Int32
         len = bytes.size
         i = start + 1
         return -1 if i >= len
+
+        if simd
+          simd.not_nil!.next_index_of(i, delimiter)
+        end
 
         backend = Warp::Backend.current
         escape_scanner = Warp::Lexer::EscapeScanner.new
@@ -472,13 +517,20 @@ module Warp
         -1
       end
 
-      private def self.scan_to_double(bytes : Bytes, start : Int32, a : UInt8, b : UInt8) : Int32
+      private def self.scan_to_double(bytes : Bytes, start : Int32, a : UInt8, b : UInt8, simd : SimdIndex? = nil) : Int32
         len = bytes.size
         i = start
         ptr = bytes.to_unsafe
         backend = Warp::Backend.current
 
         while i + 1 < len
+          if simd
+            idx = simd.not_nil!.next_index_of(i, a)
+            if idx >= 0
+              return idx if idx + 1 < len && ptr[idx + 1] == b
+              i = idx + 1
+            end
+          end
           block_len = len - i
           block_len = 64 if block_len > 64
           masks = backend.build_masks(ptr + i, block_len)
@@ -509,13 +561,17 @@ module Warp
         -1
       end
 
-      private def self.scan_to_op_byte(bytes : Bytes, start : Int32, target : UInt8) : Int32
+      private def self.scan_to_op_byte(bytes : Bytes, start : Int32, target : UInt8, simd : SimdIndex? = nil) : Int32
         len = bytes.size
         i = start
         ptr = bytes.to_unsafe
         backend = Warp::Backend.current
 
         while i < len
+          if simd
+            idx = simd.not_nil!.next_index_of(i, target)
+            return idx if idx >= 0
+          end
           block_len = len - i
           block_len = 64 if block_len > 64
           masks = backend.build_masks(ptr + i, block_len)

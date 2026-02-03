@@ -76,8 +76,15 @@ module Warp
       getter children : Array(GreenNode)
       getter token : Token?
       getter leading_trivia : Array(Token)
+      getter trailing_trivia : Array(Token)
 
-      def initialize(@kind : NodeKind, @children : Array(GreenNode) = [] of GreenNode, @token : Token? = nil, @leading_trivia : Array(Token) = [] of Token)
+      def initialize(
+        @kind : NodeKind,
+        @children : Array(GreenNode) = [] of GreenNode,
+        @token : Token? = nil,
+        @leading_trivia : Array(Token) = [] of Token,
+        @trailing_trivia : Array(Token) = [] of Token,
+      )
       end
     end
 
@@ -100,6 +107,10 @@ module Warp
 
       def leading_trivia : Array(Token)
         @green.leading_trivia
+      end
+
+      def trailing_trivia : Array(Token)
+        @green.trailing_trivia
       end
 
       def children : Array(RedNode)

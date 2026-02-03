@@ -18,7 +18,7 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     output.includes?("require \"./\"").should eq(false)
   end
 
-  it "converts &.method to &:method syntax" do
+  it "converts &.method to explicit Ruby block" do
     source = <<-CR
       def process(items)
         items.map(&.to_s)
@@ -29,7 +29,7 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     result.error.should eq(Warp::Core::ErrorCode::Success)
 
     output = result.output
-    output.includes?("&:to_s").should eq(true)
+    (output.includes?(".map { |n| n.to_s }") || output.includes?(".map({ |n| n.to_s })")).should eq(true)
     output.includes?("&.to_s").should eq(false)
   end
 
@@ -174,10 +174,10 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     result.output.should contain("sig { params(name: T.nilable(String)).returns(T.nilable(String)) }")
   end
 
-  it "translates method-to-proc shorthand &.ident to Ruby &:ident (legacy)" do
+  it "translates method-to-proc shorthand &.ident to Ruby explicit block (legacy)" do
     source = "def test(root)\n  kinds = root.not_nil!.children.map(&.kind)\nend"
     result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
     result.error.should eq(Warp::Core::ErrorCode::Success)
-    result.output.should contain(".map(&:kind)")
+    (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
   end
 end

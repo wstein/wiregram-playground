@@ -674,7 +674,7 @@ Notes:
 - The tape IR can drive an optional DOM or a richer AST; an AST typically carries more semantic information than a minimal DOM, so it should not be modeled as "DOM -> AST".
 - A bare DOM builder and simple formatter (pretty/minified) are available for convenience.
 - String values are returned as raw JSON slices (quotes stripped) without unescaping.
-- Stage1a uses Crystal NEON asm on AArch64 with a scalar fallback for non-AArch64 builds.
+- Stage1a uses Crystal NEON asm on AArch64; when SIMD instructions are unavailable the scalar backend is used as a fallback (can be forced for testing with `WARP_BACKEND=scalar`).
 - UTF-8 is validated during stage1; set `WARP_VERIFY_NEON=1` to cross-check SIMD masks with scalar for debugging (slower).
 - Stage2 builds a zero-copy tape without unescaping or number conversion.
 - Literal/number validation is optional and can be enabled per-parse without copying.
@@ -792,7 +792,7 @@ All components maintain references to the original `Bytes` buffer:
 
 ### Performance Characteristics
 
-- **Stage1a**: SIMD-accelerated on ARM64, scalar fallback elsewhere
+- **Stage1a**: SIMD-accelerated on ARM64; when SIMD instructions are unavailable the scalar backend is used as a fallback (can be forced for testing with `WARP_BACKEND=scalar`).
 - **Stage1b**: Linear pass to assemble tokens and spans
 - **Stage2**: Linear scan through structural indices
 - **Memory**: O(structural_count) metadata, O(1) per token access

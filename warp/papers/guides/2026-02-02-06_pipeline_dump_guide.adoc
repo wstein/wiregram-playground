@@ -60,7 +60,7 @@ warp dump full source.rb
 * **pretty** format is optimized for human inspection and teaching.
 * **json** format is stable and intended for tooling and automated analysis.
 * The `full` target only emits stages implemented by the selected language provider.
-* SIMD is always enabled for all languages with enhanced detection (number/word/identifier boundaries); when SIMD instructions are unavailable, the scalar backend is used automatically.
+* SIMD scanning is used when available with enhanced detection (number/word/identifier boundaries); when SIMD instructions are unavailable the scalar backend is used as a fallback (or explicitly via `WARP_BACKEND=scalar` for testing).
 
 == Error Handling
 

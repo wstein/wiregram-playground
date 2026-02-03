@@ -487,7 +487,7 @@ Warp 0.1.0 (Crystal 1.19.1)
 
 # Test environment variable override
 $ WARP_BACKEND=scalar ./bin/warp corpus/ruby/10_complex.rb
-# Uses scalar backend regardless of detected hardware
+# Forces the scalar backend regardless of detected hardware (testing/debugging only)
 ----
 
 == Conclusion
