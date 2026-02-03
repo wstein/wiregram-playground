@@ -25,6 +25,12 @@ warp dump <simd|tokens|tape|cst|ast|full> [options] <file>
 # SIMD structural indices for JSON
 warp dump simd --lang json data.json
 
+# Enhanced SIMD (now default - shows number/word boundaries)
+warp dump simd --lang json data.json
+
+# SIMD timing/throughput
+warp dump simd --lang json --perf data.json
+
 # Tokens with auto-detected language
 warp dump tokens --lang auto source.rb
 
@@ -46,6 +52,7 @@ warp dump full source.rb
 * `-l, --lang=LANG` — Language selection (`auto|json|jsonc|ruby|crystal`).
 * `-f, --format=FORMAT` — Output format (`pretty|json`).
 * `--jsonc` — Enable JSONC parsing (JSON only).
+* `--perf` — Report SIMD timing/throughput.
 * `-h, --help` — Command help.
 
 == Output Notes
@@ -53,6 +60,7 @@ warp dump full source.rb
 * **pretty** format is optimized for human inspection and teaching.
 * **json** format is stable and intended for tooling and automated analysis.
 * The `full` target only emits stages implemented by the selected language provider.
+* SIMD is always enabled for all languages with enhanced detection (number/word/identifier boundaries); when SIMD instructions are unavailable, the scalar backend is used automatically.
 
 == Error Handling
 

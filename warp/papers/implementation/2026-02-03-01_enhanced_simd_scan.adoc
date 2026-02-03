@@ -5,10 +5,12 @@
 This document describes the enhanced SIMD scanning path for JSON that extends the base structural scan with:
 
 - Number boundary detection (digits + dot + exponent markers)
-- Word boundary detection (ASCII letters + underscore)
+- Word boundary detection (ASCII letters + underscore) — JSON-specific; Ruby/Crystal use whitespace
 - UTF-8 leading byte detection (non-ASCII)
 
 The enhanced scan is designed to be backward compatible with the existing structural scan and can be enabled via the CLI.
+
+SIMD is always enabled for all languages; when SIMD instructions are unavailable, the scalar backend is used automatically.
 
 == Implementation
 
@@ -33,27 +35,39 @@ A new scanner is available at `src/warp/lexer/enhanced_simd_scan.cr`:
 
 == CLI Usage
 
-Enable enhanced SIMD in `dump simd`:
+The enhanced SIMD scan is now the default behavior for all languages. Use `dump simd` to access full SIMD detection:
 
 ----
-warp dump simd --lang json --enhanced path/to/file.json
+warp dump simd --lang json path/to/file.json
 ----
 
 To report SIMD timing/throughput:
 
 ----
-warp dump simd --lang json --enhanced --perf path/to/file.json
+warp dump simd --lang json --perf path/to/file.json
 ----
 
-The enhanced scan is also respected in `dump full` when the same flag is used.
+The enhanced scan is the default mode in `dump full` as well.
 
 == Notes
 
 - The added masks are currently computed using scalar logic inside each backend for portability.
 - SIMD-optimized versions can be added per backend without changing the public API.
+- Environment flags are not used to enable SIMD; selection is automatic via backend detection.
+
+== Language-Specific Mask Usage
+
+While the enhanced JSON scan uses the `word` mask for boundary detection, Ruby and Crystal lexers use different strategies:
+
+- **JSON**: `word` mask detects ASCII identifier boundaries
+- **Ruby/Crystal**: `whitespace` mask (space/tab) for efficient heredoc and percent literal boundary detection
+  - Whitespace is more practical for language-specific patterns
+  - Both masks are computed by all backends, so selection is flexible
+
+See `papers/implementation/2026-02-06-01_simd_ruby_crystal_implementation.adoc` for details on Ruby/Crystal SIMD lexer integration.
 
 == Next Steps
 
 - SIMD-optimized number and identifier scanning per backend
 - Unicode property tables for more precise letter detection
-- Integration into Ruby/Crystal lexers once their SIMD tokenization is expanded
+- Further optimizations for Ruby/Crystal heredoc and percent literal patterns

@@ -39,13 +39,13 @@ module Warp
           i += 1
         end
 
-        # TODO optimize: partial blocks should be rare with padded inputs.
+        # Pad unused bits with 1s to avoid false matches in partial blocks
         if block_len < 64
           whitespace |= ~0_u64 << block_len
         end
 
-        number, word, utf8_lead = compute_extra_masks(ptr, block_len)
-        Lexer::Masks.new(backslash, quote, whitespace, op, control, number, word, utf8_lead)
+        utf8_lead = compute_utf8_mask(ptr, block_len)
+        Lexer::Masks.new(backslash, quote, whitespace, op, control, utf8_lead)
       end
 
       def all_digits16?(ptr : Pointer(UInt8)) : Bool

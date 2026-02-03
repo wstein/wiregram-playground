@@ -40,13 +40,6 @@ module Warp
 
       def self.scan(bytes : Bytes) : Tuple(Array(Token), Warp::Core::ErrorCode, Int32)
         # Module-level compatibility: this method is used internally by tests and other code.
-        if ENV["WARP_SIMD_RUBY"]? == "1"
-          simd_result = Warp::Lang::Ruby.simd_scan(bytes)
-          if simd_result.error == Warp::Core::ErrorCode::Utf8Error
-            return {Array(Token).new, Warp::Core::ErrorCode::Utf8Error, 0}
-          end
-        end
-
         tokens = [] of Token
         i = 0
         len = bytes.size
@@ -78,15 +71,7 @@ module Warp
 
           # comments
           if c == '#'.ord
-            j = if ENV["WARP_SIMD_RUBY"]? == "1"
-                  scan_to_line_end(bytes, i + 1)
-                else
-                  k = i + 1
-                  while k < len && bytes[k] != '\n'.ord && bytes[k] != '\r'.ord
-                    k += 1
-                  end
-                  k
-                end
+            j = scan_to_line_end(bytes, i + 1)
             tokens << Token.new(TokenKind::CommentLine, i, j - i)
             i = j
             next
@@ -122,14 +107,9 @@ module Warp
             if delim.bytesize == 0
               # fall through to operator handling
             else
-              # move to next line start
-              while j < len && bytes[j] != '\n'.ord && bytes[j] != '\r'.ord
-                j += 1
-              end
-              if j < len && bytes[j] == '\r'.ord
-                j += 1
-              end
-              if j < len && bytes[j] == '\n'.ord
+              # move to next line start using SIMD
+              j = scan_to_line_end(bytes, j)
+              if j < len
                 j += 1
               end
               # search for delimiter at line start
@@ -137,7 +117,7 @@ module Warp
               found = -1
               while k < len
                 line_start = k
-                # skip leading whitespace
+                # skip leading whitespace using built-in scan
                 while k < len && (bytes[k] == ' '.ord || bytes[k] == '\t'.ord)
                   k += 1
                 end
@@ -147,27 +127,17 @@ module Warp
                   # ensure end of line
                   if k >= len || bytes[k] == '\n'.ord || bytes[k] == '\r'.ord
                     found = k
-                    # consume rest of line
-                    while k < len && bytes[k] != '\n'.ord && bytes[k] != '\r'.ord
-                      k += 1
-                    end
-                    if k < len && bytes[k] == '\r'.ord
-                      k += 1
-                    end
-                    if k < len && bytes[k] == '\n'.ord
+                    # consume rest of line using SIMD
+                    k = scan_to_line_end(bytes, k)
+                    if k < len
                       k += 1
                     end
                     break
                   end
                 end
-                # advance to next line
-                while k < len && bytes[k] != '\n'.ord && bytes[k] != '\r'.ord
-                  k += 1
-                end
-                if k < len && bytes[k] == '\r'.ord
-                  k += 1
-                end
-                if k < len && bytes[k] == '\n'.ord
+                # advance to next line using SIMD
+                k = scan_to_line_end(bytes, k)
+                if k < len
                   k += 1
                 end
               end
@@ -181,23 +151,8 @@ module Warp
 
           # strings
           if c == '"'.ord
-            j = i + 1
-            found = false
-            while j < len
-              if bytes[j] == '\\'.ord
-                j += 2
-                next
-              elsif bytes[j] == '"'.ord
-                j += 1
-                found = true
-                break
-              else
-                j += 1
-              end
-            end
-            unless found
-              return {tokens, ErrorCode::StringError, start_i}
-            end
+            j = scan_delimited(bytes, i, '"'.ord.to_u8)
+            return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
             last_nonspace_kind = TokenKind::String
@@ -205,23 +160,8 @@ module Warp
           end
 
           if c == '\''.ord
-            j = i + 1
-            found = false
-            while j < len
-              if bytes[j] == '\\'.ord
-                j += 2
-                next
-              elsif bytes[j] == '\''.ord
-                j += 1
-                found = true
-                break
-              else
-                j += 1
-              end
-            end
-            unless found
-              return {tokens, ErrorCode::StringError, start_i}
-            end
+            j = scan_delimited(bytes, i, '\''.ord.to_u8)
+            return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::String, i, j - i)
             i = j
             last_nonspace_kind = TokenKind::String
@@ -230,25 +170,8 @@ module Warp
 
           # regex simple form when in expression position
           if c == '/'.ord && should_be_regex(last_nonspace_kind)
-            j = i + 1
-            while j < len
-              if bytes[j] == '\\'.ord
-                j += 2
-                next
-              elsif bytes[j] == '/'.ord
-                j += 1
-                # Handle regex modifiers (e.g., /pattern/i)
-                while j < len && (bytes[j] == 'i'.ord || bytes[j] == 'm'.ord || bytes[j] == 'x'.ord || bytes[j] == 'o'.ord)
-                  j += 1
-                end
-                break
-              else
-                j += 1
-              end
-            end
-            if j >= len
-              return {tokens, ErrorCode::StringError, start_i}
-            end
+            j = scan_delimited(bytes, i, '/'.ord.to_u8, true)
+            return {tokens, ErrorCode::StringError, start_i} if j < 0
             tokens << Token.new(TokenKind::Regex, i, j - i)
             i = j
             last_nonspace_kind = TokenKind::Regex
@@ -417,31 +340,25 @@ module Warp
           when '/'.ord
             tokens << Token.new(TokenKind::Slash, i, 1); i += 1; last_nonspace_kind = TokenKind::Slash; next
           when '%'.ord
-            # percent operator or percent literal
-            if i + 1 < len && ((bytes[i + 1] >= 'a'.ord && bytes[i + 1] <= 'z'.ord) || (bytes[i + 1] >= 'A'.ord && bytes[i + 1] <= 'Z'.ord))
-              # percent literal: find matching delimiter
+            # percent operator or percent literal (%w, %i, %r, %q, %s, %x)
+            if i + 1 < len && is_percent_literal_type(bytes[i + 1])
               lit_type = bytes[i + 1]
               d = i + 2
               if d < len
                 delim = bytes[d]
-                # support paired delimiters
+                # support paired delimiters: () {} []
                 close = case delim
-                        when '('.ord then ')'.ord
-                        when '{'.ord then '}'.ord
-                        when '['.ord then ']'.ord
+                        when '('.ord then ')'.ord.to_u8
+                        when '{'.ord then '}'.ord.to_u8
+                        when '['.ord then ']'.ord.to_u8
+                        when '<'.ord then '>'.ord.to_u8
                         else              delim
                         end
-                k = d + 1
-                while k < len && bytes[k] != close
-                  if bytes[k] == '\\'.ord
-                    k += 2
-                    next
-                  end
-                  k += 1
-                end
-                if k < len && bytes[k] == close
-                  tokens << Token.new(TokenKind::String, i, k - i + 1)
-                  i = k + 1
+                # use SIMD-driven delimiter scanning for efficiency
+                k = scan_percent_delimited(bytes, d + 1, close, lit_type)
+                if k > 0
+                  tokens << Token.new(TokenKind::String, i, k - i)
+                  i = k
                   last_nonspace_kind = TokenKind::String
                   next
                 end
@@ -521,6 +438,225 @@ module Warp
           i += 64
         end
         len
+      end
+
+      private def self.scan_delimited(bytes : Bytes, start : Int32, delimiter : UInt8, allow_modifiers : Bool = false) : Int32
+        len = bytes.size
+        i = start + 1
+        return -1 if i >= len
+
+        backend = Warp::Backend.current
+        escape_scanner = Warp::Lexer::EscapeScanner.new
+        ptr = bytes.to_unsafe
+
+        while i < len
+          block_len = len - i
+          block_len = 64 if block_len > 64
+
+          masks = backend.build_masks(ptr + i, block_len)
+          backslash = masks.backslash
+          delim_mask = build_byte_mask(ptr + i, block_len, delimiter)
+          escaped = escape_scanner.next(backslash).escaped
+          unescaped = delim_mask & ~escaped
+
+          if unescaped != 0
+            end_idx = i + unescaped.trailing_zeros_count + 1
+            if allow_modifiers
+              while end_idx < len && regex_modifier?(bytes[end_idx])
+                end_idx += 1
+              end
+            end
+            return end_idx
+          end
+
+          i += 64
+        end
+
+        -1
+      end
+
+      private def self.build_byte_mask(ptr : Pointer(UInt8), block_len : Int32, target : UInt8) : UInt64
+        mask = 0_u64
+        i = 0
+        while i < block_len
+          mask |= (1_u64 << i) if ptr[i] == target
+          i += 1
+        end
+        mask
+      end
+
+      private def self.regex_modifier?(b : UInt8) : Bool
+        b == 'i'.ord.to_u8 || b == 'm'.ord.to_u8 || b == 'x'.ord.to_u8 || b == 'o'.ord.to_u8
+      end
+
+      private def self.is_percent_literal_type(c : UInt8) : Bool
+        # %w, %i, %r, %q, %s, %x, %W, %I, %Q, %R, %S, %X
+        (c >= 'a'.ord && c <= 'z'.ord) || (c >= 'A'.ord && c <= 'Z'.ord)
+      end
+
+      private def self.scan_percent_delimited(bytes : Bytes, start : Int32, close : UInt8, lit_type : UInt8) : Int32
+        len = bytes.size
+        i = start
+        return -1 if i >= len
+
+        backend = Warp::Backend.current
+        escape_scanner = Warp::Lexer::EscapeScanner.new
+        ptr = bytes.to_unsafe
+
+        # for %r (regex), we need to handle modifiers after the closing delimiter
+        is_regex = lit_type == 'r'.ord.to_u8 || lit_type == 'R'.ord.to_u8
+
+        while i < len
+          block_len = len - i
+          block_len = 64 if block_len > 64
+
+          masks = backend.build_masks(ptr + i, block_len)
+          backslash = masks.backslash
+          delim_mask = build_byte_mask(ptr + i, block_len, close)
+          escaped = escape_scanner.next(backslash).escaped
+          unescaped = delim_mask & ~escaped
+
+          if unescaped != 0
+            end_idx = i + unescaped.trailing_zeros_count + 1
+            # for %r, consume trailing modifiers
+            if is_regex
+              while end_idx < len && regex_modifier?(bytes[end_idx])
+                end_idx += 1
+              end
+            end
+            return end_idx
+          end
+
+          i += 64
+        end
+
+        -1
+      end
+
+      # SIMD-driven pattern detection for Ruby-specific structures
+      # These methods detect heredocs, regex literals, and string interpolation using whitespace masks
+      #
+      # Returns array of indices where these patterns occur
+      def self.detect_heredoc_boundaries(bytes : Bytes) : Array(UInt32)
+        indices = Array(UInt32).new
+        len = bytes.size
+        i = 0
+        while i < len - 1
+          # Look for << followed by identifier (heredoc start marker)
+          if bytes[i] == '<'.ord && bytes[i + 1] == '<'.ord
+            # Check if this is actually a heredoc (not left-shift or <<)
+            # by verifying an identifier follows
+            j = i + 2
+            # Skip optional - or ~ modifiers
+            if j < len && (bytes[j] == '-'.ord || bytes[j] == '~'.ord)
+              j += 1
+            end
+            # Check for heredoc delimiter
+            if j < len && is_identifier_start(bytes[j])
+              indices << i.to_u32
+            end
+            i += 2
+          else
+            i += 1
+          end
+        end
+        indices
+      end
+
+      # Detect regex literal delimiters using whitespace context
+      # Returns indices of regex start positions
+      def self.detect_regex_delimiters(bytes : Bytes) : Array(UInt32)
+        indices = Array(UInt32).new
+        len = bytes.size
+        i = 0
+        last_token_kind : TokenKind? = nil
+
+        while i < len
+          c = bytes[i]
+
+          # Skip whitespace
+          if c == ' '.ord || c == '\t'.ord || c == '\n'.ord || c == '\r'.ord
+            i += 1
+            next
+          end
+
+          # Check for regex delimiter (/)
+          if c == '/'.ord && should_be_regex(last_token_kind)
+            indices << i.to_u32
+            # Skip to end of regex
+            i = scan_delimited(bytes, i, '/'.ord.to_u8, true)
+            i = i < 0 ? len : i
+            last_token_kind = TokenKind::Regex
+            next
+          end
+
+          # Track token kind for context
+          case c
+          when '='.ord, '('.ord, '['.ord, '{'.ord, ','.ord, ';'.ord, '~'.ord
+            last_token_kind = TokenKind::LParen
+          when 'i'.ord..'z'.ord, 'A'.ord..'Z'.ord
+            last_token_kind = TokenKind::Identifier
+          else
+            last_token_kind = TokenKind::Unknown
+          end
+
+          i += 1
+        end
+
+        indices
+      end
+
+      # Detect string interpolation markers (#{}) using whitespace scanning
+      # Returns indices where #{} appears
+      def self.detect_string_interpolation(bytes : Bytes) : Array(UInt32)
+        indices = Array(UInt32).new
+        len = bytes.size
+        i = 0
+
+        # Only scan inside strings — look for starting quotes first
+        while i < len
+          if bytes[i] == '"'.ord
+            # Scan double-quoted string for #{...}
+            i += 1
+            while i < len - 1
+              if bytes[i] == '#'.ord && bytes[i + 1] == '{'.ord
+                indices << (i - 1).to_u32 # Mark position of opening quote + content
+                # Skip to closing }
+                depth = 1
+                i += 2
+                while i < len && depth > 0
+                  if bytes[i] == '{'.ord
+                    depth += 1
+                  elsif bytes[i] == '}'.ord
+                    depth -= 1
+                  elsif bytes[i] == '"'.ord
+                    break
+                  end
+                  i += 1
+                end
+              elsif bytes[i] == '"'.ord
+                break
+              else
+                i += 1
+              end
+            end
+            i += 1
+          else
+            i += 1
+          end
+        end
+
+        indices
+      end
+
+      # Combined SIMD pattern detection: returns all Ruby-specific structural positions
+      # with metadata about pattern type
+      def self.detect_all_patterns(bytes : Bytes) : Hash(String, Array(UInt32))
+        {
+          "heredoc_markers"      => detect_heredoc_boundaries(bytes),
+          "regex_delimiters"     => detect_regex_delimiters(bytes),
+          "string_interpolation" => detect_string_interpolation(bytes),
+        }
       end
 
       # Expose a `Lexer` class for compatibility with existing callers/tests.

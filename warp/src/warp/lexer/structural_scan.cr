@@ -244,8 +244,6 @@ module Warp
       getter whitespace : UInt64
       getter op : UInt64
       getter control : UInt64
-      getter number : UInt64
-      getter word : UInt64
       getter utf8_lead : UInt64
 
       def initialize(
@@ -254,8 +252,6 @@ module Warp
         @whitespace : UInt64,
         @op : UInt64,
         @control : UInt64,
-        @number : UInt64,
-        @word : UInt64,
         @utf8_lead : UInt64,
       )
       end

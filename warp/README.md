@@ -47,6 +47,8 @@ SIMD optimizations, hardware-specific notes, and research papers.
 - [Performance Analysis](papers/performance/2026-01-30-01_performance_study.adoc)
 - [Formatting Performance Study](papers/performance/2026-01-30-03_formatting_performance_study.adoc)
 
+SIMD regression benchmarks are available in `spec/benchmarks/simd_bench.cr`.
+
 ### [Testing](papers/testing/)
 
 Test plans, status reports, and coverage documentation.

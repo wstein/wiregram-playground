@@ -33,8 +33,18 @@ describe "Crystal Lexer" do
 
     error.should eq(Warp::Core::ErrorCode::Success)
     kinds = tokens.map(&.kind)
-    kinds.should contain(Warp::Lang::Crystal::TokenKind::At)
+    kinds.should contain(Warp::Lang::Crystal::TokenKind::Annotation)
     kinds.should contain(Warp::Lang::Crystal::TokenKind::InstanceVar)
+  end
+
+  it "lexes macro delimiters" do
+    source = "{{name}}"
+    tokens, error = Warp::Lang::Crystal::Lexer.scan(source.to_slice)
+
+    error.should eq(Warp::Core::ErrorCode::Success)
+    kinds = tokens.map(&.kind)
+    kinds.should contain(Warp::Lang::Crystal::TokenKind::MacroStart)
+    kinds.should contain(Warp::Lang::Crystal::TokenKind::MacroEnd)
   end
 
   it "detects unterminated string" do

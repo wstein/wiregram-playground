@@ -88,9 +88,9 @@ module Warp
         true
       end
 
-      protected def compute_extra_masks(ptr : Pointer(UInt8), block_len : Int32) : Tuple(UInt64, UInt64, UInt64)
-        number = 0_u64
-        word = 0_u64
+      # Compute UTF-8 leading byte mask only
+      # Whitespace and structural detection is primary; word/number boundaries are handled at lexer level
+      protected def compute_utf8_mask(ptr : Pointer(UInt8), block_len : Int32) : UInt64
         utf8_lead = 0_u64
 
         i = 0
@@ -98,14 +98,7 @@ module Warp
           b = ptr[i]
           bit = 1_u64 << i
 
-          if (b >= '0'.ord.to_u8 && b <= '9'.ord.to_u8) || b == '.'.ord.to_u8 || b == 'e'.ord.to_u8 || b == 'E'.ord.to_u8
-            number |= bit
-          end
-
-          if (b >= 'a'.ord.to_u8 && b <= 'z'.ord.to_u8) || (b >= 'A'.ord.to_u8 && b <= 'Z'.ord.to_u8) || b == '_'.ord.to_u8
-            word |= bit
-          end
-
+          # UTF-8 leading bytes: 0x80-0xFF but not continuation bytes (0x80-0xBF)
           if b >= 0x80_u8 && (b & 0xC0_u8) != 0x80_u8
             utf8_lead |= bit
           end
@@ -113,7 +106,7 @@ module Warp
           i += 1
         end
 
-        {number, word, utf8_lead}
+        utf8_lead
       end
 
       abstract def name : String

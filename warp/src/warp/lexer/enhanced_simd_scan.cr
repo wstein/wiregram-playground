@@ -1,7 +1,8 @@
-# Enhanced SIMD Scanner for JSON
+# Whitespace-Focused SIMD Scanner for JSON
 #
-# Extends structural scanning with number/identifier/unicode detection while
-# preserving the existing JSON structural behavior.
+# Simplified structural scanning that focuses on whitespace boundaries
+# and language-agnostic patterns. Number/word detection is handled at
+# lexer level where language context is available.
 
 module Warp
   module Lexer
@@ -16,9 +17,6 @@ module Warp
         backend = Backend.current
         error = ErrorCode::Success
 
-        prev_number = 0_u64
-        prev_word = 0_u64
-
         offset = 0
         while offset < len
           block_len = len - offset
@@ -32,20 +30,10 @@ module Warp
           masks = backend.build_masks(ptr + offset, block_len)
           block = scanner.next(masks.backslash, masks.quote, masks.whitespace, masks.op)
 
-          number_mask = masks.number
-          word_mask = masks.word
-
-          number_start = number_mask & ~((number_mask << 1) | prev_number)
-          word_start = word_mask & ~((word_mask << 1) | prev_word)
-
-          prev_number = number_mask >> 63
-          prev_word = word_mask >> 63
-
+          # Whitespace-focused: extract structural elements only
+          # Number/word boundary detection handled at lexer level with full language context
           outside_string = ~block.strings.in_string
-
-          structural = block.structural_start
-          structural |= number_start & outside_string
-          structural |= word_start & outside_string
+          structural = block.structural_start & outside_string
 
           if block_len < 64
             structural &= (1_u64 << block_len) - 1_u64

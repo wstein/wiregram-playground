@@ -30,6 +30,7 @@ module Warp::CLI
       return run_init(args[1..]) if args.first? == "init"
       return run_transpile(args[1..]) if args.first? == "transpile"
       return run_dump(args[1..]) if args.first? == "dump"
+      return run_detect(args[1..]) if args.first? == "detect"
       if args.first? == "version" || args.first? == "-v" || args.first? == "--version"
         puts Warp.version_string
         return 0
@@ -48,6 +49,7 @@ Usage:
   warp init
   warp transpile [target] [options]
   warp dump <simd|tokens|tape|soa|cst|dom|ast|full> [options] <file>
+  warp detect patterns [options] <file>
   warp version
 
 Targets:
@@ -62,6 +64,7 @@ Commands:
   init          Create a default .warp.yaml configuration
   transpile     Transpile between Ruby and Crystal
   dump          Inspect pipeline stages for a file
+  detect        Detect language-specific patterns
   version       Show version information
   help          Show this help message
 TXT
@@ -76,7 +79,6 @@ Options:
   -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
-  --enhanced             Use enhanced SIMD detection (JSON only)
   --perf                 Report SIMD timing/throughput
   -h, --help             Show this help message
 
@@ -101,7 +103,6 @@ Options:
   -l, --lang=LANG        Language: auto|json|jsonc|ruby|crystal (default: auto)
   -f, --format=FORMAT    Output format: pretty|json (default: pretty)
   --jsonc                Enable JSONC parsing (JSON only)
-  --enhanced             Use enhanced SIMD detection (JSON only)
   --perf                 Report SIMD timing/throughput
   -h, --help             Show this help message
 TXT
@@ -413,7 +414,6 @@ YAML
       lang_name = "auto"
       format_name = "pretty"
       jsonc = false
-      enhanced = false
       perf = false
 
       parser = OptionParser.new do |p|
@@ -421,7 +421,6 @@ YAML
         p.on("-l LANG", "--lang=LANG", "Language: auto|json|jsonc|ruby|crystal") { |v| lang_name = v }
         p.on("-f FORMAT", "--format=FORMAT", "Output format: pretty|json") { |v| format_name = v }
         p.on("--jsonc", "Enable JSONC parsing (JSON only)") { jsonc = true }
-        p.on("--enhanced", "Use enhanced SIMD detection (JSON only)") { enhanced = true }
         p.on("--perf", "Report SIMD timing/throughput") { perf = true }
         p.on("-h", "--help", "Show this help message") { puts dump_stage_usage(stage); exit 0 }
       end
@@ -460,7 +459,7 @@ YAML
 
       case stage
       when "simd"
-        return dump_simd_stage(lang, bytes, format, path, enhanced, perf)
+        return dump_simd_stage(lang, bytes, format, path, perf)
       when "tokens"
         return dump_tokens_stage(lang, bytes, format, path, jsonc_effective)
       when "tape"
@@ -474,7 +473,7 @@ YAML
       when "ast"
         return dump_ast_stage(lang, bytes, format, path, jsonc_effective)
       when "full"
-        return dump_full_stage(lang, bytes, format, path, jsonc_effective, enhanced, perf)
+        return dump_full_stage(lang, bytes, format, path, jsonc_effective, perf)
       else
         puts "Unknown dump target: #{stage}"
         return 1
@@ -561,11 +560,11 @@ YAML
       nil
     end
 
-    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, enhanced : Bool = false, perf : Bool = false) : Int32
+    private def self.dump_simd_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, perf : Bool = false) : Int32
       start_time = Time.instant
       scan_result : Warp::Lang::Common::ScanResult = case lang
       when DumpLanguage::Json
-        json_result = enhanced ? Warp::Lexer::EnhancedSimdScan.index(bytes) : Warp::Lexer.index(bytes)
+        json_result = Warp::Lexer::EnhancedSimdScan.index(bytes)
         Warp::Lang::Common::ScanResult.new(json_result.buffer.backing || Array(UInt32).new, json_result.error, "json")
       when DumpLanguage::Ruby
         Warp::Lang::Ruby.simd_scan(bytes)
@@ -866,23 +865,23 @@ YAML
       0
     end
 
-    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool, enhanced : Bool, perf : Bool) : Int32
+    private def self.dump_full_stage(lang : DumpLanguage, bytes : Bytes, format : DumpFormat, path : String, jsonc : Bool, perf : Bool) : Int32
       case format
       when DumpFormat::Pretty
         io = STDOUT
-        dump_full_stage_pretty(io, lang, bytes, path, jsonc, enhanced, perf)
+        dump_full_stage_pretty(io, lang, bytes, path, jsonc, perf)
       when DumpFormat::Json
-        dump_full_stage_json(lang, bytes, path, jsonc, enhanced, perf)
+        dump_full_stage_json(lang, bytes, path, jsonc, perf)
       end
 
       0
     end
 
-    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool, perf : Bool)
+    private def self.dump_full_stage_pretty(io : IO, lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, perf : Bool)
       io.puts "Full dump (#{dump_language_label(lang)})"
 
       io.puts "\n== simd =="
-      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path, enhanced, perf)
+      dump_simd_stage(lang, bytes, DumpFormat::Pretty, path, perf)
 
       io.puts "\n== tokens =="
       dump_tokens_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
@@ -903,14 +902,14 @@ YAML
       dump_ast_stage(lang, bytes, DumpFormat::Pretty, path, jsonc)
     end
 
-    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, enhanced : Bool, perf : Bool)
+    private def self.dump_full_stage_json(lang : DumpLanguage, bytes : Bytes, path : String, jsonc : Bool, perf : Bool)
       JSON.build(STDOUT) do |json|
         json.object do
           json.field "language", dump_language_label(lang)
           json.field "stages" do
             json.object do
               json.field "simd" do
-                write_json_simd_all_langs(json, lang, bytes, path, enhanced, perf)
+                write_json_simd_all_langs(json, lang, bytes, path, perf)
               end
               json.field "tokens" do
                 write_json_tokens(json, lang, bytes, jsonc, path)
@@ -1583,11 +1582,11 @@ YAML
       end
     end
 
-    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String, enhanced : Bool, perf : Bool)
+    private def self.write_json_simd_all_langs(json : JSON::Builder, lang : DumpLanguage, bytes : Bytes, path : String, perf : Bool)
       start_time = Time.instant
       scan_result : Warp::Lang::Common::ScanResult = case lang
       when DumpLanguage::Json
-        json_result = enhanced ? Warp::Lexer::EnhancedSimdScan.index(bytes) : Warp::Lexer.index(bytes)
+        json_result = Warp::Lexer::EnhancedSimdScan.index(bytes)
         Warp::Lang::Common::ScanResult.new(json_result.buffer.backing || Array(UInt32).new, json_result.error, "json")
       when DumpLanguage::Ruby
         Warp::Lang::Ruby.simd_scan(bytes)
@@ -2291,6 +2290,106 @@ YAML
       end
       lines << "end"
       lines.join("\n") + "\n"
+    end
+
+    private def self.run_detect(args : Array(String)) : Int32
+      if args.empty?
+        puts detect_usage
+        return 1
+      end
+
+      pattern_type = args.first
+      if pattern_type == "patterns"
+        return detect_patterns(args[1..])
+      else
+        puts "Unknown detect command: #{pattern_type}"
+        puts detect_usage
+        return 1
+      end
+    end
+
+    private def self.detect_usage : String
+      <<-TXT
+        Usage:
+          warp detect patterns --lang <ruby|crystal> [options] <file>
+
+        Options:
+          --lang                 Language (ruby or crystal)
+          --format               Output format (pretty or json) [default: pretty]
+          --perf                 Show performance timing
+
+        Examples:
+          warp detect patterns --lang ruby script.rb
+          warp detect patterns --lang crystal --format json code.cr
+      TXT
+    end
+
+    private def self.detect_patterns(args : Array(String)) : Int32
+      lang : String? = nil
+      format = DumpFormat::Pretty
+      perf = false
+      path : String? = nil
+
+      OptionParser.parse(args) do |p|
+        p.on("--lang LANG", "Language (ruby or crystal)") { |l| lang = l }
+        p.on("--format FORMAT", "Output format (pretty or json)") { |f| format = f == "json" ? DumpFormat::Json : DumpFormat::Pretty }
+        p.on("--perf", "Show performance timing") { perf = true }
+        p.on("-h", "--help") { puts detect_usage; exit 0 }
+        p.unknown_args { |rest| path = rest.first? }
+      end
+
+      if lang.nil? || path.nil?
+        puts "Error: --lang and file path required"
+        puts detect_usage
+        return 1
+      end
+
+      path_str = path.not_nil!
+      unless File.exists?(path_str)
+        puts "Error: File not found: #{path_str}"
+        return 1
+      end
+
+      start_time = Time.instant if perf
+      bytes = File.read(path_str).to_slice
+
+      case lang.not_nil!.downcase
+      when "ruby"
+        patterns = Warp::Lang::Ruby.detect_all_patterns(bytes)
+        output_patterns("ruby", patterns, format, perf, start_time)
+      when "crystal"
+        patterns = Warp::Lang::Crystal.detect_all_patterns(bytes)
+        output_patterns("crystal", patterns, format, perf, start_time)
+      else
+        puts "Error: Unknown language '#{lang}'. Supported: ruby, crystal"
+        return 1
+      end
+
+      0
+    end
+
+    private def self.output_patterns(lang : String, patterns : Hash(String, Array(UInt32)), format : DumpFormat, perf : Bool, start_time : Time::Instant?) : Nil
+      elapsed_ms = 0.0
+      if perf && start_time
+        elapsed_ms = (Time.instant - start_time).total_milliseconds
+      end
+
+      if format == DumpFormat::Json
+        result = {} of String => (String | Array(Int32) | Hash(String, Array(Int32)) | Float64)
+        result["language"] = lang
+        result["patterns"] = patterns.transform_values { |indices| indices.map(&.to_i) }
+        result["elapsed_ms"] = elapsed_ms if perf
+        puts result.to_json
+      else
+        puts "Language: #{lang}"
+        patterns.each do |pattern_name, indices|
+          first_ten = indices.first(10)
+          rest_indicator = indices.size > 10 ? "..." : ""
+          puts "  #{pattern_name}: #{indices.size} occurrences"
+          puts "    Offsets: #{first_ten.inspect}#{rest_indicator}"
+        end
+        puts "  elapsed_ms: #{elapsed_ms.round(3)}" if perf
+      end
     end
   end
 end
