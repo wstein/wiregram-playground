@@ -169,5 +169,19 @@ module Warp::Lang::Ruby
       end
       result
     end
+
+    # Get standard library require mappings (e.g., spec → rspec)
+    def get_stdlib_mappings : Hash(String, String)
+      mappings_any = @config["stdlib_mappings"]?
+      return {} of String => String unless mappings_any
+      mappings = mappings_any.as_h?
+      return {} of String => String unless mappings
+
+      result = {} of String => String
+      mappings.each do |k, v|
+        result[k.as_s] = v.as_s
+      end
+      result
+    end
   end
 end

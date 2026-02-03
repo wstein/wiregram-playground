@@ -30,7 +30,8 @@ module Warp
           return Result.new("", Warp::Core::ErrorCode::UnexpectedError, ["nil CST root"]) if crystal_root.nil?
 
           # Step 3: Transform Crystal CST to Ruby output via visitor
-          transformer = CrystalToRubyTransformer.new(bytes, config || Warp::Lang::Ruby::TranspilerConfig.new)
+          cfg = config || Warp::Lang::Ruby::TranspilerConfig.new
+          transformer = CrystalToRubyTransformer.new(bytes, cfg)
           ruby_output = transformer.visit(crystal_root)
 
           Result.new(ruby_output, Warp::Core::ErrorCode::Success, [] of String)
@@ -157,8 +158,8 @@ module Warp
         private def transform_body(body : String) : String
           # 1. Remove Crystal numeric suffixes (_u64, _i32, _f64, etc.)
           # Match patterns like 42_u64, 100_i32, 3.14_f64, 1_000_000_u64
-          body = body.gsub(/_[uif](?:8|16|32|64)\b/, "")
-          body = body.gsub(/_[uif]size\b/, "")
+          # Also handle _u, _i, _f without type size, and signed/unsigned variants
+          body = body.gsub(/_(?:[ui](?:8|16|32|64|size)|f(?:32|64))(?![a-zA-Z0-9_])/, "")
 
           # 2. Transform {} of Key => Value to {} (remove Crystal-style hash type annotations)
           # MUST come before tuple transformation to avoid double-matching
@@ -266,17 +267,20 @@ module Warp
 
             if tok.kind == TokenKind::Require
               j = i + 1
-              while j < tokens.size && tokens[j].kind == TokenKind::Newline
+              # Skip newlines and whitespace to find the string
+              while j < tokens.size && (tokens[j].kind == TokenKind::Newline || tokens[j].kind == TokenKind::Whitespace)
                 j += 1
               end
               if j < tokens.size && tokens[j].kind == TokenKind::String
                 raw = String.new(bytes[tokens[j].start, tokens[j].length])
-                if raw.starts_with?("\"./") || raw.starts_with?("\"../") || raw.starts_with?("'./") || raw.starts_with?("'../")
+                quote = raw[0]
+                content = raw[1...-1] # Remove quotes
+
+                # Check for relative requires (require_relative)
+                if content.starts_with?("./") || content.starts_with?("../")
                   edits << Edit.new(tok.start, tok.start + tok.length, "require_relative")
 
                   # Transform paths based on folder mappings using Path library
-                  quote = raw[0]
-                  content = raw[1...-1] # Remove quotes
                   new_content = transform_path_with_mappings(content, folder_mappings)
 
                   # If path was changed, create an edit
@@ -493,6 +497,7 @@ module Warp
 
         private def visit_method_call(node : CST::GreenNode) : String
           text = node.text || ""
+          # Transform &.method to &:method (symbol-to-proc syntax which is idiomatic Ruby)
           text.gsub(/&\.(\w+)/, "&:\\1")
         end
 

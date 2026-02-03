@@ -119,7 +119,7 @@ module Warp::Lang::Ruby
             # Also transform folder mappings when reverting to require using Path library
             # Look for the string token that follows
             j = i + 1
-            while j < tokens.size && tokens[j].kind == Warp::Lang::Crystal::TokenKind::Newline
+            while j < tokens.size && (tokens[j].kind == Warp::Lang::Crystal::TokenKind::Newline || tokens[j].kind == Warp::Lang::Crystal::TokenKind::Whitespace)
               j += 1
             end
             if j < tokens.size && tokens[j].kind == Warp::Lang::Crystal::TokenKind::String
@@ -133,6 +133,33 @@ module Warp::Lang::Ruby
               # If path was changed, create an edit
               if new_content != content
                 new_raw = "#{quote}#{new_content}#{quote}"
+                edits << Edit.new(tokens[j].start, tokens[j].start + tokens[j].length, new_raw)
+              end
+            end
+          elsif text == "require"
+            # Handle absolute requires with reverse stdlib mappings (e.g., require "rspec" → require "spec")
+            # Look for the string token that follows
+            j = i + 1
+            while j < tokens.size && (tokens[j].kind == Warp::Lang::Crystal::TokenKind::Newline || tokens[j].kind == Warp::Lang::Crystal::TokenKind::Whitespace)
+              j += 1
+            end
+            if j < tokens.size && tokens[j].kind == Warp::Lang::Crystal::TokenKind::String
+              raw = String.new(bytes[tokens[j].start, tokens[j].length])
+
+              quote = raw[0]
+              content = raw[1...-1] # Remove quotes
+
+              # Create reverse mapping (value → key) from stdlib mappings
+              stdlib_mappings = config.get_stdlib_mappings
+              reverse_mappings = {} of String => String
+              stdlib_mappings.each do |k, v|
+                reverse_mappings[v] = k
+              end
+
+              # Check if this library has a reverse stdlib mapping
+              if reverse_mappings.has_key?(content)
+                new_library = reverse_mappings[content]
+                new_raw = "#{quote}#{new_library}#{quote}"
                 edits << Edit.new(tokens[j].start, tokens[j].start + tokens[j].length, new_raw)
               end
             end

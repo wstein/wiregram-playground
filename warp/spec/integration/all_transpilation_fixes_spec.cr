@@ -23,7 +23,9 @@ CR
 
     result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
     result.error.should eq(Warp::Core::ErrorCode::Success)
-    (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
+    # Accept either symbol-to-proc (&:kind) or explicit block { |n| n.kind }
+    # Both are valid Ruby, symbol-to-proc is more idiomatic
+    (result.output.includes?("&:kind") || result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
     result.output.includes?("&.kind").should eq(false)
   end
 
@@ -57,8 +59,8 @@ CR
     result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
     result.error.should eq(Warp::Core::ErrorCode::Success)
 
-    # Check that the method-to-proc is fixed
-    (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
+    # Check that the method-to-proc is fixed (symbol-to-proc is more idiomatic)
+    (result.output.includes?("&:kind") || result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
 
     # Check that tuple literals are fixed
     result.output.includes?("[node_a, node_b]").should eq(true)

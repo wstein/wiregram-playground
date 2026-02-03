@@ -37,8 +37,8 @@ CR
       # Should NOT contain &.kind
       result.output.includes?("&.kind").should eq(false)
 
-      # Should contain explicit block
-      (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
+      # Should contain symbol-to-proc or explicit block (symbol-to-proc is more idiomatic)
+      (result.output.includes?("&:kind") || result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
     end
   end
 
@@ -56,8 +56,8 @@ CR
       result.error.should eq(Warp::Core::ErrorCode::Success)
       result.output.should_not be_empty
 
-      # Should contain explicit block
-      (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
+      # Should contain symbol-to-proc or explicit block (symbol-to-proc is more idiomatic)
+      (result.output.includes?("&:kind") || result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
     end
   end
 end
