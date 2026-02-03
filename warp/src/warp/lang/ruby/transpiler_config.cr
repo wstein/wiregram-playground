@@ -150,5 +150,24 @@ module Warp::Lang::Ruby
       return nil unless target_path_any
       target_path_any.as_s?
     end
+
+    # Get folder mappings from output section
+    def get_folder_mappings : Hash(String, String)
+      output_any = @config["output"]?
+      return {} of String => String unless output_any
+      output = output_any.as_h?
+      return {} of String => String unless output
+
+      mappings_any = output[YAML::Any.new("folder_mappings")]?
+      return {} of String => String unless mappings_any
+      mappings = mappings_any.as_h?
+      return {} of String => String unless mappings
+
+      result = {} of String => String
+      mappings.each do |k, v|
+        result[k.as_s] = v.as_s
+      end
+      result
+    end
   end
 end

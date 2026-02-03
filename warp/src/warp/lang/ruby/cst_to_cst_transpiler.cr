@@ -13,7 +13,7 @@ module Warp::Lang::Ruby
       end
     end
 
-    def self.transpile(bytes : Bytes, annotations : Annotations::AnnotationStore? = nil, path : String? = nil) : Result
+    def self.transpile(bytes : Bytes, annotations : Annotations::AnnotationStore? = nil, path : String? = nil, config : TranspilerConfig? = nil) : Result
       # Step 1: Lex Ruby
       tokens, lex_error, lex_pos = Lexer.scan(bytes)
       if lex_error != Warp::Core::ErrorCode::Success
@@ -38,7 +38,7 @@ module Warp::Lang::Ruby
       output = Warp::Lang::Crystal::Serializer.emit(crystal_doc)
 
       # Step 6: Apply language-specific transformations (Ruby -> Crystal mappings)
-      output = apply_ruby_to_crystal_mappings(output)
+      output = apply_ruby_to_crystal_mappings(output, config || TranspilerConfig.new)
 
       Result.new(output, Warp::Core::ErrorCode::Success, context.diagnostics, crystal_doc)
     end
@@ -52,12 +52,61 @@ module Warp::Lang::Ruby
       end
     end
 
-    private def self.apply_ruby_to_crystal_mappings(source : String) : String
+    private def self.transform_path_with_reverse_mappings(path : String, mappings : Hash(String, String)) : String
+      return path if mappings.empty?
+
+      # Parse the path into parts - reverse mappings (dst -> src)
+      path_obj = Path.new(path)
+      parts = path_obj.parts.dup
+
+      # Try each mapping in reverse
+      mappings.each do |src_dir, dst_dir|
+        # Remove trailing slash for comparison if present
+        src_name = src_dir.rstrip('/')
+        dst_name = dst_dir.rstrip('/')
+
+        # Find and replace the first occurrence of the destination directory name back to source
+        parts.each_with_index do |part, idx|
+          if part == dst_name
+            parts[idx] = src_name
+            # Only replace the first occurrence per mapping
+            break
+          end
+        end
+      end
+
+      # Reconstruct path from parts
+      if parts.empty?
+        return path
+      end
+
+      # Preserve leading "./" or "../" patterns
+      if path.starts_with?("../")
+        # Count leading ../
+        leading_ups = 0
+        temp = path
+        while temp.starts_with?("../")
+          leading_ups += 1
+          temp = temp[3..-1]
+        end
+        # Rebuild with leading ../
+        result = "../" * leading_ups
+        result += parts[leading_ups..-1].join("/") if leading_ups < parts.size
+        return result
+      elsif path.starts_with?("./")
+        return "./" + parts[1..-1].join("/")
+      else
+        return parts.join("/")
+      end
+    end
+
+    private def self.apply_ruby_to_crystal_mappings(source : String, config : TranspilerConfig) : String
       bytes = source.to_slice
       tokens, error, _ = Warp::Lang::Crystal::Lexer.scan(bytes)
       return source unless error == Warp::Core::ErrorCode::Success
 
       edits = [] of Edit
+      folder_mappings = config.get_folder_mappings
 
       i = 0
       while i < tokens.size
@@ -66,6 +115,27 @@ module Warp::Lang::Ruby
           text = String.new(bytes[tok.start, tok.length])
           if text == "require_relative"
             edits << Edit.new(tok.start, tok.start + tok.length, "require")
+
+            # Also transform folder mappings when reverting to require using Path library
+            # Look for the string token that follows
+            j = i + 1
+            while j < tokens.size && tokens[j].kind == Warp::Lang::Crystal::TokenKind::Newline
+              j += 1
+            end
+            if j < tokens.size && tokens[j].kind == Warp::Lang::Crystal::TokenKind::String
+              raw = String.new(bytes[tokens[j].start, tokens[j].length])
+
+              # Transform path using reverse mappings (lib/ → src/)
+              quote = raw[0]
+              content = raw[1...-1] # Remove quotes
+              new_content = transform_path_with_reverse_mappings(content, folder_mappings)
+
+              # If path was changed, create an edit
+              if new_content != content
+                new_raw = "#{quote}#{new_content}#{quote}"
+                edits << Edit.new(tokens[j].start, tokens[j].start + tokens[j].length, new_raw)
+              end
+            end
           end
         end
 

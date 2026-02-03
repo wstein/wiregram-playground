@@ -9,6 +9,10 @@ targets:
     description: "Transpile Ruby (Sorbet) to Crystal with type annotations"
     target_path: "ports/crystal/" # Output directory for transpiled Crystal files
 
+    # Folder mappings for require path transformation
+    folder_mappings:
+      "src/": "lib/"
+
     # Library handling rules
     libraries:
       sorbet-runtime:
@@ -86,6 +90,25 @@ targets:
     description: "Transpile Sorbet annotations to RBS format (Ruby → Ruby)"
     target_path: "ports/ruby/" # Output directory for transpiled Ruby files
 
+    # Folder mappings for require path transformation
+    folder_mappings:
+      "src/": "lib/"
+
+    # Require path transformation rules
+    require_paths:
+      src_to_lib:
+        action: "transform"
+        description: "Transform require statements from ../src/ to ../lib/ paths"
+        pattern: "require ['\"]\\.\\./(src)/(.+?)['\"]"
+        replacement: 'require_relative "../lib/$2"'
+        examples:
+          - input: 'require "../src/warp"'
+            output: 'require_relative "../lib/warp"'
+          - input: 'require "../src/warp/cli/config"'
+            output: 'require_relative "../lib/warp/cli/config"'
+          - input: "require '../src/warp/version'"
+            output: "require_relative '../lib/warp/version'"
+
     libraries:
       sorbet-runtime:
         action: "keep"
@@ -132,8 +155,14 @@ output:
   rbi_directory: "ports/ruby/rbi"
   generate_rbs: true
   generate_rbi: false
+  # Folder mappings for bidirectional require path transformation
+  # Crystal → Ruby: Applies forward mapping (src/ → lib/)
+  # Ruby → Crystal: Applies reverse mapping (lib/ → src/)
   folder_mappings:
     "src/": "lib/"
+    # Additional mappings can be added here
+    # "app/": "application/"
+    # "vendor/": "vendor_gems/"
 
 annotations:
   rbs_paths: []

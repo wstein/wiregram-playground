@@ -18,6 +18,67 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     output.includes?("require \"./\"").should eq(false)
   end
 
+  it "transforms require ../src/ paths to ../lib/ paths" do
+    source = <<-CR
+      require "../src/warp"
+      require "../src/warp/version"
+      require "../src/warp/cli/config"
+    CR
+
+    result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
+    result.error.should eq(Warp::Core::ErrorCode::Success)
+
+    output = result.output
+    output.includes?("require_relative \"../lib/warp\"").should eq(true)
+    output.includes?("require_relative \"../lib/warp/version\"").should eq(true)
+    output.includes?("require_relative \"../lib/warp/cli/config\"").should eq(true)
+    output.includes?("../src/").should eq(false)
+  end
+
+  it "handles mixed quote styles in require paths" do
+    source = <<-CR
+      require '../src/warp'
+      require "../src/warp/version"
+    CR
+
+    result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
+    result.error.should eq(Warp::Core::ErrorCode::Success)
+
+    output = result.output
+    output.includes?("require_relative '../lib/warp'").should eq(true)
+    output.includes?("require_relative \"../lib/warp/version\"").should eq(true)
+  end
+
+  it "does not modify non-src requires" do
+    source = <<-CR
+      require "../models/user"
+      require "../lib/other"
+      require "./local"
+    CR
+
+    result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
+    result.error.should eq(Warp::Core::ErrorCode::Success)
+
+    output = result.output
+    output.includes?("require_relative \"../models/user\"").should eq(true)
+    output.includes?("require_relative \"../lib/other\"").should eq(true)
+    output.includes?("require_relative \"./local\"").should eq(true)
+  end
+
+  it "handles nested src paths with multiple levels" do
+    source = <<-CR
+      require "../../src/warp"
+      require "../src/warp/lang/ruby"
+    CR
+
+    result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
+    result.error.should eq(Warp::Core::ErrorCode::Success)
+
+    output = result.output
+    output.includes?("require_relative \"../../lib/warp\"").should eq(true)
+    output.includes?("require_relative \"../lib/warp/lang/ruby\"").should eq(true)
+  end
+
   it "converts &.method to explicit Ruby block" do
     source = <<-CR
       def process(items)

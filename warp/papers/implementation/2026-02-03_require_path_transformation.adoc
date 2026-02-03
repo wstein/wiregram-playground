@@ -1,0 +1,246 @@
+# Require Path Transformation Strategy
+
+## Overview
+
+The transpiler implements a comprehensive strategy for transforming Crystal require statements to Ruby require_relative statements, with special handling for source-to-library path mappings.
+
+## Transformation Rules
+
+### 1. Require to Require_Relative Conversion
+
+Crystal uses `require` for relative paths, while Ruby uses `require_relative` for the same functionality.
+
+**Pattern**: Any relative require path (starting with `./` or `../`)
+
+**Transformation**:
+```crystal
+# Crystal
+require "./local"
+require "../module"
+
+# Ruby
+require_relative "./local"
+require_relative "../module"
+```
+
+### 2. Source Path to Library Path Mapping
+
+When transpiling Crystal code to Ruby for a Ruby library, require paths that point to the Crystal source folder (`../src/`) are automatically transformed to point to the Ruby library folder (`../lib/`).
+
+**Pattern**: `require "../src/..."`
+
+**Transformation**:
+```crystal
+# Crystal (source)
+require "../src/warp"
+require "../src/warp/version"
+require "../src/warp/cli/config"
+
+# Ruby (target)
+require_relative "../lib/warp"
+require_relative "../lib/warp/version"
+require_relative "../lib/warp/cli/config"
+```
+
+**Why**: This ensures Ruby code can properly resolve library dependencies when the transpiled code is placed in the `ports/ruby/lib/` directory structure.
+
+## Supported Patterns
+
+### Quote Styles
+
+Both single and double quotes are supported:
+
+```crystal
+require "../src/warp"
+require '../src/warp'
+```
+
+Both are correctly transformed to their respective quote styles:
+
+```ruby
+require_relative "../lib/warp"
+require_relative '../lib/warp'
+```
+
+### Nesting Levels
+
+The transformation handles various nesting depths:
+
+```crystal
+# From same level
+require "../src/module"
+
+# From one level up
+require "../../src/module"
+
+# From nested location
+require "../src/warp/cli/config"
+```
+
+All are correctly transformed:
+
+```ruby
+require_relative "../lib/module"
+require_relative "../../lib/module"
+require_relative "../lib/warp/cli/config"
+```
+
+### Mixed Require Types
+
+In the same file, both relative and absolute requires can coexist:
+
+```crystal
+require "../src/warp"          # Will be transformed
+require "json"                 # Left unchanged (absolute path)
+require_relative "./local"     # Already correct (left as-is)
+```
+
+Result:
+
+```ruby
+require_relative "../lib/warp"
+require "json"
+require_relative "./local"
+```
+
+## Edge Cases
+
+### 1. Non-src Paths
+
+Paths that don't contain `../src/` are not modified (other than require → require_relative):
+
+```crystal
+require "../models/user"       # Transformed to require_relative
+require "../lib/existing"      # Transformed to require_relative, path unchanged
+```
+
+Result:
+
+```ruby
+require_relative "../models/user"
+require_relative "../lib/existing"
+```
+
+### 2. Already Correct Paths
+
+If code already uses `require_relative` with correct paths, it's left unchanged:
+
+```crystal
+require_relative "../lib/warp"  # Already correct
+```
+
+### 3. Nested src/ in Path
+
+Multiple `../src/` patterns in a path are all transformed:
+
+```crystal
+require "../src/warp/../src/other"  # Edge case (unusual)
+```
+
+Result:
+
+```ruby
+require_relative "../lib/warp/../lib/other"
+```
+
+## Implementation Details
+
+### Location
+
+The transformation is implemented in:
+- **File**: `src/warp/lang/crystal/crystal_to_ruby_transpiler.cr`
+- **Method**: `apply_token_mappings`
+- **Mechanism**: Token-based edit system
+
+### Algorithm
+
+1. **Lexical Analysis**: Crystal lexer tokenizes the input
+2. **Token Detection**: `TokenKind::Require` and `TokenKind::String` tokens are identified
+3. **Path Analysis**: String token is analyzed for relative path patterns
+4. **Transformation**: Two transformations are applied:
+   - `require` → `require_relative`
+   - `../src/` → `../lib/` (if present)
+5. **Edit Application**: Multiple edits are accumulated and applied in-order
+
+### Edit Batching
+
+Multiple transformations in the same file are batched and applied simultaneously to prevent position corruption:
+
+```crystal
+edits = [] of Edit
+
+# Collect all edits
+edits << Edit.new(tok.start, tok.start + tok.length, "require_relative")
+edits << Edit.new(tokens[j].start, tokens[j].start + tokens[j].length, new_raw)
+
+# Apply edits in order (sorted by position)
+apply_edits(bytes, edits)
+```
+
+## Testing Strategy
+
+### Test Categories
+
+1. **Basic Transformation**
+   - Single require statements
+   - Multiple requires in one file
+   - Different quote styles
+
+2. **Path Variations**
+   - Different nesting levels (../, ../../, etc.)
+   - Various module paths
+   - Nested module structures
+
+3. **Edge Cases**
+   - Non-src paths (unchanged except for require → require_relative)
+   - Already-correct require_relative (left as-is)
+   - Mixed require types in same file
+   - Absolute paths (unchanged)
+
+4. **Quote Preservation**
+   - Single quote paths remain single quoted
+   - Double quote paths remain double quoted
+
+### Test File
+
+Located in: `spec/unit/crystal_to_ruby_transpiler_spec.cr`
+
+Key test cases:
+- `transforms require ../src/ paths to ../lib/ paths`
+- `handles mixed quote styles in require paths`
+- `does not modify non-src requires`
+- `handles nested src paths with multiple levels`
+
+## Configuration
+
+The `.warp.yaml` file documents this transformation:
+
+```yaml
+ruby:
+  require_paths:
+    src_to_lib:
+      action: "transform"
+      description: "Transform require statements from ../src/ to ../lib/ paths"
+      examples:
+        - input: 'require "../src/warp"'
+          output: 'require_relative "../lib/warp"'
+```
+
+## Performance Considerations
+
+- **Time Complexity**: O(n) where n = number of tokens
+- **Space Complexity**: O(m) where m = number of edits (typically << n)
+- **Optimization**: Single-pass scanning with edit batching
+
+## Future Enhancements
+
+1. **Configurable Path Mappings**: Support custom source/target directory pairs
+2. **Namespace Preservation**: Map require paths to proper Ruby namespaces
+3. **Recursive Transformation**: Auto-detect nested require_relative chains
+4. **Validation**: Verify target files exist before transformation
+
+## Related Documentation
+
+- [Crystal to Ruby Transpilation Architecture](papers/architecture/2026-01-31-02_crystal_to_ruby_transpilation_architecture.adoc)
+- [Warp Configuration Guide](README.md)
+- [CST-based Transformation System](papers/architecture/2026-01-23-04_architecture_visual_reference.adoc)
