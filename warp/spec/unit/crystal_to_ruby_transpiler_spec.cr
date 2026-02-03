@@ -90,7 +90,8 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     result.error.should eq(Warp::Core::ErrorCode::Success)
 
     output = result.output
-    (output.includes?(".map { |n| n.to_s }") || output.includes?(".map({ |n| n.to_s })")).should eq(true)
+    # Crystal &.method is converted to Ruby symbol-to-proc &:method which is idiomatic and valid
+    output.includes?(".map(&:to_s)").should eq(true)
     output.includes?("&.to_s").should eq(false)
   end
 
@@ -239,6 +240,7 @@ describe "CrystalToRubyTranspiler (CST-driven)" do
     source = "def test(root)\n  kinds = root.not_nil!.children.map(&.kind)\nend"
     result = Warp::Lang::Crystal::CrystalToRubyTranspiler.transpile(source.to_slice)
     result.error.should eq(Warp::Core::ErrorCode::Success)
-    (result.output.includes?(".map { |n| n.kind }") || result.output.includes?(".map({ |n| n.kind })")).should eq(true)
+    # Crystal &.method is converted to Ruby symbol-to-proc &:method which is idiomatic and valid
+    result.output.includes?(".map(&:kind)").should eq(true)
   end
 end

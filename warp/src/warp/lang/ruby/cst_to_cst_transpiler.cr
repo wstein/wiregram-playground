@@ -163,6 +163,19 @@ module Warp::Lang::Ruby
           end
         end
 
+        # Handle symbol-to-proc conversion: &:method_name → &.method_name (Ruby → Crystal)
+        if tok.kind == Warp::Lang::Crystal::TokenKind::Ampersand && i + 2 < tokens.size
+          if tokens[i + 1].kind == Warp::Lang::Crystal::TokenKind::Colon &&
+             tokens[i + 2].kind == Warp::Lang::Crystal::TokenKind::Identifier
+            method_name = String.new(bytes[tokens[i + 2].start, tokens[i + 2].length])
+            # Convert &:method to &.method for Crystal
+            replacement = "&.#{method_name}"
+            start_pos = tok.start
+            end_pos = tokens[i + 2].start + tokens[i + 2].length
+            edits << Edit.new(start_pos, end_pos, replacement)
+          end
+        end
+
         i += 1
       end
 

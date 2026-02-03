@@ -292,7 +292,9 @@ module Warp
               if tokens[i + 1].kind == TokenKind::Dot && tokens[i + 2].kind == TokenKind::Identifier
                 if prev_kind == TokenKind::LParen || prev_kind == TokenKind::Comma
                   method_name = String.new(bytes[tokens[i + 2].start, tokens[i + 2].length])
-                  replacement = "{ |n| n.#{method_name} }"
+                  # Use symbol-to-proc syntax (&:method) which is valid in all contexts
+                  # This is the idiomatic Ruby way and works with parentheses: arr.map(&:kind)
+                  replacement = "&:#{method_name}"
                   start_pos = tok.start
                   end_pos = tokens[i + 2].start + tokens[i + 2].length
                   edits << Edit.new(start_pos, end_pos, replacement)
