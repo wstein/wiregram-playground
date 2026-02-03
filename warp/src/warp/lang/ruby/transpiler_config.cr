@@ -205,11 +205,11 @@ module Warp::Lang::Ruby
 
     def debug_cst_fallback? : Bool
       debug_config = @config["debug"]?
-      return true unless debug_config # Default to allowing fallback
+      return false unless debug_config # Default to strict mode (no fallback)
       debug_config_h = debug_config.as_h?
-      return true unless debug_config_h
+      return false unless debug_config_h
       val = debug_config_h["cst_fallback"]?
-      val ? val.as_bool? || true : true
+      val ? val.as_bool? || false : false
     end
 
     def debug_verbose_tokens? : Bool

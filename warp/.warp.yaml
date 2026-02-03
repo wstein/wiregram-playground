@@ -4,10 +4,12 @@
 version: 1.0
 
 # Debug configuration
+# NOTE: Strict mode is always enabled by default - all parser/lexer errors are reported!
+# RawText fallback NEVER happens silently - parsing failures are always visible.
 debug:
-  parser_errors: true # Report parser errors instead of silently falling back
-  lexer_errors: true # Report lexer errors with details
-  cst_fallback: false # Disable silent RawText fallback on parse failures
+  parser_errors: true # Report parser errors (always enabled)
+  lexer_errors: true # Report lexer errors with details (always enabled)
+  cst_fallback: false # Strict mode - no silent RawText fallback (default: false)
   verbose_tokens: false # Log all tokenization steps (very verbose)
   show_cst_tree: false # Display CST tree structure for debugging
 

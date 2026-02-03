@@ -13,9 +13,11 @@ module Warp
         property diagnostics : Array(String)
 
         def initialize(config : Warp::Lang::Ruby::TranspilerConfig? = nil)
-          @parser_errors = config.try(&.debug_parser_errors?) || false
-          @lexer_errors = config.try(&.debug_lexer_errors?) || false
-          @allow_cst_fallback = config.try(&.debug_cst_fallback?) || true
+          # Always report errors - no silent failures
+          @parser_errors = true
+          @lexer_errors = true
+          # Strict mode is default - no silent RawText fallbacks
+          @allow_cst_fallback = false
           @verbose_tokens = config.try(&.debug_verbose_tokens?) || false
           @show_cst_tree = config.try(&.debug_show_cst_tree?) || false
           @diagnostics = [] of String
@@ -26,31 +28,25 @@ module Warp
         end
 
         def report_parser_error(message : String, line : Int32 = -1, col : Int32 = -1)
-          if @parser_errors
-            msg = "PARSER ERROR: #{message}"
-            msg += " (line #{line}, col #{col})" if line > -1 && col > -1
-            @diagnostics << msg
-            puts msg
-          end
+          msg = "PARSER ERROR: #{message}"
+          msg += " (line #{line}, col #{col})" if line > -1 && col > -1
+          @diagnostics << msg
+          puts msg
         end
 
         def report_lexer_error(message : String, position : Int32 = -1)
-          if @lexer_errors
-            msg = "LEXER ERROR: #{message}"
-            msg += " (pos #{position})" if position > -1
-            @diagnostics << msg
-            puts msg
-          end
+          msg = "LEXER ERROR: #{message}"
+          msg += " (pos #{position})" if position > -1
+          @diagnostics << msg
+          puts msg
         end
 
         def report_raw_text_fallback(context : String, position : Int32 = -1, token_kind : String = "unknown")
-          unless @allow_cst_fallback
-            msg = "PARSING FAILED: Falling back to RawText for #{context}"
-            msg += " at position #{position}" if position > -1
-            msg += " (token: #{token_kind})" unless token_kind == "unknown"
-            @diagnostics << msg
-            puts msg
-          end
+          msg = "PARSING FAILED: Falling back to RawText for #{context}"
+          msg += " at position #{position}" if position > -1
+          msg += " (token: #{token_kind})" unless token_kind == "unknown"
+          @diagnostics << msg
+          puts msg
         end
 
         def report_verbose(message : String)

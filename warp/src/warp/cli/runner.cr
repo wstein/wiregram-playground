@@ -124,11 +124,13 @@ Options:
   -s, --source=PATH       Source file or directory
   -c, --config=PATH       Config file (default .warp.yaml or warp.yaml)
   -o, --out=DIR           Output directory
+  -f, --format=FORMAT     Inspect output format: pretty|json (default: pretty)
   --rbs=PATH              RBS file to load (repeatable)
   --rbi=PATH              RBI file to load (repeatable)
   --inline-rbs=BOOL       Parse inline # @rbs comments (default true)
   --generate-rbs=BOOL     Generate .rbs signature files (default false)
   --generate-rbi=BOOL     Generate .rbi annotation files (default false)
+  --inspect               Show pipeline internals (source CST, target CST, transformations)
   --parallel=N            Use N parallel workers (default: CPU cores)
   --dry-run               Parse/validate without writing output files
   --stdout                Write output to stdout
@@ -233,6 +235,7 @@ YAML
       dry_run = false
       backend_override : String? = nil
       inspect = false
+      inspect_format : String = "pretty"
 
       parser = OptionParser.new do |p|
         p.banner = transpile_usage
@@ -240,6 +243,7 @@ YAML
         p.on("-s PATH", "--source=PATH", "Source file or directory") { |v| source_path = v }
         p.on("-c PATH", "--config=PATH", "Config file (default .warp.yaml)") { |v| config_path = v }
         p.on("-o DIR", "--out=DIR", "Output directory") { |v| out_dir = v }
+        p.on("-f FORMAT", "--format=FORMAT", "Inspect output format: pretty|json (default: pretty)") { |v| inspect_format = v }
         p.on("--rbs=PATH", "RBS file to load (repeatable)") { |v| extra_rbs << v }
         p.on("--rbi=PATH", "RBI file to load (repeatable)") { |v| extra_rbi << v }
         p.on("--inline-rbs=BOOL", "Parse inline # @rbs comments (default true)") { |v| inline_rbs = (v != "false") }
