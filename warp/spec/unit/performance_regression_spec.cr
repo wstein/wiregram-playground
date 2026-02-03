@@ -19,7 +19,7 @@ describe "SIMD Performance Regression Tests" do
       end
 
       # Measure throughput
-      start_time = Time.monotonic
+      start_time = Time.instant
       iterations = 100
 
       iterations.times do
@@ -31,7 +31,7 @@ describe "SIMD Performance Regression Tests" do
         )
       end
 
-      elapsed = Time.monotonic - start_time
+      elapsed = Time.instant - start_time
       throughput_mbps = (ruby_code.size * iterations) / elapsed.total_seconds / (1024 * 1024)
 
       # Throughput should be at least 100 MB/s on modern systems
@@ -55,7 +55,7 @@ describe "SIMD Performance Regression Tests" do
       end
 
       # Measure throughput
-      start_time = Time.monotonic
+      start_time = Time.instant
       iterations = 20
 
       iterations.times do
@@ -67,7 +67,7 @@ describe "SIMD Performance Regression Tests" do
         )
       end
 
-      elapsed = Time.monotonic - start_time
+      elapsed = Time.instant - start_time
       throughput_mbps = (ruby_code.size * iterations) / elapsed.total_seconds / (1024 * 1024)
 
       # Throughput should be at least 50 MB/s for longer strings
@@ -92,7 +92,7 @@ describe "SIMD Performance Regression Tests" do
       end
 
       # Measure throughput
-      start_time = Time.monotonic
+      start_time = Time.instant
       iterations = 100
 
       iterations.times do
@@ -103,7 +103,7 @@ describe "SIMD Performance Regression Tests" do
         )
       end
 
-      elapsed = Time.monotonic - start_time
+      elapsed = Time.instant - start_time
       throughput_mbps = (ruby_code.size * iterations) / elapsed.total_seconds / (1024 * 1024)
 
       # Throughput should be at least 100 MB/s
@@ -132,7 +132,7 @@ EOF}.to_slice
       end
 
       # Measure throughput
-      start_time = Time.monotonic
+      start_time = Time.instant
       iterations = 50
 
       iterations.times do
@@ -144,7 +144,7 @@ EOF}.to_slice
         )
       end
 
-      elapsed = Time.monotonic - start_time
+      elapsed = Time.instant - start_time
       throughput_mbps = (ruby_heredoc.size * iterations) / elapsed.total_seconds / (1024 * 1024)
 
       # Throughput should be at least 50 MB/s
@@ -172,7 +172,7 @@ EOF}.to_slice
       end
 
       # Measure throughput
-      start_time = Time.monotonic
+      start_time = Time.instant
       iterations = 50
 
       iterations.times do
@@ -183,7 +183,7 @@ EOF}.to_slice
         )
       end
 
-      elapsed = Time.monotonic - start_time
+      elapsed = Time.instant - start_time
       throughput_mbps = (crystal_macro.size * iterations) / elapsed.total_seconds / (1024 * 1024)
 
       # Throughput should be at least 50 MB/s
@@ -209,7 +209,7 @@ EOF}.to_slice
       end
 
       # Measure throughput
-      start_time = Time.monotonic
+      start_time = Time.instant
       iterations = 100
 
       iterations.times do
@@ -220,7 +220,7 @@ EOF}.to_slice
         )
       end
 
-      elapsed = Time.monotonic - start_time
+      elapsed = Time.instant - start_time
       throughput_mbps = (crystal_annotation.size * iterations) / elapsed.total_seconds / (1024 * 1024)
 
       # Throughput should be at least 75 MB/s for annotations

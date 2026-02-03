@@ -1,6 +1,6 @@
 module Warp::Lang::Crystal
   module CST
-    # Crystal-specific CST node kinds (Phase 1 minimal set)
+    # Crystal-specific CST node kinds (Phase 2 expanded set)
     enum NodeKind
       Root
       RawText
@@ -10,10 +10,15 @@ module Warp::Lang::Crystal
       StructDef
       EnumDef
       MacroDef
+      Require         # top-level require "..."
+      RequireRelative # top-level require_relative "..."
+      Assignment      # simple assignments like ENV["FOO"] = "1"
+      ConstantDef     # top-level constants like CONST = value
+      PropertyDef     # @property getter setter annotations
       MethodCall
       Identifier
       StringLiteral
-      Block
+      Block # do...end or {...} blocks
     end
 
     struct ParamInfo
@@ -43,6 +48,34 @@ module Warp::Lang::Crystal
       end
     end
 
+    struct ConstantDefPayload
+      getter name : String
+      getter type : String?
+      getter value : String
+      getter original_source : String?
+
+      def initialize(
+        @name : String,
+        @type : String?,
+        @value : String,
+        @original_source : String? = nil,
+      )
+      end
+    end
+
+    struct BlockPayload
+      getter parameters : Array(String)
+      getter body : String
+      getter is_brace_block : Bool
+
+      def initialize(
+        @parameters : Array(String),
+        @body : String,
+        @is_brace_block : Bool,
+      )
+      end
+    end
+
     # GreenNode: immutable tree node holding structure and trivia
     class GreenNode
       getter kind : NodeKind
@@ -51,6 +84,8 @@ module Warp::Lang::Crystal
       getter leading_trivia : Array(Warp::Lang::Crystal::Trivia)
       getter trailing_trivia : Array(Warp::Lang::Crystal::Trivia)
       getter method_payload : MethodDefPayload?
+      getter constant_payload : ConstantDefPayload?
+      getter block_payload : BlockPayload?
 
       def initialize(
         @kind : NodeKind,
@@ -59,6 +94,8 @@ module Warp::Lang::Crystal
         @leading_trivia : Array(Warp::Lang::Crystal::Trivia) = [] of Warp::Lang::Crystal::Trivia,
         @trailing_trivia : Array(Warp::Lang::Crystal::Trivia) = [] of Warp::Lang::Crystal::Trivia,
         @method_payload : MethodDefPayload? = nil,
+        @constant_payload : ConstantDefPayload? = nil,
+        @block_payload : BlockPayload? = nil,
       )
       end
     end
@@ -91,6 +128,14 @@ module Warp::Lang::Crystal
         @green.method_payload
       end
 
+      def constant_payload : ConstantDefPayload?
+        @green.constant_payload
+      end
+
+      def block_payload : BlockPayload?
+        @green.block_payload
+      end
+
       def children : Array(RedNode)
         @green.children.map { |child| RedNode.new(child, self) }
       end
@@ -119,10 +164,13 @@ module Warp::Lang::Crystal
       def self.parse(bytes : Bytes, tokens : Array(Warp::Lang::Crystal::Token), debug : DebugContext? = nil) : Tuple(GreenNode?, Warp::Core::ErrorCode)
         parser = new(bytes, tokens, debug)
         root = parser.parse_program
+        if root.nil?
+          return {nil, Warp::Core::ErrorCode::UnexpectedError}
+        end
         {root, Warp::Core::ErrorCode::Success}
       end
 
-      private def report_raw_text(reason : String) : GreenNode?
+      private def report_raw_text(reason : String) : Bool
         # Report debug info about the fallback
         if debug = @debug
           preview = if @pos < @tokens.size
@@ -134,15 +182,23 @@ module Warp::Lang::Crystal
           debug.report_raw_text_fallback(reason, (@pos < @tokens.size ? current.start : -1), preview)
 
           # In strict mode, don't allow RawText fallback
-          if debug.strict_mode?
-            # Instead of creating RawText, return nil to signal parse failure
-            return nil
-          end
+          return false if debug.strict_mode?
         end
-        nil # Continue with normal fallback behavior
+        true # Continue with normal fallback behavior
       end
 
-      def parse_program : GreenNode
+      private def ignorable_leading_text?(snippet : String) : Bool
+        snippet.lines.each do |line|
+          trimmed = line.lstrip
+          next if trimmed.empty?
+          next if trimmed.starts_with?("#")
+          next if trimmed.starts_with?("@[")
+          return false
+        end
+        true
+      end
+
+      def parse_program : GreenNode?
         trivia = collect_trivia
         children = [] of GreenNode
         last_pos = 0
@@ -152,9 +208,15 @@ module Warp::Lang::Crystal
           when TokenKind::Def
             # Capture any preceding text as RawText
             if last_pos < current.start
-              report_raw_text("unparsed content before def")
-              raw_text = String.new(@bytes[last_pos, current.start - last_pos])
-              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before def")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
             end
 
             children << parse_method_def
@@ -162,44 +224,170 @@ module Warp::Lang::Crystal
           when TokenKind::Class
             # Capture any preceding text as RawText
             if last_pos < current.start
-              report_raw_text("unparsed content before class")
-              raw_text = String.new(@bytes[last_pos, current.start - last_pos])
-              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before class")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
             end
 
             children << parse_simple_block(NodeKind::ClassDef)
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Module
             if last_pos < current.start
-              report_raw_text("unparsed content before module")
-              raw_text = String.new(@bytes[last_pos, current.start - last_pos])
-              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before module")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
             end
             children << parse_simple_block(NodeKind::ModuleDef)
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Struct
             if last_pos < current.start
-              report_raw_text("unparsed content before struct")
-              raw_text = String.new(@bytes[last_pos, current.start - last_pos])
-              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before struct")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
             end
             children << parse_simple_block(NodeKind::StructDef)
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Enum
             if last_pos < current.start
-              report_raw_text("unparsed content before enum")
-              raw_text = String.new(@bytes[last_pos, current.start - last_pos])
-              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before enum")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
             end
             children << parse_simple_block(NodeKind::EnumDef)
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           when TokenKind::Macro
             if last_pos < current.start
-              report_raw_text("unparsed content before macro")
-              raw_text = String.new(@bytes[last_pos, current.start - last_pos])
-              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before macro")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
             end
             children << parse_simple_block(NodeKind::MacroDef)
+            last_pos = @pos < @tokens.size ? current.start : @bytes.size
+          when TokenKind::Require
+            # Capture preceding text
+            if last_pos < current.start
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before require")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
+            end
+            node = parse_require
+            return nil unless node
+            children << node
+            last_pos = @pos < @tokens.size ? current.start : @bytes.size
+          when TokenKind::Constant
+            # Try to parse ENV[...] = "value" assignments or CONST = value
+            assignment = parse_assignment
+            if assignment
+              children << assignment
+              last_pos = @pos < @tokens.size ? current.start : @bytes.size
+            else
+              # Try to parse constant definition (CONST = value)
+              constant_def = parse_constant_def
+              if constant_def
+                children << constant_def
+                last_pos = @pos < @tokens.size ? current.start : @bytes.size
+              else
+                # Treat as expression start (e.g., Constant.method or CONST access)
+                if last_pos < current.start
+                  snippet = String.new(@bytes[last_pos, current.start - last_pos])
+                  if ignorable_leading_text?(snippet)
+                    unless snippet.strip.empty?
+                      children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                    end
+                  else
+                    return nil unless report_raw_text("unparsed content before expression")
+                    children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                  end
+                end
+                children << parse_expression
+                last_pos = @pos < @tokens.size ? current.start : @bytes.size
+              end
+            end
+          when TokenKind::Identifier
+            # Top-level expression (method calls, chaining, or require_relative "path")
+            if last_pos < current.start
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before expression")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
+            end
+
+            assignment = parse_simple_assignment
+            if assignment
+              children << assignment
+              last_pos = @pos < @tokens.size ? current.start : @bytes.size
+            else
+              children << parse_expression
+              last_pos = @pos < @tokens.size ? current.start : @bytes.size
+            end
+          when TokenKind::When, TokenKind::If, TokenKind::Elsif, TokenKind::Else, TokenKind::Unless, TokenKind::While, TokenKind::Until, TokenKind::For, TokenKind::Return, TokenKind::Break, TokenKind::Next, TokenKind::Yield
+            if last_pos < current.start
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before statement")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
+            end
+            children << parse_statement_line
+            last_pos = @pos < @tokens.size ? current.start : @bytes.size
+          when TokenKind::Number, TokenKind::Float, TokenKind::String, TokenKind::Symbol
+            if last_pos < current.start
+              snippet = String.new(@bytes[last_pos, current.start - last_pos])
+              if ignorable_leading_text?(snippet)
+                unless snippet.strip.empty?
+                  children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+                end
+              else
+                return nil unless report_raw_text("unparsed content before literal")
+                children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+              end
+            end
+            children << parse_expression
             last_pos = @pos < @tokens.size ? current.start : @bytes.size
           else
             # Skip unknown tokens (will be captured as RawText at the end)
@@ -209,13 +397,164 @@ module Warp::Lang::Crystal
 
         # Capture any remaining text as RawText
         if last_pos < @bytes.size
-          report_raw_text("trailing unparsed content at end of file")
-          raw_text = String.new(@bytes[last_pos, @bytes.size - last_pos])
-          children << GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+          snippet = String.new(@bytes[last_pos, @bytes.size - last_pos])
+          if ignorable_leading_text?(snippet)
+            unless snippet.strip.empty?
+              children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+            end
+          else
+            return nil unless report_raw_text("trailing unparsed content at end of file")
+            children << GreenNode.new(NodeKind::RawText, [] of GreenNode, snippet)
+          end
         end
 
         eof_trivia = @tokens.size > 0 ? @tokens[-1].trivia : [] of Warp::Lang::Crystal::Trivia
         GreenNode.new(NodeKind::Root, children, nil, trivia, eof_trivia)
+      end
+
+      private def parse_require : GreenNode?
+        start = current.start
+        advance # consume Require token
+
+        # Expect a String token containing the required path
+        if current.kind == TokenKind::String
+          s_tok = current
+          path_text = String.new(@bytes[s_tok.start, s_tok.length])
+          advance
+          advance if current.kind == TokenKind::Newline
+          GreenNode.new(NodeKind::Require, [] of GreenNode, path_text)
+        else
+          # Malformed require - report and fall back according to strict mode
+          return nil unless report_raw_text("malformed require")
+          raw_text = String.new(@bytes[start, (current.start - start).positive? ? current.start - start : 1])
+          GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+        end
+      end
+
+      private def parse_require_relative : GreenNode?
+        start = current.start
+        advance # consume RequireRelative token
+
+        # Expect a String token containing the required path
+        if current.kind == TokenKind::String
+          s_tok = current
+          path_text = String.new(@bytes[s_tok.start, s_tok.length])
+          advance
+          advance if current.kind == TokenKind::Newline
+          GreenNode.new(NodeKind::RequireRelative, [] of GreenNode, path_text)
+        else
+          # Malformed require_relative - report and fall back according to strict mode
+          return nil unless report_raw_text("malformed require_relative")
+          raw_text = String.new(@bytes[start, (current.start - start).positive? ? current.start - start : 1])
+          GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+        end
+      end
+
+      private def parse_assignment : GreenNode?
+        # Parse simple assignments like: ENV["FOO"] = "1"
+        return nil unless current.kind == TokenKind::Constant
+
+        # Look ahead to see if this is an ENV[...] = pattern
+        return nil unless @pos + 1 < @tokens.size && @tokens[@pos + 1].kind == TokenKind::LBracket
+
+        start = current.start
+        advance
+        advance # consume '['
+        return nil unless current.kind == TokenKind::String
+        key_tok = current
+        advance
+        return nil unless current.kind == TokenKind::RBracket
+        advance
+        return nil unless current.kind == TokenKind::Equal
+        advance
+        if current.kind == TokenKind::String || current.kind == TokenKind::Number || current.kind == TokenKind::Identifier
+          val_tok = current
+          end_pos = val_tok.start + val_tok.length
+          text = String.new(@bytes[start, end_pos - start])
+          advance
+          advance if current.kind == TokenKind::Newline
+          GreenNode.new(NodeKind::Assignment, [] of GreenNode, text)
+        else
+          return nil unless report_raw_text("malformed assignment")
+          raw_text = String.new(@bytes[start, (current.start - start).positive? ? current.start - start : 1])
+          GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+        end
+      end
+
+      private def parse_simple_assignment : GreenNode?
+        return nil unless current.kind == TokenKind::Identifier
+
+        i = @pos + 1
+        while i < @tokens.size && @tokens[i].kind == TokenKind::Whitespace
+          i += 1
+        end
+        return nil unless i < @tokens.size && @tokens[i].kind == TokenKind::Equal
+
+        start = current.start
+        while @pos < @tokens.size && current.kind != TokenKind::Newline && current.kind != TokenKind::Semicolon
+          advance
+        end
+
+        end_pos = if @pos < @tokens.size && current.kind == TokenKind::Newline
+                    current.start + current.length
+                  else
+                    @pos < @tokens.size ? current.start : @bytes.size
+                  end
+        text = String.new(@bytes[start, end_pos - start])
+        advance if current.kind == TokenKind::Newline || current.kind == TokenKind::Semicolon
+        GreenNode.new(NodeKind::Assignment, [] of GreenNode, text)
+      end
+
+      private def parse_constant_def : GreenNode?
+        # Parse constant definitions like: CONST = value or CONST : Type = value
+        return nil unless current.kind == TokenKind::Constant
+        start = current.start
+        const_name = String.new(@bytes[current.start, current.length])
+        advance
+
+        # Check for type annotation: Type = value
+        type_annotation : String? = nil
+        if current.kind == TokenKind::Colon
+          advance
+          type_start = @pos
+          # Collect type tokens until '='
+          while @pos < @tokens.size && current.kind != TokenKind::Equal
+            advance
+          end
+          if type_start < @pos
+            type_tokens = @tokens[type_start...@pos]
+            type_annotation = String.build do |io|
+              type_tokens.each { |t| io << String.new(@bytes[t.start, t.length]) }
+            end
+          end
+        end
+
+        # Expect '='
+        return nil unless current.kind == TokenKind::Equal
+        advance
+
+        # Collect value tokens until newline or semicolon
+        value_start = @pos
+        while @pos < @tokens.size && current.kind != TokenKind::Newline && current.kind != TokenKind::Semicolon
+          advance
+        end
+
+        if value_start < @pos
+          value_tokens = @tokens[value_start...@pos]
+          value_text = String.build do |io|
+            value_tokens.each { |t| io << String.new(@bytes[t.start, t.length]) }
+          end
+          advance if current.kind == TokenKind::Newline || current.kind == TokenKind::Semicolon
+
+          end_pos = @pos < @tokens.size ? current.start : @bytes.size
+          original_source = String.new(@bytes[start, end_pos - start])
+          payload = ConstantDefPayload.new(const_name, type_annotation, value_text.strip, original_source)
+          GreenNode.new(NodeKind::ConstantDef, [] of GreenNode, nil, [] of Warp::Lang::Crystal::Trivia, [] of Warp::Lang::Crystal::Trivia, nil, payload)
+        else
+          return nil unless report_raw_text("malformed constant definition")
+          raw_text = String.new(@bytes[start, (current.start - start).positive? ? current.start - start : 1])
+          GreenNode.new(NodeKind::RawText, [] of GreenNode, raw_text)
+        end
       end
 
       private def parse_expression : GreenNode
@@ -223,6 +562,15 @@ module Warp::Lang::Crystal
         tok_text = String.new(@bytes[tok.start, tok.length])
         node = GreenNode.new(NodeKind::Identifier, [] of GreenNode, tok_text)
         advance
+
+        if (tok_text == "require" || tok_text == "require_relative") && current.kind == TokenKind::String
+          s_tok = current
+          path_text = String.new(@bytes[s_tok.start, s_tok.length])
+          advance
+          advance if current.kind == TokenKind::Newline
+          kind = tok_text == "require" ? NodeKind::Require : NodeKind::RequireRelative
+          return GreenNode.new(kind, [] of GreenNode, path_text)
+        end
 
         while @pos < @tokens.size
           case current.kind
@@ -249,11 +597,43 @@ module Warp::Lang::Crystal
             end
             advance if current.kind == TokenKind::RParen
             # Wrap as method call if we just had one, or keep same node
+          when TokenKind::LBrace
+            brace_depth = 0
+            while @pos < @tokens.size
+              if current.kind == TokenKind::LBrace
+                brace_depth += 1
+              elsif current.kind == TokenKind::RBrace
+                brace_depth -= 1
+                advance
+                break if brace_depth <= 0
+                next
+              end
+              advance
+            end
+          when TokenKind::String, TokenKind::Number, TokenKind::Symbol
+            # Handle method calls with direct string/number arguments (e.g., require_relative "./foo")
+            # Consume the argument but keep it simple - just skip it
+            advance
           else
             break
           end
         end
         node
+      end
+
+      private def parse_statement_line : GreenNode
+        start = current.start
+        while @pos < @tokens.size && current.kind != TokenKind::Newline
+          advance
+        end
+        end_pos = if @pos < @tokens.size && current.kind == TokenKind::Newline
+                    current.start + current.length
+                  else
+                    @pos < @tokens.size ? current.start : @bytes.size
+                  end
+        text = String.new(@bytes[start, end_pos - start])
+        advance if current.kind == TokenKind::Newline
+        GreenNode.new(NodeKind::RawText, [] of GreenNode, text)
       end
 
       private def parse_simple_block(kind : NodeKind) : GreenNode

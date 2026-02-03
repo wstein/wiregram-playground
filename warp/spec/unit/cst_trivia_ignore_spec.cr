@@ -29,14 +29,18 @@ describe "CST trivia (parser-level ignore)" do
     err1.should eq(Warp::Core::ErrorCode::Success)
     cst1, pe1 = Warp::Lang::Crystal::CST::Parser.parse(base.to_slice, tokens1)
     pe1.should eq(Warp::Core::ErrorCode::Success)
+    cst1.should_not be_nil
 
     tokens2, err2 = Warp::Lang::Crystal::Lexer.scan(with_trivia.to_slice)
     err2.should eq(Warp::Core::ErrorCode::Success)
     cst2, pe2 = Warp::Lang::Crystal::CST::Parser.parse(with_trivia.to_slice, tokens2)
     pe2.should eq(Warp::Core::ErrorCode::Success)
+    cst2.should_not be_nil
 
-    kinds1 = cst1.children.map(&.kind).reject { |k| k == Warp::Lang::Crystal::CST::NodeKind::RawText }
-    kinds2 = cst2.children.map(&.kind).reject { |k| k == Warp::Lang::Crystal::CST::NodeKind::RawText }
-    kinds1.should eq(kinds2)
+    if cst1 && cst2
+      kinds1 = cst1.children.map(&.kind).reject { |k| k == Warp::Lang::Crystal::CST::NodeKind::RawText }
+      kinds2 = cst2.children.map(&.kind).reject { |k| k == Warp::Lang::Crystal::CST::NodeKind::RawText }
+      kinds1.should eq(kinds2)
+    end
   end
 end

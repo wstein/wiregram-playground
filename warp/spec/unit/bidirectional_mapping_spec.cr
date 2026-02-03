@@ -93,10 +93,17 @@ RB
       lex_error.should eq(Warp::Core::ErrorCode::Success)
 
       cst, parse_error = Warp::Lang::Crystal::CST::Parser.parse(bytes, tokens)
+      if cst.nil?
+        puts "DEBUG TOKENS: #{tokens.map(&.kind).inspect}"
+        puts "parse_error=#{parse_error}"
+      end
       parse_error.should eq(Warp::Core::ErrorCode::Success)
+      cst.should_not be_nil
 
       # CST should have nested MethodCall nodes
-      cst.children.size.should be > 0
+      if cst
+        cst.children.size.should be > 0
+      end
     end
   end
 

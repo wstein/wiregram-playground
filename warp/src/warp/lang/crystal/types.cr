@@ -52,6 +52,7 @@ module Warp
         Lib
         Fun
         Require
+        RequireRelative
         Include
         Extend
         Abstract

@@ -79,6 +79,12 @@ module Warp
             visit_enum_def(node)
           when CST::NodeKind::MacroDef
             visit_macro_def(node)
+          when CST::NodeKind::Require
+            visit_require(node)
+          when CST::NodeKind::RequireRelative
+            visit_require_relative(node)
+          when CST::NodeKind::ConstantDef
+            visit_constant_def(node)
           when CST::NodeKind::MethodCall
             visit_method_call(node)
           when CST::NodeKind::Identifier
@@ -509,6 +515,40 @@ module Warp
         private def visit_macro_def(node : CST::GreenNode) : String
           text = node.text || ""
           transform_body(text)
+        end
+
+        private def visit_require(node : CST::GreenNode) : String
+          raw = node.text || ""
+          return "" if raw.empty?
+          apply_token_mappings("require #{raw}\n")
+        end
+
+        private def visit_require_relative(node : CST::GreenNode) : String
+          raw = node.text || ""
+          return "" if raw.empty?
+
+          quote = raw[0]?
+          content = raw.size >= 2 ? raw[1...-1] : raw
+          if quote && (quote == '"' || quote == '\'')
+            new_content = transform_path_with_mappings(content, @config.get_folder_mappings)
+            new_raw = "#{quote}#{new_content}#{quote}"
+            return "require_relative #{new_raw}\n"
+          end
+
+          "require_relative #{raw}\n"
+        end
+
+        private def visit_constant_def(node : CST::GreenNode) : String
+          if payload = node.constant_payload
+            if original = payload.original_source
+              return transform_body(original)
+            end
+
+            type_part = payload.type ? " : #{payload.type}" : ""
+            return "#{payload.name}#{type_part} = #{payload.value}\n"
+          end
+
+          node.text || ""
         end
 
         private def visit_method_call(node : CST::GreenNode) : String

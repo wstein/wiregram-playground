@@ -2535,7 +2535,7 @@ YAML
 
         puts "[PARSING Crystal CST]"
         c_cst, c_parse_error = Warp::Lang::Crystal::CST::Parser.parse(bytes, c_tokens)
-        if c_parse_error != Warp::Core::ErrorCode::Success
+        if c_parse_error != Warp::Core::ErrorCode::Success || c_cst.nil?
           puts "ERROR: Parsing failed (#{c_parse_error})"
           return
         end

@@ -131,14 +131,14 @@ module Warp::Parallel
 
         break if work_item.nil? # Shutdown signal
 
-        start_time = Time.monotonic
+        start_time = Time.instant
 
         begin
           result = work_item.process
-          duration = Time.monotonic - start_time
+          duration = Time.instant - start_time
           @result_queue.send(WorkResult.new(result, nil, worker_id, duration))
         rescue ex
-          duration = Time.monotonic - start_time
+          duration = Time.instant - start_time
           # Return error result with nil value (using default value for R)
           default_result = uninitialized R
           @result_queue.send(WorkResult.new(default_result, ex, worker_id, duration))
