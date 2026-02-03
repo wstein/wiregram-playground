@@ -1,0 +1,84 @@
+= SIMD State Analysis and Roadmap
+:doctype: book
+:author: Warp Engineering
+:revnumber: 0.1
+:revdate: 2026-02-03
+
+== Executive Summary
+
+This document summarizes the current SIMD coverage across Warp parsers (JSON, Ruby, Crystal), identifies architectural gaps, and provides a short, prioritized roadmap to achieve consistent SIMD support and related parser improvements.
+
+*Key finding*: JSON has a mature SIMD implementation with multiple backends (NEON, AVX2, AVX512, SSE2, Scalar). Ruby and Crystal lack SIMD integration entirely, creating a performance and architectural imbalance.
+
+== Current State
+
+=== JSON
+* Status: ✅ Fully implemented
+* Backends: NEON, AVX2, AVX512, SSE2, Scalar
+* Strengths: high performance, multi-backend support, integrated pipeline
+* Gaps: limited to structural detection, no state-aware SIMD yet
+
+=== Ruby
+* Status: ❌ No SIMD implementation
+* Impact: slower parsing, no backend selection, missed optimization opportunities (strings, heredocs, comments, percent literals)
+
+=== Crystal
+* Status: ❌ No SIMD implementation
+* Impact: slower parsing, missed optimization opportunities (macros, annotations, interpolation)
+
+== Architecture Gaps
+
+- Missing unified SIMD backend interface for language-agnostic scanning
+- Ruby/Crystal lexers are scalar-only; need to consume SIMD structural indices
+- SIMD is not state-aware; can't optimize string/regex/heredoc bounded scans
+- Documentation and dump tooling (`warp dump simd`) need to support Ruby/Crystal
+
+== Short Roadmap (Phases)
+
+=== Phase 1 — Foundations (0–2 weeks)
+* Create a common SIMD scanner interface (`src/warp/lang/common/simd_scanner.cr`).
+* Scaffold Ruby and Crystal SIMD scanner implementations (language-specific masks).
+* Add `dump simd` CLI for Ruby/Crystal and basic integration tests.
+* Add unit tests for Ruby/Crystal SIMD scanners (empty input, UTF-8 handling, basic structural detection).
+
+=== Phase 2 — Integration (2–6 weeks)
+* Integrate SIMD indices into Ruby/Crystal lexers and token scanners.
+* Add end-to-end integration tests (dump simd → tokens → tape → cst) for sample corpus files.
+* Add benchmarks to measure SIMD speedups vs scalar on representative files.
+* Add backend selection support and ensure ARMv6/NEON and x86 backends are selectable.
+
+=== Phase 3 — Optimizations & State (6–12 weeks)
+* Introduce state-aware SIMD helpers for string, heredoc, regex, macro scans.
+* Optimize masks and backend implementations for key hotspots.
+* Add performance regression tests and CI benchmarking harness.
+
+=== Phase 4 — Long-term (12+ weeks)
+* Refactor lexers to a stateful architecture (enable incremental parsing later).
+* Explore cross-language SIMD utilities (dedupe mask code).
+* Consider parser combinators / grammar-driven parsing where appropriate.
+
+== Quick Wins
+
+- Add `warp dump simd --lang ruby|--lang crystal` to expose SIMD indices early.
+- Add small unit tests and docs to set expectations.
+- Keep ARMv6 backend maintenance (compatibility note) while focusing on NEON/AVX performance.
+
+== Next Actions
+
+1. Add this document to the repository (`papers/analysis/2026-02-03_simd_state_analysis.adoc`).
+2. Create an actionable backlog (issues/roadmap) targeting Phase 1 tasks.
+3. Implement `dump simd` CLI wiring and unit tests for Ruby/Crystal as an initial deliverable.
+
+== Contacts & Owners
+
+* Proposed owner: @werner (engineering lead)
+* Contributors: SIMD, Lexer, Parser teams
+
+== References
+
+* papers/implementation/2026-02-06-01_simd_ruby_crystal_implementation.adoc
+* papers/implementation/2026-02-03-01_enhanced_simd_scan.adoc
+* README.md (SIMD / Stage1a notes)
+
+
+// End of document
