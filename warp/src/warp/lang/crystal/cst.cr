@@ -469,9 +469,14 @@ module Warp::Lang::Crystal
         advance
         if current.kind == TokenKind::String || current.kind == TokenKind::Number || current.kind == TokenKind::Identifier
           val_tok = current
-          end_pos = val_tok.start + val_tok.length
-          text = String.new(@bytes[start, end_pos - start])
           advance
+          # Include newline in the assignment text if present
+          end_pos = if current.kind == TokenKind::Newline
+                      current.start + current.length
+                    else
+                      val_tok.start + val_tok.length
+                    end
+          text = String.new(@bytes[start, end_pos - start])
           advance if current.kind == TokenKind::Newline
           GreenNode.new(NodeKind::Assignment, [] of GreenNode, text)
         else
