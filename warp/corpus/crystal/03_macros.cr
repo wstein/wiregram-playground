@@ -12,11 +12,11 @@ macro create_methods
   def foo_uppercase
     "foo".upcase
   end
-  
+
   def bar_uppercase
     "bar".upcase
   end
-  
+
   def baz_uppercase
     "baz".upcase
   end
