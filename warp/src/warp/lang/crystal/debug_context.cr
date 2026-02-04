@@ -8,7 +8,7 @@ module Warp
         property allow_cst_fallback : Bool
         property verbose_tokens : Bool
         property show_cst_tree : Bool
-        property report_diagnostics : Bool  # Whether to print diagnostics to stdout
+        property report_diagnostics : Bool # Whether to print diagnostics to stdout
 
         # Collected diagnostics during parsing
         property diagnostics : Array(String)

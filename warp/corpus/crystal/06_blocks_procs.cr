@@ -10,9 +10,9 @@ end
 
 # Yield in methods
 def with_timer(&)
-  start = Time.now
+  start = Time.local
   yield
-  elapsed = Time.now - start
+  elapsed = Time.local - start
   puts "Took #{elapsed.total_seconds}s"
 end
 

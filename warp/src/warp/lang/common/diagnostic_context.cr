@@ -24,7 +24,7 @@ module Warp
 
         def initialize(
           @verbose : Bool = false,
-          @report_to_stdout : Bool = false
+          @report_to_stdout : Bool = false,
         )
           @diagnostics = [] of String
         end

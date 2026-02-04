@@ -14,10 +14,12 @@ end
 class ExternalClass
 end
 
-@[Windows]
-fun windows_only
-  puts "Windows only"
-end
+# Platform-specific code would need ifdef
+# ifdef windows
+#   fun windows_only
+#     puts "Windows only"
+#   end
+# end
 
 @[Raises(ArgumentError)]
 def may_raise
@@ -29,13 +31,9 @@ def inline_method
   42
 end
 
-# Custom annotations
-@[MyCustom(value: 123, name: "test")]
+# Documented class with annotations
 class AnnotatedClass
-end
-
-annotation MyCustom
   def to_s
-    "Custom annotation"
+    "Annotated class"
   end
 end

@@ -3,7 +3,7 @@
 
 # Basic string literals
 str1 = "Double quoted"
-str2 = 'Single quoted'
+str2 = "Single quoted"
 
 # String interpolation
 name = "Alice"
